@@ -1,5 +1,8 @@
 # MatuxMod
 
+MatuxMod is a mod to collect data for the website [Good Loss](https://goodloss.fr) inside the popular game Among Us.
+It's mainly provided through [Mod Manager](https://goodloss.fr/github)
+
 ## How to customize MatuxMod for your mod ?
 
 Work In Progress
