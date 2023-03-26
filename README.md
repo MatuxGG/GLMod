@@ -3,7 +3,7 @@
 GLMod is a mod to collect data for the website [Good Loss](https://goodloss.fr) inside the popular game Among Us.
 It's mainly provided through [Mod Manager](https://goodloss.fr/github)
 
-## How to customize MatuxMod for your mod ?
+## How to customize GLMod for your mod ?
 
 Work In Progress
 
@@ -14,7 +14,7 @@ MatuxMod does collect the following data:
 ### Room data
 
 - State : Started / Finished
-- Code
+- Code (disabled)
 - Map
 - Start date
 - Duration
@@ -27,17 +27,14 @@ MatuxMod does collect the following data:
 - Goodloss account (if connected)
 - Role
 - Team : Crewmate / Impostor / Neutral / Others
-- Tasks completed
+- Tasks completed alive
+- Tasks completed dead
 - Total tasks to complete
-- Exiled : Yes / No
-- Exiled : Yes / No
-- Killed : Yes / No
-- Killed first : Yes / No
-- Kills
-- Bodies Reported
-- Emergencies called
-- Special actions : Target & Value
 
-### In game events
+### Actions data
 
-- Kills : Author, Target & Turn
+- Source
+- Target
+- Action
+
+Default available actions : kills, exiles, reports, emergencies, votes
