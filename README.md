@@ -23,8 +23,15 @@ It's mainly provided through [Mod Manager](https://goodloss.fr/github)
 
 Download GLMod.dll for your game version and add GLMod.dll to BepInEx/plugins.
 In files where you use GLMod, use:
+
 ```
 using GLMod;
+```
+
+You also need to define the name of your mod in your Load() function:
+
+```
+GLMod.setModName("YOUR_MOD_NAME");
 ```
 
 ### Disable services
@@ -132,6 +139,15 @@ GLMod.EndGame();
 ```
 
 Note that default teams are "Crewmate" and "Impostor". Also, prefer starting teams and roles with a capital letter.
+
+### Check if it works
+
+To verify that your implementation of GLMod is correct, you can complete a game with GLMod enabled.
+Take a look at the file BepInEx/config/glmod.cfg.
+
+After completing a game, all config entries in "Validation" section (aka "stepConf" and "stepRpc") should be equal to "YES".
+If it does, all good :)
+If not, please open an issue for this repository and explain how you configuration looks like !
 
 ## What does MatuxMod collect
 
