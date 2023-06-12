@@ -34,7 +34,7 @@ You also need to define the name of your mod in your Load() function:
 GLMod.setModName("YOUR_MOD_NAME");
 ```
 
-### Disable services
+### <ins>Disable services</ins>
 
 GLMod comes with a lot of default services enabled. You have to disable each one that you want to overwrite by add this call in your Load() function :
 
@@ -58,7 +58,7 @@ For information, these services also exist and can be disabled. However, it's re
 - Turns: Manage turns collect (meeting & turns).
 - Votes: Manage votes collect. The vote count is not stored, so mayor roles should already work without any action.
 
-### Overwrite StartGame
+### <ins>Overwrite StartGame</ins>
 
 In your mod, you should start with the declaration of a new game on each client:
 
@@ -99,7 +99,7 @@ GLMod.AddMyPlayer();
 
 Then, the start game is correctly overwritten ;)
 
-### Add actions
+### <ins>Add actions</ins>
 
 Basically, in the game, there are a few actions recorded (kills, exiles, emergencies, ...).
 But you can define custom ones for your roles with this function:
@@ -125,7 +125,7 @@ GLMod.currentGame.addAction("Matux", "", "killed itself");
 
 And in history: "Matux killed itself".
 
-### Overwrite EndGame
+### <ins>Overwrite EndGame</ins>
 
 In your mod, you should end a game by declaring an end game on each client.
 
@@ -166,7 +166,7 @@ GLMod.EndGame();
 
 Note that default teams are "Crewmate" and "Impostor". Also, prefer starting teams and roles with a capital letter.
 
-### Check if it works
+### <ins>Check if it works</ins>
 
 To verify that your implementation of GLMod is correct, you can complete a game with GLMod enabled.
 Take a look at the file BepInEx/config/glmod.cfg.
@@ -179,7 +179,7 @@ If not, please open an issue for this repository and explain how you configurati
 
 MatuxMod does collect the following data:
 
-### Room data
+### <ins>Room data</ins>
 
 - State : Started / Finished
 - Code (disabled)
@@ -189,7 +189,7 @@ MatuxMod does collect the following data:
 - Mod used
 - Amount of players
 
-### Player data
+### <ins>Player data</ins>
 
 - Name
 - Goodloss account (if connected)
@@ -199,7 +199,7 @@ MatuxMod does collect the following data:
 - Tasks completed dead
 - Total tasks to complete
 
-### Actions data
+### <ins>Actions data</ins>
 
 - Source
 - Target
