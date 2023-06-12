@@ -17,9 +17,8 @@ It's mainly provided through [Mod Manager](https://goodloss.fr/github)
 | 2022.02.24s| [Download]
 | 2021.6.30s| [Download]
 
-## How to customize GLMod for your mod ?
 
-### <ins>Install GLMod</ins>
+## Install GLMod
 
 Download GLMod.dll for your game version and add GLMod.dll to BepInEx/plugins.
 In files where you use GLMod, use:
@@ -33,6 +32,10 @@ You also need to define the name of your mod in your Load() function:
 ```
 GLMod.setModName("YOUR_MOD_NAME");
 ```
+
+Everything is set up and everything will be recorded. The game will be available on players' match history on Good Loss.
+
+## Customize GLMod
 
 ### <ins>Disable services</ins>
 
