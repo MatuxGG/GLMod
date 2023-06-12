@@ -99,6 +99,32 @@ GLMod.AddMyPlayer();
 
 Then, the start game is correctly overwritten ;)
 
+### Add actions
+
+Basically, in the game, there are a few actions recorded (kills, exiles, emergencies, ...).
+But you can define custom ones for your roles with this function:
+```
+GLMod.currentGame.addAction(SOURCE_PLAYER_NAME, TARGET_PLAYER_NAME, CUSTOM_ACTION);
+```
+
+For example, if Sean (Sheriff) kills Paul (Impostor), you can add:
+
+```
+GLMod.currentGame.addAction("Sean", "Paul", "killed as Sheriff");
+```
+
+In this example, the next sentence will be shown in Good Loss history : "Send killed as Sheriff Paul".
+
+You can also let the source or the target player empty.
+
+For example, if a role can kill itself, you can have:
+
+```
+GLMod.currentGame.addAction("Matux", "", "killed itself");
+```
+
+And in history: "Matux killed itself".
+
 ### Overwrite EndGame
 
 In your mod, you should end a game by declaring an end game on each client.
