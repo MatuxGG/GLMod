@@ -19,7 +19,7 @@ It's mainly provided through [Mod Manager](https://goodloss.fr/github)
 
 ## How to customize GLMod for your mod ?
 
-### __Install GLMod__
+### <ins>Install GLMod</ins>
 
 Download GLMod.dll for your game version and add GLMod.dll to BepInEx/plugins.
 In files where you use GLMod, use:
