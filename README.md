@@ -86,9 +86,42 @@ Then, the start game is correctly overwritten ;)
 
 In your mod, you should end a game by declaring an end game on each client.
 
-```
-GLMod.AddWinnerPlayer();
+You need to declare each team that won. Each player with this team will be added to winners.
 
+```
+List<string> WinList = new List<string>();
+WinList.Add(TEAM_1);
+WinList.Add(TEAM_2);
+...
+GLMod.SetWinnerTeams(WinList);
+```
+
+If a team is called diffently that the team role given to its members, you need to also add each players that won like this:
+
+```
+GLMod.AddWinnerPlayer(PLAYER_NAME);
+```
+
+After all of these, you need to validate the end game with this function:
+
+```
+GLMod.EndGame();
+```
+
+Here is an example of a complete endgame:
+
+```
+List<string> WinList = new List<string>();
+WinList.Add("Crewmate");
+WinList.Add("Love");
+GLMod.SetWinnerTeams(WinList);
+// Love players have the role "Lover"
+GLMod.AddWinnerPlayer("Sean"); // Lover 1
+GLMod.AddWinnerPlayer("Paul"); // Lover 2
+GLMod.EndGame();
+```
+
+Note that default teams are "Crewmate" and "Impostor". Also, prefer starting teams and roles with a capital letter.
 
 ## What does MatuxMod collect
 
