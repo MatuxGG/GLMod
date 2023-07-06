@@ -13,10 +13,6 @@ It's mainly provided through [Mod Manager](https://goodloss.fr/github)
 | 2023.02.28s| [Download](https://github.com/MatuxGG/GLMod/releases/download/3.1.2023228/GLMod.dll)
 | 2022.12.14s| [Download](https://github.com/MatuxGG/GLMod/releases/download/3.1.2023328/GLMod.dll)
 | 2022.10.25s| [Download](https://github.com/MatuxGG/GLMod/releases/download/3.0.3/GLMod.dll)
-| 2022.08.24s| [Download]
-| 2022.07.12s| [Download]
-| 2022.02.24s| [Download]
-| 2021.6.30s| [Download]
 
 
 ## Install GLMod
