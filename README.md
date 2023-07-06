@@ -8,6 +8,7 @@ It's mainly provided through [Mod Manager](https://goodloss.fr/github)
 
 | Among Us - Version | Link |
 |----------|-----------------|
+| 2023.6.13| [Download]
 | 2023.03.28s| [Download](https://github.com/MatuxGG/GLMod/releases/download/3.1.2023328/GLMod.dll)
 | 2023.02.28s| [Download](https://github.com/MatuxGG/GLMod/releases/download/3.1.2023228/GLMod.dll)
 | 2022.12.14s| [Download](https://github.com/MatuxGG/GLMod/releases/download/3.1.2023328/GLMod.dll)
@@ -31,6 +32,9 @@ You also need to define the name of your mod in your Load() function:
 
 ```
 GLMod.setModName("YOUR_MOD_NAME");
+
+Example :
+GLMod.setModName("AllOfUs");
 ```
 
 Everything is set up and everything will be recorded. The game will be available on players' match history on Good Loss.
@@ -75,6 +79,8 @@ For example:
 
 ```
 GLMod.StartGame("ABCDEF", "Polus", false);
+or
+GLMod.StartGame("ABCDTE", "Submerged", false);
 ```
 
 Then, for each role you give to players, you have to use this function on each client:
@@ -91,6 +97,7 @@ For example:
 GLMod.AddPlayer("Matux1", "Sheriff", "Crewmate");
 GLMod.AddPlayer("Sean", "Guesser", "Impostor");
 GLMod.AddPlayer("Paul", "Jester", "Jester");
+GLMod.AddPlayer("AmongUsDev", "TheGlitch", "Neutral");
 ```
 
 For each client, when all roles are set on itself, you should validate the start game process by calling these functions:
