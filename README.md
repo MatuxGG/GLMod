@@ -35,6 +35,8 @@ GLMod.setModName("YOUR_MOD_NAME");
 
 Everything is set up and everything will be recorded. The game will be available on players' match history on Good Loss.
 
+Note that GLMod uses RPC 240.
+
 ## Customize GLMod
 
 ### <ins>Disable services</ins>
