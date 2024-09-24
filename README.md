@@ -248,3 +248,7 @@ MatuxMod does collect the following data:
 - Action
 
 Default available actions : kills, exiles, reports, emergencies, votes
+
+# License
+
+This software is distributed under the GNU GPLv3 License.
