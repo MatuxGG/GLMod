@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <Version>4.0.0</Version>
+        <GameVersion>v2024.6.18s</GameVersion>
+
+        <Description>GLMod</Description>
+        <Authors>Matux</Authors>
+        <Configurations>Debug</Configurations>
+    </PropertyGroup>
+
+    <ItemGroup>
+         <Reference Include="..\Among Us\BepInEx\core\*.dll" />
+         <Reference Include="..\Among Us\BepInEx\interop\*.dll" />
+    </ItemGroup>
+    
+    <PropertyGroup>
+        <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+        <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>   
+    </PropertyGroup>
+
+    <ItemGroup>
+      <Compile Remove="Items\**" />
+      <EmbeddedResource Remove="Items\**" />
+      <None Remove="Items\**" />
+    </ItemGroup>
+	
+    <Target Name="Copy" AfterTargets="Build">
+        <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="../Among Us/BepInEx/plugins/" Condition="'$(Configuration)' == 'Debug'" />
+		<Exec Command="&quot;../Among Us/Among Us.exe&quot;" Condition="'$(Configuration)' == 'Debug'" />	
+	</Target>
+</Project>
