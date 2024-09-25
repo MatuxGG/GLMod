@@ -2,7 +2,7 @@
     <PropertyGroup>
         <TargetFramework>net6.0</TargetFramework>
         <Version>4.0.0</Version>
-        <GameVersion>v2024.6.18s</GameVersion>
+        <GameVersion>v2024.9.4s</GameVersion>
 
         <Description>GLMod</Description>
         <Authors>Matux</Authors>

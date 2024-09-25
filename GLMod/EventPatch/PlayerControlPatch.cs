@@ -141,38 +141,36 @@ namespace GLMod
 
             try
             {
-                if (AmongUsClient.Instance.GameState == InnerNetClient.GameStates.Started)
-                {
-                    if (gameStarted) return;
-
-
-
-                    int nbImp = GameOptionsManager.Instance.CurrentGameOptions.NumImpostors;
-                    int realImp = 0;
-                    foreach (PlayerControl p in PlayerControl.AllPlayerControls)
-                    {
-                        if (p.Data.Role.IsImpostor)
-                        {
-                            realImp++;
-                        }
-                    }
-
-                    if (nbImp != realImp) return;
-
-                    // Start game
-                    GLMod.gameMap = GLMod.getMapName();
-
-                    VanillaEvents.startGameVanilla();
-                    gameStarted = true;
-                }
-                else
+                if (AmongUsClient.Instance.GameState != InnerNet.InnerNetClient.GameStates.Started)
                 {
                     gameStarted = false;
+                    return;
                 }
+
+                if (gameStarted) return;
+
+                int nbImp = GameOptionsManager.Instance.CurrentGameOptions.NumImpostors;
+                int realImp = 0;
+                foreach (PlayerControl p in PlayerControl.AllPlayerControls)
+                {
+                    if (p?.Data?.Role?.IsImpostor == true)
+                    {
+                        realImp++;
+                    }
+                }
+
+
+                if (nbImp != realImp) return;
+
+                // Start game
+                GLMod.gameMap = GLMod.getMapName();
+
+                VanillaEvents.startGameVanilla();
+                gameStarted = true;
             }
             catch (Exception e)
             {
-                GLMod.logError("[VanillaFixedUpdate] Catch exception " + e.Message);
+                GLMod.logError("[VanillaFixedUpdate] Catch exception " + e.Message + " / stack = " + e.StackTrace);
             }
 
 

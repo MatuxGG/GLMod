@@ -758,23 +758,23 @@ namespace GLMod
         {
             try
             {
-                //if (PlayerControl.GameOptions.MapId == 0)
-                //    return "The Skeld";
+                if (GameOptionsManager.Instance.currentGameOptions.MapId == (byte)MapNames.Skeld)
+                    return "The Skeld";
 
-                //if (PlayerControl.GameOptions.MapId == 1)
-                //    return "MiraHQ";
+                if (GameOptionsManager.Instance.currentGameOptions.MapId == (byte)MapNames.Mira)
+                    return "MiraHQ";
 
-                //if (PlayerControl.GameOptions.MapId == 2)
-                //    return "Polus";
+                if (GameOptionsManager.Instance.currentGameOptions.MapId == (byte)MapNames.Polus)
+                    return "Polus";
 
-                //if (PlayerControl.GameOptions.MapId == 3)
-                //    return "dlekSehT";
+                if (GameOptionsManager.Instance.currentGameOptions.MapId == (byte)MapNames.Dleks)
+                    return "dlekSehT";
 
-                //if (PlayerControl.GameOptions.MapId == 4)
-                //    return "Airship";
+                if (GameOptionsManager.Instance.currentGameOptions.MapId == (byte)MapNames.Airship)
+                    return "Airship";
 
-                //if (PlayerControl.GameOptions.MapId == 5)
-                //    return "Submerged";
+                if (GameOptionsManager.Instance.currentGameOptions.MapId == (byte)MapNames.Fungle)
+                    return "The Fungle";
 
                 return "Unknown";
             } catch (Exception e)
