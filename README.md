@@ -6,7 +6,8 @@ GLMod is a mod to collect data for the website [Good Loss](https://goodloss.fr) 
 
 | Among Us - Version | Link |
 |--------------------|-----------------|
-| 2024.06.18s        | [Release](https://github.com/MatuxGG/GLMod/releases/4.0.0)
+| 2024.09.04s        | [Release](https://github.com/MatuxGG/GLMod/releases/4.0.1)
+| 2024.06.18s        | [Release](https://github.com/MatuxGG/GLMod/releases/4.0.1)
 
 # Installation
 
