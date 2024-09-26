@@ -1,28 +1,28 @@
-name: CI
+name: .NET Build
 
-on: [ "push", "pull_request" ]
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
-        with:
-          submodules: true
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v1
+        uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: 5.x
+          dotnet-version: '6.x'
 
-      - name: Run the Cake script
-        uses: cake-build/cake-action@v1
-        with:
-          verbosity: Diagnostic
+      - name: Restore dependencies
+        run: dotnet restore
 
-# Change MatuxMod to the name of your project if you want CI artifacts
-#      - uses: actions/upload-artifact@v2
-#        with:
-#          name: MatuxMod.dll
-#          path: MatuxMod/bin/Release/netstandard2.1/MatuxMod.dll
+      - name: Build in Debug mode
+        run: dotnet build --configuration Debug --no-restore

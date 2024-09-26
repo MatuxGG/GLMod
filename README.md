@@ -5,8 +5,8 @@
   <a href="https://goodloss.fr/discord">
     <img src="https://img.shields.io/badge/Good%20Loss%20Discord%20Server-Join-7289DA?logo=discord&logoColor=white" alt="Good Loss Discord Server">
   </a>
-  <a href="https://dotnet.microsoft.com/download/dotnet/8.0">
-    <img src="https://img.shields.io/badge/.NET-8.0-blueviolet" alt=".NET Version">
+  <a href="https://dotnet.microsoft.com/download/dotnet/6.0">
+    <img src="https://img.shields.io/badge/.NET-6.0-blueviolet" alt=".NET Version">
   </a>
   <a href="https://github.com/MatuxGG/MedBot/blob/master/LICENSE">
     <img src="https://img.shields.io/github/license/MatuxGG/GLMod" alt="GLMod License">
