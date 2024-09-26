@@ -85,9 +85,6 @@ namespace GLMod
                         }
                     }
                 }
-            
-
-            
         }
     }
 
@@ -116,7 +113,7 @@ namespace GLMod
                 {
                     if (GLMod.existService("Roles") || GLMod.debug)
                     {
-                        GLMod.currentGame.addAction(__instance.Data.PlayerName, targetPlayer.Data.PlayerName != null ? targetPlayer.Data.PlayerName : "", "shapeshed into");
+                        GLMod.currentGame.addAction(__instance.Data.PlayerName, targetPlayer.Data.PlayerName != null ? targetPlayer.Data.PlayerName : "", "shapeshifted into");
                     }
                 }
                 catch (Exception e)
