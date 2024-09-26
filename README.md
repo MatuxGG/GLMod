@@ -11,18 +11,6 @@ GLMod is a mod to collect data for the website [Good Loss](https://goodloss.fr) 
 
 # Installation
 
-## Combining GLMod with another mod
-GLMod is a mod that can be combined with any other mod. It is designed to be as simple as possible to use and to be as flexible as possible. It is also designed to be as lightweight as possible to avoid any performance issues.
-If you want to combine GLMod with another mod, you can do it by following the instructions below.
-
-1. Download and install the mod you want following its instructions.
-2. Download the dll file from the releases for your game version (see above).
-3. In the folder of the mod, go to BepInEx/plugins and add the GLMod.dll file.
-4. In the folder of the mod again, go to BepInEx/config and add a file called MODNAME.mm where MODNAME is the name of the other mod used.
-
-Note that only vanilla actions and roles will be recorded. If you want to record custom actions and roles, you will have to modify the other mod to use GLMod functions.
-If you're a mod developper, see the "Integration with other mods" section below.
-
 ## Installation for Vanilla on Windows & Steam
 1. Download the zip file from the releases for your game version (see above).
 2. Find the folder of your game. In Steam, you can right click on the game in your library, a menu will appear. Then, click on Properties > local data > browse.
@@ -46,6 +34,18 @@ Not working? You might want to install the dependency [vc_redist](https://aka.ms
 3. Extract the zip file into "~/.steam/steam/steamapps/common/Among Us".
 3. Enable winhttp.dll via the proton winecfg (https://docs.bepinex.dev/articles/advanced/proton_wine.html)
 4. Launch the game via Steam
+
+## Combining GLMod with another mod
+GLMod is a mod that can be combined with any other mod. It is designed to be as simple as possible to use and to be as flexible as possible. It is also designed to be as lightweight as possible to avoid any performance issues.
+If you want to combine GLMod with another mod, you can do it by following the instructions below.
+
+1. Download and install the mod you want following its instructions.
+2. Download the dll file from the releases for your game version (see above).
+3. In the folder of the mod, go to BepInEx/plugins and add the GLMod.dll file.
+4. In the folder of the mod again, go to BepInEx/config and add a file called MODNAME.mm where MODNAME is the name of the other mod used.
+
+Note that only vanilla actions and roles will be recorded. If you want to record custom actions and roles, you will have to modify the other mod to use GLMod functions.
+If you're a mod developper, see the "Integration with other mods" section below.
 
 # Contributing
 
