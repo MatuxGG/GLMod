@@ -1,3 +1,18 @@
+<p align="center">
+  <a href="https://github.com/MatuxGG/GLMod">
+    <img src="https://img.shields.io/badge/GLMod-v4.0.1-blueviolet" alt="GLMod Version">
+  </a>
+  <a href="https://goodloss.fr/discord">
+    <img src="https://img.shields.io/badge/Good%20Loss%20Discord%20Server-Join-7289DA?logo=discord&logoColor=white" alt="Good Loss Discord Server">
+  </a>
+  <a href="https://dotnet.microsoft.com/download/dotnet/8.0">
+    <img src="https://img.shields.io/badge/.NET-8.0-blueviolet" alt=".NET Version">
+  </a>
+  <a href="https://github.com/MatuxGG/MedBot/blob/master/LICENSE">
+    <img src="https://img.shields.io/github/license/MatuxGG/GLMod" alt="GLMod License">
+  </a>
+</p>
+
 # GLMod
 
 Among us GLMod is an open source mod that collects data inside the game to provide a complete match history and various stats on [Good Loss](https://goodloss.fr).
