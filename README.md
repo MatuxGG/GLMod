@@ -1,6 +1,6 @@
 # GLMod
 
-GLMod is a mod to collect data for the website [Good Loss](https://goodloss.fr) inside the popular game Among Us.
+Among us GLMod is an open source mod that collects data inside the game to provide a complete match history and various stats on [Good Loss](https://goodloss.fr).
 
 # Downloads
 
