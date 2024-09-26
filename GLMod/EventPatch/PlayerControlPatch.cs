@@ -43,8 +43,6 @@ namespace GLMod
             {
                 GLMod.logError("[VanillaMurder] Catch exception " + e.Message);
             }
-
-            
         }
     }
 
@@ -54,8 +52,6 @@ namespace GLMod
     {
         public static void Postfix(PlayerControl __instance)
         {
-
-           
                 if (GLMod.existService("Tasks") || GLMod.debug)
                 {
                     if (__instance.Data.IsDead)
@@ -92,6 +88,103 @@ namespace GLMod
             
 
             
+        }
+    }
+
+    // Shapeshift
+    [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.Shapeshift))]
+    public class ShapeshiftPatch
+    {
+        public static void Postfix(PlayerControl __instance, PlayerControl targetPlayer)
+        {
+            if (__instance.Data.PlayerName == targetPlayer.Data.PlayerName)
+            {
+                try
+                {
+                    if (GLMod.existService("Roles") || GLMod.debug)
+                    {
+                        GLMod.currentGame.addAction(__instance.Data.PlayerName, "", "unshifted");
+                    }
+                }
+                catch (Exception e)
+                {
+                    GLMod.logError("[VanillaUnShapeshift] Catch exception " + e.Message);
+                }
+            } else
+            {
+                try
+                {
+                    if (GLMod.existService("Roles") || GLMod.debug)
+                    {
+                        GLMod.currentGame.addAction(__instance.Data.PlayerName, targetPlayer.Data.PlayerName != null ? targetPlayer.Data.PlayerName : "", "shapeshed into");
+                    }
+                }
+                catch (Exception e)
+                {
+                    GLMod.logError("[VanillaShapeshift] Catch exception " + e.Message);
+                }
+            }
+            
+        }
+    }
+
+    // Guardian angel protect
+    [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.ProtectPlayer))]
+    public class ProtectPatch
+    {
+        public static void Postfix(PlayerControl __instance, PlayerControl target)
+        {
+            try
+            {
+                if (GLMod.existService("Roles") || GLMod.debug)
+                {
+                    GLMod.currentGame.addAction(__instance.Data.PlayerName, target.Data.PlayerName != null ? target.Data.PlayerName : "", "protected");
+                }
+            }
+            catch (Exception e)
+            {
+                GLMod.logError("[VanillaProtect] Catch exception " + e.Message);
+            }
+        }
+    }
+
+    // Tracker track
+    [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.StartPlayerTracking))]
+    public class TrackPatch
+    {
+        public static void Postfix(PlayerControl __instance, PlayerControl playerToTrack)
+        {
+            try
+            {
+                if (GLMod.existService("Roles") || GLMod.debug)
+                {
+                    GLMod.currentGame.addAction(__instance.Data.PlayerName, playerToTrack.Data.PlayerName, "started tracking");
+                }
+            }
+            catch (Exception e)
+            {
+                GLMod.logError("[VanillaTrack] Catch exception " + e.Message);
+            }
+        }
+    }
+
+    // Tracker untrack
+    [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.CancelPlayerTracking))]
+    public class UntrackPatch
+    {
+        public static void Postfix(PlayerControl __instance)
+        {
+            try
+            {
+                if (GLMod.existService("Roles") || GLMod.debug)
+                {
+                    GLMod.currentGame.addAction(__instance.Data.PlayerName, "", "stopped tracking");
+                }
+            }
+            catch (Exception e)
+            {
+                GLMod.logError("[VanillaUnTrack Catch exception " + e.Message);
+            }
         }
     }
 

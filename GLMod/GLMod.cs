@@ -80,6 +80,7 @@ namespace GLMod
             GLMod.enableService("Emergencies");
             GLMod.enableService("Turns");
             GLMod.enableService("Votes");
+            GLMod.enableService("Roles");
 
             stepConf.Value = "YES";
             stepRpc.Value = "YES";

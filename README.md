@@ -115,6 +115,7 @@ For information, these services also exist and can be disabled. However, it's re
 - Emergencies: Manage emergencies collect.
 - Turns: Manage turns collect (meeting & turns).
 - Votes: Manage votes collect. The vote count is not stored, so mayor roles should already work without any action.
+- Roles: Manage vanilla roles actions collect. See actions to see which roles.
 
 ### <ins>Overwrite StartGame</ins>
 
@@ -233,9 +234,9 @@ After completing a game, all config entries in "Validation" section (aka "stepCo
 If it does, all good :)
 If not, please open an issue for this repository and explain how you configuration looks like !
 
-## What does MatuxMod collect
+## What does GLMod collect
 
-MatuxMod does collect the following data:
+GLMod does collect the following data:
 
 ### <ins>Room data</ins>
 
@@ -246,6 +247,7 @@ MatuxMod does collect the following data:
 - Duration
 - Mod used
 - Amount of players
+- Mod (if any)
 
 ### <ins>Player data</ins>
 
@@ -263,7 +265,7 @@ MatuxMod does collect the following data:
 - Target
 - Action
 
-Default available actions : kills, exiles, reports, emergencies, votes
+Default available actions : kills, exiles, reports, emergencies, votes, shapeshifts, unshapeshifts, tracks, untracks, shields.
 
 # License
 
