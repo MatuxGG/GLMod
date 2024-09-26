@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://github.com/MatuxGG/GLMod">
-    <img src="https://img.shields.io/badge/GLMod-v4.0.1-blueviolet" alt="GLMod Version">
+    <img src="https://img.shields.io/badge/GLMod-v4.0.1-blue" alt="GLMod Version">
   </a>
   <a href="https://goodloss.fr/discord">
     <img src="https://img.shields.io/badge/Good%20Loss%20Discord%20Server-Join-7289DA?logo=discord&logoColor=white" alt="Good Loss Discord Server">
