@@ -15,8 +15,9 @@ namespace GLMod
                     GLMod.StartGame("******", GLMod.gameMap, false);
                     foreach (PlayerControl p in PlayerControl.AllPlayerControls)
                     {
-                        string role = p?.Data?.Role?.TeamType == RoleTeamTypes.Crewmate ? "Crewmate" : "Impostor";
-                        GLMod.AddPlayer(p?.Data?.PlayerName, "Vanilla" + p?.Data?.Role?.Role.ToString(), role);
+                        string team = p?.Data?.Role?.TeamType == RoleTeamTypes.Crewmate ? "Crewmate" : "Impostor";
+                        string role = "Vanilla" + (p?.Data?.Role?.Role.ToString() ?? string.Empty);
+                        GLMod.AddPlayer(p?.Data?.PlayerName, role, team);
                     }
                     GLMod.SendGame();
                     GLMod.AddMyPlayer();
