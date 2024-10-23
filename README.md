@@ -61,7 +61,7 @@ If you're a mod developper, see the "Integration with other mods" section below.
 
 # Integrate GLMod to you own mod
 
-See [dev](docs/dev.md).
+See [dev](docs/dev.MD).
 
 # Contributing
 
