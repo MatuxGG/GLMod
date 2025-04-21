@@ -20,7 +20,7 @@ namespace GLMod
                     }
                 } catch (Exception e)
                 {
-                    GLMod.logError("[VanillaAddTurn] Catch exception " + e.Message);
+                    GLMod.log("[VanillaAddTurn] Catch exception " + e.Message);
                 }
                 
             }

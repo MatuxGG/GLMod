@@ -48,7 +48,7 @@ namespace GLMod
                     
                 } catch (Exception e)
                 {
-                    GLMod.logError("[VanillaVotes] Catch exception " + e.Message);
+                    GLMod.log("[VanillaVotes] Catch exception " + e.Message);
                 }
                 
             }

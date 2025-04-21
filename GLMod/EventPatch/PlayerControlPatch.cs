@@ -20,7 +20,7 @@ namespace GLMod
                 }
             } catch (Exception e)
             {
-                GLMod.logError("[VanillaExile] Catch exception " + e.Message);
+                GLMod.log("[VanillaExile] Catch exception " + e.Message);
             }
             
         }
@@ -41,7 +41,7 @@ namespace GLMod
             }
             catch (Exception e)
             {
-                GLMod.logError("[VanillaMurder] Catch exception " + e.Message);
+                GLMod.log("[VanillaMurder] Catch exception " + e.Message);
             }
         }
     }
@@ -66,7 +66,7 @@ namespace GLMod
                         }
                         catch (Exception e)
                         {
-                            GLMod.logError("[VanillaTaskDead] Catch exception " + e.Message);
+                            GLMod.log("[VanillaTaskDead] Catch exception " + e.Message);
                         }
                     }
                     else
@@ -81,7 +81,7 @@ namespace GLMod
                         }
                         catch (Exception e)
                         {
-                            GLMod.logError("[VanillaTaskAlive] Catch exception2 " + e.Message);
+                            GLMod.log("[VanillaTaskAlive] Catch exception2 " + e.Message);
                         }
                     }
                 }
@@ -105,7 +105,7 @@ namespace GLMod
                 }
                 catch (Exception e)
                 {
-                    GLMod.logError("[VanillaUnShapeshift] Catch exception " + e.Message);
+                    GLMod.log("[VanillaUnShapeshift] Catch exception " + e.Message);
                 }
             } else
             {
@@ -118,7 +118,7 @@ namespace GLMod
                 }
                 catch (Exception e)
                 {
-                    GLMod.logError("[VanillaShapeshift] Catch exception " + e.Message);
+                    GLMod.log("[VanillaShapeshift] Catch exception " + e.Message);
                 }
             }
             
@@ -140,7 +140,7 @@ namespace GLMod
             }
             catch (Exception e)
             {
-                GLMod.logError("[VanillaProtect] Catch exception " + e.Message);
+                GLMod.log("[VanillaProtect] Catch exception " + e.Message);
             }
         }
     }
@@ -160,7 +160,7 @@ namespace GLMod
             }
             catch (Exception e)
             {
-                GLMod.logError("[VanillaTrack] Catch exception " + e.Message);
+                GLMod.log("[VanillaTrack] Catch exception " + e.Message);
             }
         }
     }
@@ -180,7 +180,7 @@ namespace GLMod
             }
             catch (Exception e)
             {
-                GLMod.logError("[VanillaUnTrack Catch exception " + e.Message);
+                GLMod.log("[VanillaUnTrack Catch exception " + e.Message);
             }
         }
     }
@@ -214,7 +214,7 @@ namespace GLMod
             }
             catch (Exception e)
             {
-                GLMod.logError("[VanillaStartMeeting] Catch exception " + e.Message);
+                GLMod.log("[VanillaStartMeeting] Catch exception " + e.Message);
             }
         }
     }
@@ -240,6 +240,7 @@ namespace GLMod
                 if (gameStarted) return;
 
                 int nbImp = GameOptionsManager.Instance.CurrentGameOptions.NumImpostors;
+                if (PlayerControl.AllPlayerControls.Count < 6) nbImp = 1;
                 int realImp = 0;
                 foreach (PlayerControl p in PlayerControl.AllPlayerControls)
                 {
@@ -249,18 +250,19 @@ namespace GLMod
                     }
                 }
 
-
                 if (nbImp != realImp) return;
 
                 // Start game
                 GLMod.gameMap = GLMod.getMapName();
 
-                VanillaEvents.startGameVanilla();
-                gameStarted = true;
+                VanillaEvents.startGameVanilla().ContinueWith(_ =>
+                {
+                    gameStarted = true;
+                });
             }
             catch (Exception e)
             {
-                GLMod.logError("[VanillaFixedUpdate] Catch exception " + e.Message + " / stack = " + e.StackTrace);
+                GLMod.log("[VanillaFixedUpdate] Catch exception " + e.Message + " / stack = " + e.StackTrace);
             }
 
 

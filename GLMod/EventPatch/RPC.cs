@@ -5,6 +5,8 @@ using System.Linq;
 using UnityEngine;
 using System;
 using System.ComponentModel;
+using System.Threading.Tasks;
+using System.Threading;
 
 namespace GLMod
 {
@@ -16,20 +18,32 @@ namespace GLMod
     public static class GLRPCProcedure
     {
         // Step 4 : Receive Game Id for non host
-        public static void shareId(int gameId)
+        public static async Task shareId(int gameId)
         {
-            try {
-                BackgroundWorkers.gameId = gameId;
-
-                BackgroundWorker backgroundWorker = new BackgroundWorker();
-                backgroundWorker.WorkerReportsProgress = true;
-                backgroundWorker.DoWork += new DoWorkEventHandler(BackgroundWorkers.backgroundWorkerReceiveId_DoWork);
-                backgroundWorker.RunWorkerCompleted += new RunWorkerCompletedEventHandler(BackgroundWorkers.backgroundWorker_RunWorkerCompleted);
-                backgroundWorker.ProgressChanged += new ProgressChangedEventHandler(BackgroundWorkers.backgroundWorker_ProgressChanged);
-                backgroundWorker.RunWorkerAsync();
-            } catch (Exception e)
+            try
             {
-                GLMod.logError("[SyncGameId] Rpc worker make fail");
+                await Task.Run(() =>
+                {
+                    try
+                    {
+                        while (GLMod.step != 3 || GLMod.currentGame == null)
+                        {
+                            Thread.Sleep(100);
+                        }
+
+                        GLMod.currentGame.setId(gameId);
+                        GLMod.step = 4;
+                    }
+                    catch (Exception ex)
+                    {
+                        GLMod.log("[Background Worker] Catch exception " + ex.Message);
+                    }
+                });
+
+            }
+            catch (Exception e)
+            {
+                GLMod.log("[SyncGameId] Rpc worker make fail, error: " + e.Message);
             }
             GLMod.UpdateRpcStep();
         }
@@ -45,7 +59,7 @@ namespace GLMod
             {
                 case (byte)CustomRPC.ShareId:
                     int gameId = reader.ReadInt32();
-                    GLRPCProcedure.shareId(gameId);
+                    _= GLRPCProcedure.shareId(gameId);
                     break;
             }
         }

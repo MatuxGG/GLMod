@@ -1,12 +1,13 @@
 ﻿using HarmonyLib;
 using System;
 using System.Collections.Generic;
-using System.Net;
+using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace GLMod
 {
-    public static class Utils
+    public class PingTrackerPatch
     {
         public static string debug = "";
 
@@ -19,12 +20,5 @@ namespace GLMod
                 //   + "\ndebug:" + debug;
             }
         }
-        public static WebClient getClient()
-        {
-            WebClient client = new WebClient();
-            client.Proxy = GlobalProxySelection.GetEmptyWebProxy();
-            return client;
-        }
-
     }
 }

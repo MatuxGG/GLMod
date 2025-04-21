@@ -1,4 +1,5 @@
 ﻿using HarmonyLib;
+using Steamworks;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -10,6 +11,44 @@ namespace GLMod
     {
         public static async void Postfix()
         {
+            try
+            {
+                if (!SteamAPI.Init())
+                {
+                    return;
+                }
+
+                if (SteamUser.BLoggedOn())
+                {
+                    string SteamName = SteamFriends.GetPersonaName();
+                    string SteamID = SteamUser.GetSteamID().m_SteamID.ToString();
+
+                    try
+                    {
+                        await GLMod.login();
+                        if (!GLMod.withUnityExplorer)
+                        {
+                            _ = GLMod.getRank();
+                            _ = GLMod.reloadItems();
+                            _ = GLMod.reloadDlcOwnerships();
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        GLMod.disableAllServices();
+                        GLMod.log(e.Source.ToString() + " / " + e.InnerException.ToString() + " / " + e.Message.ToString());
+                    }
+
+                }
+                else
+                {
+                }
+            }
+            catch (Exception)
+            {
+                
+            }
+
             if (SteamManager.Initialized)
             {
                 if (GLMod.token == null)
@@ -19,14 +58,14 @@ namespace GLMod
                         await GLMod.login();
                         if (!GLMod.withUnityExplorer)
                         {
-                            GLMod.getRank();
-                            GLMod.reloadItems();
-                            GLMod.reloadDlcOwnerships();
+                            _ = GLMod.getRank();
+                            _ = GLMod.reloadItems();
+                            _ = GLMod.reloadDlcOwnerships();
                         }
                     } catch (Exception e)
                     {
                         GLMod.disableAllServices();
-                        GLMod.logWithoutInfo(e.Source.ToString() + " / " + e.InnerException.ToString() + " / " + e.Message.ToString());
+                        GLMod.log(e.Source.ToString() + " / " + e.InnerException.ToString() + " / " + e.Message.ToString());
                     }
                 }
             }

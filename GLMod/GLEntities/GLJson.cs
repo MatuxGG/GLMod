@@ -14,7 +14,7 @@ namespace GLMod
             }
             catch (Exception ex)
             {
-                GLMod.logError("Deserialize Error: " + ex.Message);
+                GLMod.log("Deserialize Error: " + ex.Message);
                 return default(T);
             }
         }
@@ -28,7 +28,7 @@ namespace GLMod
             }
             catch (Exception ex)
             {
-                GLMod.logError("Serialize Error: " + ex.Message);
+                GLMod.log("Serialize Error: " + ex.Message);
                 return null;
             }
         }

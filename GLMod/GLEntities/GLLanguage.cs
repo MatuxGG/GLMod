@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Net;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace GLMod
 {
@@ -25,20 +26,17 @@ namespace GLMod
             this.translations = new List<GLTranslation>() { };
         }
 
-        public void load()
+        public async Task load()
         {
             string translationsURL = GLMod.api + "/trans/" + this.code;
             string tr = "";
             try
             {
-                using (var client = Utils.getClient())
-                {
-                    tr = client.DownloadString(translationsURL);
-                }
+                tr = await HttpHelper.Client.GetStringAsync(translationsURL);
             }
             catch (Exception e)
             {
-
+                GLMod.log("Error language load: " + e.Message);
             }
             translations = GLJson.Deserialize<List<GLTranslation>>(tr);
         }

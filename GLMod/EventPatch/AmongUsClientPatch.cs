@@ -27,23 +27,23 @@ namespace GLMod
                 {
                     switch (gameOverReason)
                     {
-                        case GameOverReason.HumansByTask:
-                        case GameOverReason.HumansByVote:
+                        case GameOverReason.CrewmatesByTask:
+                        case GameOverReason.CrewmatesByVote:
                         case GameOverReason.ImpostorDisconnect:
                             GLMod.SetWinnerTeams(new List<string>() { "Crewmate" });
                             break;
-                        case GameOverReason.ImpostorByKill:
-                        case GameOverReason.ImpostorBySabotage:
-                        case GameOverReason.ImpostorByVote:
-                        case GameOverReason.HumansDisconnect:
+                        case GameOverReason.ImpostorsByKill:
+                        case GameOverReason.ImpostorsBySabotage:
+                        case GameOverReason.ImpostorsByVote:
+                        case GameOverReason.CrewmateDisconnect:
                             GLMod.SetWinnerTeams(new List<string>() { "Impostor" });
                             break;
                     }
-                    GLMod.EndGame();
+                    _ = GLMod.EndGame();
                 }
             }
             catch (Exception e) {
-                GLMod.logError("[VanillaGameEnd] Catch exception " + e.Message);
+                GLMod.log("[VanillaGameEnd] Catch exception " + e.Message);
             }
         }
     }
