@@ -21,9 +21,7 @@ Among us GLMod is an open source mod that collects data inside the game to provi
 
 | Among Us - Version | Link |
 |--------------------|-----------------|
-| 2024.10.29s        | [Release](https://github.com/MatuxGG/GLMod/releases/latest)
-| 2024.09.04s        | [Release](https://github.com/MatuxGG/GLMod/releases/latest)
-| 2024.06.18s        | [Release](https://github.com/MatuxGG/GLMod/releases/latest)
+| 2025.3.31          | [Release](https://github.com/MatuxGG/GLMod/releases/latest)
 
 # Installation
 
