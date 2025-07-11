@@ -23,7 +23,7 @@ using Random = System.Random;
 
 namespace GLMod
 {
-    [BepInPlugin(Id, "GLMod", "5.1.0")]
+    [BepInPlugin(Id, "GLMod", "5.1.1")]
     [BepInProcess("Among Us.exe")]
     public class GLMod : BasePlugin
     {
@@ -70,12 +70,7 @@ namespace GLMod
             stepConf = Config.Bind("Validation", "steps", "");
             stepRpc = Config.Bind("Validation", "RPC", "");
             configPath = Path.GetDirectoryName(Config.ConfigFilePath);
-
-            if (!await verifyGLMod())
-            {
-                return;
-            }
-
+          
             Random random = new Random();
             string newSupportId = new string(Enumerable.Repeat(supportIdChars, 10)
                 .Select(s => s[random.Next(s.Length)]).ToArray());
@@ -902,7 +897,7 @@ namespace GLMod
             }
         }
 
-        public async Task<bool> verifyDll(string checksumId, string dllPath)
+        public static async Task<bool> verifyDll(string checksumId, string dllPath)
         {
             string localChecksum = GLMod.CalculateFileSHA512(dllPath);
             string remoteChecksum = await GLMod.getChecksum(checksumId);
@@ -917,7 +912,7 @@ namespace GLMod
             return false;
         }
 
-        private async Task<bool> verifyGLMod()
+        private static async Task<bool> verifyGLMod()
         {
             var pluginAttribute = typeof(GLMod).GetCustomAttribute<BepInPlugin>();
             string version = pluginAttribute?.Version.ToString();
