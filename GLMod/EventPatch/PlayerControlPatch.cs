@@ -219,6 +219,26 @@ namespace GLMod
         }
     }
 
+    // Tasks
+    [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.CompleteTask))]
+    public class CompleteTaskPatch
+    {
+        public static void Postfix(PlayerControl __instance)
+        {
+            try
+            {
+                if (GLMod.existService("Tasks") || GLMod.debug)
+                {
+                    GLMod.currentGame.addAction(__instance.Data.PlayerName, "", "completedTask");
+                }
+            }
+            catch (Exception e)
+            {
+                GLMod.log("[VanillaCompleteTask] Catch exception " + e.Message);
+            }
+        }
+    }
+
     // Update
     [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.FixedUpdate))]
     public class FixedUpdatePatch

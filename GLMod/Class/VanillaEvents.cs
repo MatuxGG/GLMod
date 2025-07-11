@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Hazel;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
@@ -29,6 +30,21 @@ namespace GLMod
                 {
                     GLMod.log("[VanillaStartGame] Catch exception " + e.Message);
                 }
+            }
+
+        }
+
+        public static void handleDc(string reason, string playerName)
+        {
+            if (GLMod.step == 0) return;
+            try
+            {
+                GLMod.log("handleDc: " +  reason + " / " + playerName);
+                GLMod.addAction(playerName, reason, "");
+            }
+            catch (Exception e)
+            {
+                GLMod.log("[VanillaHandleDc] Catch exception " + e.Message);
             }
 
         }

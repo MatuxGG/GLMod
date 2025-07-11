@@ -78,7 +78,8 @@ namespace GLMod
         }
         public void addAction(string source, string target, string action)
         {
-            this.actions.Add(new GLAction(this.turns, source, target, action));
+            long timestampSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            this.actions.Add(new GLAction(this.turns, source, target, action, timestampSeconds.ToString()));
         }
     }
 }

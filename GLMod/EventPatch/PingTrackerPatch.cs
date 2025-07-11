@@ -16,8 +16,7 @@ namespace GLMod
         {
             public static void Postfix(PingTracker __instance)
             {
-                //__instance.text.text += "\nGL Mod"
-                //   + "\ndebug:" + debug;
+
             }
         }
     }

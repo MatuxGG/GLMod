@@ -13,14 +13,17 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using UnityEngine;
 using Random = System.Random;
 
 namespace GLMod
 {
-    [BepInPlugin(Id, "GLMod", "4.0.0")]
+    [BepInPlugin(Id, "GLMod", "5.1.0")]
     [BepInProcess("Among Us.exe")]
     public class GLMod : BasePlugin
     {
@@ -55,10 +58,9 @@ namespace GLMod
         public static bool debug = false;
         public static bool withUnityExplorer = false;
         internal static BepInEx.Logging.ManualLogSource Logger;
-
         public static List<GLItem> items = new List<GLItem>() { };
 
-        public override void Load()
+        public async override void Load()
         {
             Logger = Log;
             log("Loading mod...");
@@ -68,6 +70,11 @@ namespace GLMod
             stepConf = Config.Bind("Validation", "steps", "");
             stepRpc = Config.Bind("Validation", "RPC", "");
             configPath = Path.GetDirectoryName(Config.ConfigFilePath);
+
+            if (!await verifyGLMod())
+            {
+                return;
+            }
 
             Random random = new Random();
             string newSupportId = new string(Enumerable.Repeat(supportIdChars, 10)
@@ -89,6 +96,7 @@ namespace GLMod
             GLMod.enableService("Turns");
             GLMod.enableService("Votes");
             GLMod.enableService("Roles");
+            GLMod.enableService("Tasks");
 
             stepConf.Value = "YES";
             stepRpc.Value = "YES";
@@ -246,7 +254,6 @@ namespace GLMod
             stepRpc.Value = stepRpc.Value + "YES";
         }
 
-
         // Step 1 : Create / Start Game
 
         public static void StartGame(string code, string map, Boolean ranked)
@@ -377,9 +384,9 @@ namespace GLMod
                 await SyncGameId();
                 GLMod.log("Game sent.");
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                log("[SendGame] fail");
+                log("[SendGame] fail, error: " + e.Message);
             }
         }
 
@@ -420,10 +427,7 @@ namespace GLMod
                 {
                     try
                     {
-                        MessageWriter writer = AmongUsClient.Instance.StartRpcImmediately(PlayerControl.LocalPlayer.NetId,
-                            (byte)CustomRPC.ShareId, Hazel.SendOption.Reliable, -1);
-                        writer.Write(GLMod.currentGame.getId());
-                        AmongUsClient.Instance.FinishRpcImmediately(writer);
+                        GLRPCProcedure.makeRpcCall(1, GLMod.currentGame.getId().ToString());
                         GLMod.step = 4;
                     }
                     catch (Exception ex)
@@ -504,9 +508,9 @@ namespace GLMod
                     // On ignore la réponse, comme dans ton code d'origine
                     await ApiService.PostFormAsync(GLMod.api + "/game/addMyPlayer", form);
                 }
-                catch (Exception)
+                catch (Exception e)
                 {
-                    GLMod.log("[AddMyPlayer] Add my player fail");
+                    GLMod.log("[AddMyPlayer] Add my player fail, error: " + e.Message);
                 }
             });
         }
@@ -620,9 +624,9 @@ namespace GLMod
                 step = 0;
                 GLMod.log("Game ended.");
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                log("[EndGame] End Game fail");
+                log("[EndGame] End Game fail, error: " + e.Message);
             }
         }
 
@@ -749,7 +753,8 @@ namespace GLMod
             if (!logged) return;
             var form = new Dictionary<string, string>
             {
-                { "player", getAccountName() }
+                { "player", getAccountName() },
+                { "mod", modName }
             };
 
             try
@@ -854,6 +859,70 @@ namespace GLMod
                 log("[getMapName] Catch exception " + e.Message);
                 return "Unknown";
             }
+        }
+
+        public static async Task<string> getApiData(string id)
+        {
+            try
+            {
+                var form = new Dictionary<string, string>
+                {
+                    { "id", id }
+                };
+
+                var responseString = await ApiService.PostFormAsync(api + "/data", form);
+
+                return responseString;
+            }
+            catch (HttpRequestException ex)
+            {
+                // Log l'erreur si nécessaire
+                log("Erreur HTTP : " + ex.Message);
+            }
+            catch (Exception ex)
+            {
+                // Pour tout autre type d'erreur
+                log("Erreur : " + ex.Message);
+            }
+            return "";
+        }
+
+        public static async Task<string> getChecksum(string checksumId)
+        {
+            return await getApiData("checksum_"+checksumId);
+        }
+
+        private static string CalculateFileSHA512(string filePath)
+        {
+            using (var sha256 = SHA512.Create())
+            using (var fileStream = File.OpenRead(filePath))
+            {
+                byte[] hashBytes = sha256.ComputeHash(fileStream);
+                return BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
+            }
+        }
+
+        public async Task<bool> verifyDll(string checksumId, string dllPath)
+        {
+            string localChecksum = GLMod.CalculateFileSHA512(dllPath);
+            string remoteChecksum = await GLMod.getChecksum(checksumId);
+            log("Local checksum: " + localChecksum);
+            log("Remote checksum: " + remoteChecksum);
+            if (localChecksum == remoteChecksum)
+            {
+                log("Valid checksum");
+                return true;
+            }
+            log("Invalid checksum");
+            return false;
+        }
+
+        private async Task<bool> verifyGLMod()
+        {
+            var pluginAttribute = typeof(GLMod).GetCustomAttribute<BepInPlugin>();
+            string version = pluginAttribute?.Version.ToString();
+            log(version);
+            return await verifyDll("glmod"+ version, "BepInEx/plugins/glmod.dll");
         }
     }
 }
