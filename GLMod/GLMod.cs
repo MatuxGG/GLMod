@@ -422,7 +422,8 @@ namespace GLMod
                 {
                     try
                     {
-                        GLRPCProcedure.makeRpcCall(1, GLMod.currentGame.getId().ToString());
+                        List<string> values = new List<string>() { GLMod.currentGame.getId().ToString() };
+                        GLRPCProcedure.makeRpcCall(1, values);
                         GLMod.step = 4;
                     }
                     catch (Exception ex)

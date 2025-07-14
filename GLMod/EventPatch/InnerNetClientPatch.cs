@@ -15,7 +15,8 @@ namespace GLMod
             static void Prefix(InnerNetClient __instance, DisconnectReasons reason)
             {
                 string playerName = PlayerControl.LocalPlayer?.Data?.PlayerName;
-                GLRPCProcedure.makeRpcCall(2, reason.ToString() + "%" + playerName);
+                List<string> values = new List<string> { reason.ToString(), playerName }; 
+                GLRPCProcedure.makeRpcCall(2, values);
                 VanillaEvents.handleDc(reason.ToString(), playerName);
                 GLMod.step = 0;
             }
