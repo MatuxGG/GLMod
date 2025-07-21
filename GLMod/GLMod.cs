@@ -23,7 +23,7 @@ using Random = System.Random;
 
 namespace GLMod
 {
-    [BepInPlugin(Id, "GLMod", "5.1.1")]
+    [BepInPlugin(Id, "GLMod", "5.1.3")]
     [BepInProcess("Among Us.exe")]
     public class GLMod : BasePlugin
     {
@@ -605,6 +605,8 @@ namespace GLMod
                 log("[EndGame] Current Game null");
                 return;
             }
+
+            await DisconnectEvents.endDcProcess();
 
             try
             {

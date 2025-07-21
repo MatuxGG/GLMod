@@ -83,9 +83,19 @@ namespace GLMod
                         GLMod.UpdateRpcStep();
                         break;
                     case 2: // DisconnectInternal
-                        string reason = "dc_" + values[0];
-                        string playerName = values[1];
-                        VanillaEvents.handleDc(reason, playerName);
+                        string reason = "DC_INTERNAL_" + (values[0] ?? "unknown");
+                        string playerName = values[1] ?? "";
+                        DisconnectEvents.handleDc(reason, playerName);
+                        break;
+                    case 3: // HandleDisconnect
+                        string reason2 = "DC_HANDLE_" + (values[0] ?? "unknown");
+                        string playerName2 = values[1] ?? "";
+                        DisconnectEvents.handleDc(reason2, playerName2);
+                        break;
+                    case 4: // OnDisconnect
+                        string reason3 = "DC_ON_" + (values[0] ?? "unknown");
+                        string playerName3 = values[1] ?? "";
+                        DisconnectEvents.handleDc(reason3, playerName3);
                         break;
                     // ...
                     // Case 99
@@ -116,7 +126,7 @@ namespace GLMod
                     List<string> values = new List<string>() { };
 
                     for (int i = 0; i < valuesLength; i++) {
-                        values.Add(reader.ReadString());
+                        values.Add(reader.ReadString() ?? "");
                     }
 
                     _ = GLRPCProcedure.handleRpc(id, values);

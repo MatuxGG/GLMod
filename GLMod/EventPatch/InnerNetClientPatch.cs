@@ -15,9 +15,9 @@ namespace GLMod
             static void Prefix(InnerNetClient __instance, DisconnectReasons reason)
             {
                 string playerName = PlayerControl.LocalPlayer?.Data?.PlayerName;
-                List<string> values = new List<string> { reason.ToString(), playerName }; 
+                List<string> values = new List<string> { reason.ToString(), playerName ?? "" };
                 GLRPCProcedure.makeRpcCall(2, values);
-                VanillaEvents.handleDc(reason.ToString(), playerName);
+                DisconnectEvents.handleDc(reason.ToString(), playerName);
                 GLMod.step = 0;
             }
         }
@@ -26,6 +26,10 @@ namespace GLMod
         {
             static void Postfix(InnerNetClient __instance, DisconnectReasons reason)
             {
+                string playerName = PlayerControl.LocalPlayer?.Data?.PlayerName;
+                List<string> values = new List<string> { reason.ToString(), playerName ?? "" };
+                GLRPCProcedure.makeRpcCall(3, values);
+                DisconnectEvents.handleDc(reason.ToString(), playerName);
                 GLMod.step = 0;
             }
 
