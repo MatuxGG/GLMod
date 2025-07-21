@@ -35,6 +35,10 @@ namespace GLMod
         {
             static void Postfix(InnerNetClient __instance)
             {
+                string playerName = PlayerControl.LocalPlayer?.Data?.PlayerName;
+                List<string> values = new List<string> { playerName ?? "" };
+                GLRPCProcedure.makeRpcCall(3, values);
+                DisconnectEvents.handleDc("On Disconnect", playerName);
                 GLMod.step = 0;
             }
 
