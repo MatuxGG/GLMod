@@ -34,6 +34,15 @@ namespace GLMod
         {
             try
             {
+                long timestampSeconds = System.DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                // Set positions before kill
+                float x = __instance.MyPhysics.body.transform.position.x;
+                float y = __instance.MyPhysics.body.transform.position.y;
+                GLMod.currentGame.addPosition(__instance.Data.PlayerName, x, y, timestampSeconds.ToString());
+                x = target.MyPhysics.body.transform.position.x;
+                y = target.MyPhysics.body.transform.position.y;
+                GLMod.currentGame.addPosition(target.Data.PlayerName, x, y, timestampSeconds.ToString());
+
                 if (GLMod.existService("Kills") || GLMod.debug)
                 {
                     GLMod.currentGame.addAction(__instance.Data.PlayerName, target.Data.PlayerName != null ? target.Data.PlayerName : "", "killed");

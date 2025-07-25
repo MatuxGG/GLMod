@@ -15,7 +15,6 @@ namespace GLMod
         public string winner { get; set; }
         public string turns { get; set; }
         public List<GLPlayer> players { get; set; }
-
         public List<GLAction> actions { get; set; }
 
         public GLGame(string code, string map, bool ranked, string modName)
@@ -44,9 +43,9 @@ namespace GLMod
             this.actions = actions;
         }
 
-        public void addPlayer(string login, string playerName, string role, string team)
+        public void addPlayer(string login, string playerName, string role, string team, string color)
         {
-            this.players.Add(new GLPlayer(login, playerName, role, team));
+            this.players.Add(new GLPlayer(login, playerName, role, team, color));
         }
 
         public void setId(int id)
@@ -80,6 +79,11 @@ namespace GLMod
         {
             long timestampSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             this.actions.Add(new GLAction(this.turns, source, target, action, timestampSeconds.ToString()));
+        }
+
+        public void addPosition(string playerName, float x, float y, string timestampStr)
+        {
+            this.players.Find(p => p.playerName == playerName).addPosition(x, y, timestampStr);
         }
     }
 }

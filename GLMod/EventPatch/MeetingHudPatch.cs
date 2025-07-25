@@ -54,4 +54,20 @@ namespace GLMod
             }
         }
     }
+
+    [HarmonyPatch(typeof(MeetingHud), nameof(MeetingHud.Start))]
+    public class MeetingHudStartPatch
+    {
+        public static void Postfix(MeetingHud __instance)
+        {
+            long timestampSeconds = System.DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            foreach (PlayerControl player in PlayerControl.AllPlayerControls)
+            {
+                if (player.Data.IsDead) continue;
+                float x = player.MyPhysics.body.transform.position.x;
+                float y = player.MyPhysics.body.transform.position.y;
+                GLMod.currentGame.addPosition(player.Data.PlayerName, x, y, timestampSeconds.ToString());
+            }
+        }
+    }
 }

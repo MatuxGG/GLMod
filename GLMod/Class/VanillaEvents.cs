@@ -1,6 +1,7 @@
 ﻿using Hazel;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -21,7 +22,8 @@ namespace GLMod
                     {
                         string team = p?.Data?.Role?.TeamType == RoleTeamTypes.Crewmate ? "Crewmate" : "Impostor";
                         string role = "Vanilla" + (p?.Data?.Role?.Role.ToString() ?? string.Empty);
-                        GLMod.AddPlayer(p?.Data?.PlayerName, role, team);
+                        string color = p ? p.Data.DefaultOutfit.ColorId.ToString() : "";
+                        GLMod.AddPlayer(p?.Data?.PlayerName, role, team, color);
                     }
                     await GLMod.SendGame();
                     await GLMod.AddMyPlayer();
@@ -31,7 +33,7 @@ namespace GLMod
                     GLMod.log("[VanillaStartGame] Catch exception " + e.Message);
                 }
             }
-            await DisconnectEvents.startDcProcess();
+            BackgroundEvents.startBackgroundProcess();
         }
     }
 }

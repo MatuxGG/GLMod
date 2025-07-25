@@ -23,7 +23,7 @@ using Random = System.Random;
 
 namespace GLMod
 {
-    [BepInPlugin(Id, "GLMod", "5.1.3")]
+    [BepInPlugin(Id, "GLMod", "5.1.4")]
     [BepInProcess("Among Us.exe")]
     public class GLMod : BasePlugin
     {
@@ -283,7 +283,7 @@ namespace GLMod
         }
 
         // Step 2 : Add Player until all players recorded
-        public static void AddPlayer(string playerName, string role, string team)
+        public static void AddPlayer(string playerName, string role, string team, string color)
         {
             if (step != 1)
             {
@@ -317,7 +317,7 @@ namespace GLMod
 
             try
             {
-                currentGame.addPlayer(null, playerName, role, team);
+                currentGame.addPlayer(null, playerName, role, team, color);
             } catch (Exception e)
             {
                 log("[AddPlayer] Catch exception " + e.Message);
@@ -370,6 +370,9 @@ namespace GLMod
                     { "modName", currentGame.modName },
                     { "players", GLJson.Serialize<List<GLPlayer>>(currentGame.players) }
                 };
+
+                // DEBUG
+                GLMod.log("startGame: " + GLJson.Serialize<List<GLPlayer>>(currentGame.players));
 
                 var responseString = await ApiService.PostFormAsync(api + "/game/start", form);
 
@@ -606,11 +609,15 @@ namespace GLMod
                 return;
             }
 
-            await DisconnectEvents.endDcProcess();
+            BackgroundEvents.endBackgroundProcess();
 
             try
             {
                 string json = GLJson.Serialize<GLGame>(currentGame);
+                
+                // DEBUG
+                // GLMod.log("endGame: "+ json);
+
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
                 var response = await HttpHelper.Client.PostAsync(api + "/game/end", content);

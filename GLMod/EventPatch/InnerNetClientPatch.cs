@@ -17,7 +17,7 @@ namespace GLMod
                 string playerName = PlayerControl.LocalPlayer?.Data?.PlayerName;
                 List<string> values = new List<string> { reason.ToString(), playerName ?? "" };
                 GLRPCProcedure.makeRpcCall(2, values);
-                DisconnectEvents.handleDc(reason.ToString(), playerName);
+                BackgroundEvents.handleDc(reason.ToString(), playerName);
                 GLMod.step = 0;
             }
         }
@@ -29,7 +29,7 @@ namespace GLMod
                 string playerName = PlayerControl.LocalPlayer?.Data?.PlayerName;
                 List<string> values = new List<string> { reason.ToString(), playerName ?? "" };
                 GLRPCProcedure.makeRpcCall(3, values);
-                DisconnectEvents.handleDc(reason.ToString(), playerName);
+                BackgroundEvents.handleDc(reason.ToString(), playerName);
                 GLMod.step = 0;
             }
 
@@ -42,7 +42,7 @@ namespace GLMod
                 string playerName = PlayerControl.LocalPlayer?.Data?.PlayerName;
                 List<string> values = new List<string> { playerName ?? "" };
                 GLRPCProcedure.makeRpcCall(3, values);
-                DisconnectEvents.handleDc("On Disconnect", playerName);
+                BackgroundEvents.handleDc("On Disconnect", playerName);
                 GLMod.step = 0;
             }
 

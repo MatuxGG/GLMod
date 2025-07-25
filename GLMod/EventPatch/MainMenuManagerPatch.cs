@@ -7,7 +7,7 @@ using System.Text;
 namespace GLMod
 {
     [HarmonyPatch(typeof(MainMenuManager), nameof(MainMenuManager.Start))]
-    public class StartPatch
+    public class MainMenuManagerStartPatch
     {
         public static async void Postfix()
         {
