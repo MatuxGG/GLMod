@@ -34,7 +34,7 @@ namespace GLMod
         {
             try
             {
-                long timestampSeconds = System.DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                long timestampSeconds = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                 // Set positions before kill
                 float x = __instance.MyPhysics.body.transform.position.x;
                 float y = __instance.MyPhysics.body.transform.position.y;
@@ -202,10 +202,15 @@ namespace GLMod
         {
             try
             {
+                long timestampSeconds = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                 if (target == null)
                 {
                     if (GLMod.existService("Emergencies") || GLMod.debug)
                     {
+                        // Set positions before kill
+                        float x = __instance.MyPhysics.body.transform.position.x;
+                        float y = __instance.MyPhysics.body.transform.position.y;
+                        GLMod.currentGame.addPosition(__instance.Data.PlayerName, x, y, timestampSeconds.ToString());
                         GLMod.currentGame.addAction(__instance.Data.PlayerName, "", "called an emergency");
                     }
                 }
@@ -213,6 +218,10 @@ namespace GLMod
                 {
                     if (GLMod.existService("BodyReported") || GLMod.debug)
                     {
+                        // Set positions before kill
+                        float x = __instance.MyPhysics.body.transform.position.x;
+                        float y = __instance.MyPhysics.body.transform.position.y;
+                        GLMod.currentGame.addPosition(__instance.Data.PlayerName, x, y, timestampSeconds.ToString());
                         GLMod.currentGame.addAction(__instance.Data.PlayerName, target.PlayerName, "reported");
                     }
                 }

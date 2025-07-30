@@ -10,7 +10,7 @@ namespace GLMod
         public string source { get; set; }
         public string target { get; set; }
         public string action { get; set; }
-        public string triggerTime { get; set; }
+        public string triggerTimeMs { get; set; }
 
         public GLAction(string turn, string source, string target, string action, string triggerTime)
         {
@@ -18,7 +18,7 @@ namespace GLMod
             this.source = source;
             this.target = target;
             this.action = action;
-            this.triggerTime = triggerTime;
+            this.triggerTimeMs = triggerTime;
         }
 
     }

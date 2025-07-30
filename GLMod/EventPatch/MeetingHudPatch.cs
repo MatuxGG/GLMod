@@ -60,7 +60,7 @@ namespace GLMod
     {
         public static void Postfix(MeetingHud __instance)
         {
-            long timestampSeconds = System.DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            long timestampSeconds = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             foreach (PlayerControl player in PlayerControl.AllPlayerControls)
             {
                 if (player.Data.IsDead) continue;

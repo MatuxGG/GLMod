@@ -10,7 +10,7 @@ namespace GLMod
     {
         private static List<string> playersDc;
         private static bool processEnabled = false;
-
+        private static string cachedSabotage = null;
         public static void handleDc(string reason, string playerName)
         {
             if (GLMod.step == 0) return;
@@ -29,6 +29,7 @@ namespace GLMod
         {
             playersDc = new List<string>() { };
             processEnabled = true;
+            cachedSabotage = null;
             _ = handleProcess();
         }
 
@@ -36,7 +37,6 @@ namespace GLMod
         {
             processEnabled = false;
         }
-
 
         private static async Task<bool> handleProcess()
         {
@@ -48,7 +48,7 @@ namespace GLMod
                 int turn = int.Parse(GLMod.currentGame.turns);
                 if (turn > 1000) continue;
 
-                long timestampSeconds = System.DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                long timestampSeconds = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
                 foreach (PlayerControl player in PlayerControl.AllPlayerControls)
                 {
@@ -69,6 +69,54 @@ namespace GLMod
                     {
                         handleDc("DC_PROCESS_", currentGamePlayer.playerName);
                         playersDc.Add(currentGamePlayer.playerName);
+                    }
+                }
+
+                if (PlayerControl.LocalPlayer?.myTasks != null)
+                {
+                    string currentSabotage = null;
+                    foreach (PlayerTask playerTask in PlayerControl.LocalPlayer.myTasks)
+                    {
+                        switch (playerTask.TaskType)
+                        {
+                            case TaskTypes.ResetSeismic:
+                            case TaskTypes.ResetReactor:
+                                currentSabotage = "Reactor";
+                                break;
+                            case TaskTypes.FixComms:
+                                currentSabotage = "Coms";
+                                break;
+                            case TaskTypes.FixLights:
+                                currentSabotage = "Lights";
+                                break;
+                            case TaskTypes.CleanO2Filter:
+                                currentSabotage = "O2";
+                                break;
+                        }
+
+                        if (currentSabotage != null) break;
+                    }
+
+                    if (cachedSabotage == null)
+                    {
+                        if (currentSabotage != cachedSabotage) // Nouveau sabotage
+                        {
+                            GLMod.addAction("", "", "SAB_START_"+currentSabotage);
+                            cachedSabotage = currentSabotage;
+                        }
+                    } else
+                    {
+                        if (currentSabotage == null)  // Fin d'un sabotage
+                        {
+                            GLMod.addAction("", "", "SAB_END_" + cachedSabotage);
+                            cachedSabotage = null;
+                        } else if (cachedSabotage != currentSabotage) // Remplacement de sabotage
+                        {
+                            GLMod.addAction("", "", "SAB_END_" + cachedSabotage);
+                            cachedSabotage = null;
+                            GLMod.addAction("", "", "SAB_START_" + currentSabotage);
+                            cachedSabotage = currentSabotage;
+                        }
                     }
                 }
             }
