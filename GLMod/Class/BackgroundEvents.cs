@@ -17,7 +17,7 @@ namespace GLMod
             try
             {
                 GLMod.log("handleDc: " + reason + " / " + playerName);
-                GLMod.addAction(playerName, reason, "");
+                GLMod.addAction(playerName, "", reason);
             }
             catch (System.Exception e)
             {

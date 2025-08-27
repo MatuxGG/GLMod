@@ -59,6 +59,8 @@ namespace GLMod
         public static bool withUnityExplorer = false;
         internal static BepInEx.Logging.ManualLogSource Logger;
         public static List<GLItem> items = new List<GLItem>() { };
+        public static bool isBanned = false;
+        public static string banReason = "";
 
         public async override void Load()
         {
@@ -717,16 +719,55 @@ namespace GLMod
                     { "steamId", steamId }
                 };
 
-                token = await ApiService.PostFormAsync(api + "/user/login", form);
+                var response = await ApiService.PostFormWithErrorHandlingAsync(api + "/user/login", form);
 
-                connectionState.Value = "Yes";
-                logged = true;
+                if (response.IsSuccess)
+                {
+                    log("Login success");
+                    token = response.Content;
+                    connectionState.Value = "Yes";
+                    logged = true;
+                    isBanned = false;
+                    banReason = "";
+                }
+                else if (response.StatusCode == 403)
+                {
+                    // Gestion spécifique de l'erreur 403 (bannissement)
+                    if (!string.IsNullOrEmpty(response.Content) && response.Content.StartsWith("Banned: "))
+                    {
+                        isBanned = true;
+                        banReason = response.Content.Substring("Banned: ".Length);
+                        log("User banned, reason: " + banReason);
+                    }
+                    else
+                    {
+                        log("Login failed for unknown reason");
+                        isBanned = false;
+                        banReason = "";
+                    }
+
+                    token = "";
+                    connectionState.Value = "No";
+                    logged = false;
+                }
+                else
+                {
+                    log("Login failed for unknown reason");
+                    token = "";
+                    connectionState.Value = "No";
+                    logged = false;
+                    isBanned = false;
+                    banReason = "";
+                }
             }
-            catch (Exception)
+            catch (Exception e)
             {
+                log("Login failed, error: " + e.Message);
                 token = "";
                 connectionState.Value = "No";
                 logged = false;
+                isBanned = false;
+                banReason = "";
             }
 
         }
