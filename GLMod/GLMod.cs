@@ -713,12 +713,10 @@ namespace GLMod
             try
             {
                 var steamId = SteamUser.GetSteamID().ToString();
-
                 var form = new Dictionary<string, string>
-                {
-                    { "steamId", steamId }
-                };
-
+        {
+            { "steamId", steamId }
+        };
                 var response = await ApiService.PostFormWithErrorHandlingAsync(api + "/user/login", form);
 
                 if (response.IsSuccess)
@@ -733,26 +731,33 @@ namespace GLMod
                 else if (response.StatusCode == 403)
                 {
                     // Gestion spécifique de l'erreur 403 (bannissement)
-                    if (!string.IsNullOrEmpty(response.Content) && response.Content.StartsWith("Banned: "))
+                    var trimmedContent = response.Content?.Trim();
+
+                    // Retirer les guillemets doubles si présents
+                    if (trimmedContent != null && trimmedContent.StartsWith("\"") && trimmedContent.EndsWith("\""))
+                    {
+                        trimmedContent = trimmedContent.Substring(1, trimmedContent.Length - 2);
+                    }
+
+                    if (!string.IsNullOrEmpty(trimmedContent) && trimmedContent.StartsWith("Banned: ", StringComparison.OrdinalIgnoreCase))
                     {
                         isBanned = true;
-                        banReason = response.Content.Substring("Banned: ".Length);
+                        banReason = trimmedContent.Substring("Banned: ".Length);
                         log("User banned, reason: " + banReason);
                     }
                     else
                     {
-                        log("Login failed for unknown reason");
+                        log($"Login failed for unknown reason - Status code: {response.StatusCode}");
                         isBanned = false;
                         banReason = "";
                     }
-
                     token = "";
                     connectionState.Value = "No";
                     logged = false;
                 }
                 else
                 {
-                    log("Login failed for unknown reason");
+                    log($"Login failed for unknown reason - Status code: {response.StatusCode}");
                     token = "";
                     connectionState.Value = "No";
                     logged = false;
@@ -769,7 +774,6 @@ namespace GLMod
                 isBanned = false;
                 banReason = "";
             }
-
         }
 
         public static void logout()
