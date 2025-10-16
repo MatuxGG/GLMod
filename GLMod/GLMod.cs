@@ -23,7 +23,7 @@ using Random = System.Random;
 
 namespace GLMod
 {
-    [BepInPlugin(Id, "GLMod", "5.1.5")]
+    [BepInPlugin(Id, "GLMod", "5.1.7")]
     [BepInProcess("Among Us.exe")]
     public class GLMod : BasePlugin
     {
@@ -49,7 +49,6 @@ namespace GLMod
         public static string gameMap = "Unknown";
         public static string configPath;
         public static string modName = "Vanilla";
-        public static GLRank rank;
         public static List<GLLanguage> languages;
         public static string lg = "en";
         public static int step = 0;
@@ -782,7 +781,6 @@ namespace GLMod
             {
                 if (token != "")
                 {
-                    rank = new GLRank();
                     logged = false;
                     token = "";
                 }
@@ -798,23 +796,33 @@ namespace GLMod
             return logged;
         }
 
-        public static async Task getRank()
+        public static async Task<GLRank> getRank(string customModName = null)
         {
-            if (!logged) return;
+            if (customModName == null)
+            {
+                customModName = GLMod.modName;
+            }
+            GLRank errorRank = new GLRank();
+            if (!logged)
+            {
+                errorRank.error = "Offline";
+                return errorRank;
+            }
             var form = new Dictionary<string, string>
             {
                 { "player", getAccountName() },
-                { "mod", modName }
+                { "mod", customModName }
             };
 
             try
             {
                 var responseString = await ApiService.PostFormAsync(api + "/player/rank", form);
-                rank = GLJson.Deserialize<GLRank>(responseString);
+                return GLJson.Deserialize<GLRank>(responseString);
             }
             catch (HttpRequestException)
             {
-                rank = new GLRank();
+                errorRank.error = "Login fail";
+                return errorRank;
             }
         }
 

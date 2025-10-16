@@ -11,12 +11,14 @@ namespace GLMod
         public string link { get; set; }
 
         public int percent { get; set; }
+        public string error { get; set; }
         public GLRank()
         {
             this.id = -1;   
             this.name = null;
             this.link = null;
             this.percent = 0;
+            this.error = null;
         }
 
         public GLRank(int id, string name, string link, int percent)
@@ -25,6 +27,7 @@ namespace GLMod
             this.name = name;
             this.link = link;
             this.percent = percent;
+            this.error = null;
         }
     }
 }

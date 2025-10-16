@@ -28,7 +28,6 @@ namespace GLMod
                         await GLMod.login();
                         if (!GLMod.withUnityExplorer)
                         {
-                            _ = GLMod.getRank();
                             _ = GLMod.reloadItems();
                             _ = GLMod.reloadDlcOwnerships();
                         }

@@ -26,7 +26,6 @@
     </ItemGroup>
 	
     <Target Name="Copy" AfterTargets="Build">
-        <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="../Among Us/BepInEx/plugins/" Condition="'$(Configuration)' == 'Debug'" />
-		<Exec Command="&quot;../Among Us/Among Us.exe&quot;" Condition="'$(Configuration)' == 'Debug'" />	
+        <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="../Among Us/BepInEx/plugins/" Condition="'$(Configuration)' == 'Debug'" />	
 	</Target>
 </Project>
