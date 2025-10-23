@@ -39,7 +39,7 @@ namespace GLMod
                             GLMod.SetWinnerTeams(new List<string>() { "Impostor" });
                             break;
                     }
-                    _ = GLMod.EndGame();
+                    CoroutineRunner.Run(GLMod.EndGame());
                 }
             }
             catch (Exception e) {

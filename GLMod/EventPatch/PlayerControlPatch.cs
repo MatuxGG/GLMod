@@ -293,10 +293,9 @@ namespace GLMod
                 // Start game
                 GLMod.gameMap = GLMod.getMapName();
 
-                VanillaEvents.startGameVanilla().ContinueWith(_ =>
-                {
-                    gameStarted = true;
-                });
+                CoroutineRunner.Run(VanillaEvents.startGameVanilla());
+                gameStarted = true;
+
             }
             catch (Exception e)
             {

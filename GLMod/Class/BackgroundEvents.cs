@@ -1,8 +1,10 @@
 ﻿using Il2CppSystem;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using UnityEngine;
 
 namespace GLMod
 {
@@ -11,6 +13,8 @@ namespace GLMod
         private static List<string> playersDc;
         private static bool processEnabled = false;
         private static string cachedSabotage = null;
+        private static Coroutine backgroundCoroutine = null;
+
         public static void handleDc(string reason, string playerName)
         {
             if (GLMod.step == 0) return;
@@ -30,19 +34,45 @@ namespace GLMod
             playersDc = new List<string>() { };
             processEnabled = true;
             cachedSabotage = null;
-            _ = handleProcess();
+
+            // Arrêter la coroutine précédente si elle existe
+            if (backgroundCoroutine != null)
+            {
+                CoroutineRunner.Run(StopBackgroundCoroutine());
+            }
+
+            // Démarrer la nouvelle coroutine
+            backgroundCoroutine = CoroutineRunner.Run(handleProcess());
         }
 
         public static void endBackgroundProcess()
         {
             processEnabled = false;
+
+            // Arrêter la coroutine
+            if (backgroundCoroutine != null)
+            {
+                CoroutineRunner.Run(StopBackgroundCoroutine());
+            }
         }
 
-        private static async Task<bool> handleProcess()
+        private static IEnumerator StopBackgroundCoroutine()
+        {
+            if (backgroundCoroutine != null)
+            {
+                // Note: Unity's StopCoroutine ne fonctionne pas toujours bien en IL2CPP
+                // On utilise plutôt le flag processEnabled pour arrêter proprement
+                backgroundCoroutine = null;
+            }
+            yield break;
+        }
+
+        private static IEnumerator handleProcess()
         {
             while (processEnabled)
             {
-                await Task.Delay(500);
+                // Attendre 500ms (équivalent de Task.Delay(500))
+                yield return new WaitForSeconds(0.5f);
 
                 // Check if not in meeting
                 int turn = int.Parse(GLMod.currentGame.turns);
@@ -63,6 +93,7 @@ namespace GLMod
                 {
                     playersIndexed.Add(p.Data.PlayerName);
                 }
+
                 foreach (GLPlayer currentGamePlayer in GLMod.currentGame.players)
                 {
                     if (!playersDc.Contains(currentGamePlayer.playerName) && !playersIndexed.Contains(currentGamePlayer.playerName))
@@ -101,16 +132,18 @@ namespace GLMod
                     {
                         if (currentSabotage != cachedSabotage) // Nouveau sabotage
                         {
-                            GLMod.addAction("", "", "SAB_START_"+currentSabotage);
+                            GLMod.addAction("", "", "SAB_START_" + currentSabotage);
                             cachedSabotage = currentSabotage;
                         }
-                    } else
+                    }
+                    else
                     {
-                        if (currentSabotage == null)  // Fin d'un sabotage
+                        if (currentSabotage == null) // Fin d'un sabotage
                         {
                             GLMod.addAction("", "", "SAB_END_" + cachedSabotage);
                             cachedSabotage = null;
-                        } else if (cachedSabotage != currentSabotage) // Remplacement de sabotage
+                        }
+                        else if (cachedSabotage != currentSabotage) // Remplacement de sabotage
                         {
                             GLMod.addAction("", "", "SAB_END_" + cachedSabotage);
                             cachedSabotage = null;
@@ -120,7 +153,8 @@ namespace GLMod
                     }
                 }
             }
-            return true;
+
+            backgroundCoroutine = null;
         }
     }
 }

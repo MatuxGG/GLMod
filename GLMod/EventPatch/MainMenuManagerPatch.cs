@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using BepInEx.Unity.IL2CPP.Utils;
+using HarmonyLib;
 using Steamworks;
 using System;
 using System.Collections.Generic;
@@ -9,7 +10,8 @@ namespace GLMod
     [HarmonyPatch(typeof(MainMenuManager), nameof(MainMenuManager.Start))]
     public class MainMenuManagerStartPatch
     {
-        public static async void Postfix()
+
+        public static void Postfix(MainMenuManager __instance)
         {
             try
             {
@@ -25,11 +27,11 @@ namespace GLMod
 
                     try
                     {
-                        await GLMod.login();
+                        CoroutineRunner.Run(GLMod.login());
                         if (!GLMod.withUnityExplorer)
                         {
-                            _ = GLMod.reloadItems();
-                            _ = GLMod.reloadDlcOwnerships();
+                            CoroutineRunner.Run(GLMod.reloadItems());
+                            CoroutineRunner.Run(GLMod.reloadDlcOwnerships());
                         }
                     }
                     catch (Exception e)
@@ -54,12 +56,11 @@ namespace GLMod
                 {
                     try
                     {
-                        await GLMod.login();
+                        CoroutineRunner.Run(GLMod.login());
                         if (!GLMod.withUnityExplorer)
                         {
-                            _ = GLMod.getRank();
-                            _ = GLMod.reloadItems();
-                            _ = GLMod.reloadDlcOwnerships();
+                            CoroutineRunner.Run(GLMod.reloadItems());
+                            CoroutineRunner.Run(GLMod.reloadDlcOwnerships());
                         }
                     } catch (Exception e)
                     {

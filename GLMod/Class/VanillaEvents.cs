@@ -9,15 +9,20 @@ namespace GLMod
 {
     public static class VanillaEvents
     {
-        public static async Task startGameVanilla()
+        public static System.Collections.IEnumerator startGameVanilla()
         {
             if (GLMod.existService("StartGame") || GLMod.debug)
             {
-                if (GLMod.step != 0) return;
+                if (GLMod.step != 0)
+                {
+                    yield break;
+                }
+
                 try
                 {
                     GLMod.log("Starting game...");
                     GLMod.StartGame("******", GLMod.gameMap, false);
+
                     foreach (PlayerControl p in PlayerControl.AllPlayerControls)
                     {
                         string team = p?.Data?.Role?.TeamType == RoleTeamTypes.Crewmate ? "Crewmate" : "Impostor";
@@ -25,15 +30,20 @@ namespace GLMod
                         string color = p ? p.Data.DefaultOutfit.ColorId.ToString() : "";
                         GLMod.AddPlayer(p?.Data?.PlayerName, role, team, color);
                     }
-                    await GLMod.SendGame();
-                    await GLMod.AddMyPlayer();
+
+                    CoroutineRunner.Run(GLMod.SendGame());
+                    CoroutineRunner.Run(GLMod.AddMyPlayer());
                     GLMod.log("Game started.");
-                } catch (Exception e)
+                }
+                catch (Exception e)
                 {
                     GLMod.log("[VanillaStartGame] Catch exception " + e.Message);
                 }
             }
+
             BackgroundEvents.startBackgroundProcess();
+
+            yield break;
         }
     }
 }

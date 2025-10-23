@@ -2,10 +2,13 @@
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using BepInEx.Unity.IL2CPP;
+using BepInEx.Unity.IL2CPP.Utils.Collections;
 using HarmonyLib;
 using Hazel;
+using Il2CppInterop.Runtime.Injection;
 using Steamworks;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.ComponentModel;
@@ -61,7 +64,7 @@ namespace GLMod
         public static bool isBanned = false;
         public static string banReason = "";
 
-        public async override void Load()
+        public override void Load()
         {
             Logger = Log;
             log("Loading mod...");
@@ -103,57 +106,52 @@ namespace GLMod
             }
             log("Mod loaded");
 
+            CoroutineRunner.Init();
+
             Harmony.PatchAll();
         }
+
 
         /*
          * Items
          */
 
-        public static async Task reloadItems()
+        public static IEnumerator reloadItems()
         {
-            if (!logged) return;
-            // Load from API using toke
+            if (!logged)
+                yield break;
 
+            var form = new Dictionary<string, string> { { "player", getAccountName() } };
+
+            string responseString = null;
+            string error = null;
+
+            // Appel de la coroutine ApiService
+            yield return ApiService.PostFormAsync(api + "/player/challengerItems", form,
+                result => {
+                    responseString = result;
+                },
+                err => {
+                    error = err;
+                }
+            );
+
+            // Vérifier l'erreur
+            if (error != null)
+            {
+                log("Erreur HTTP : " + error);
+                yield break;
+            }
+
+            // Désérialiser la réponse
             try
             {
-                var form = new Dictionary<string, string>
-                {
-                    { "player", getAccountName() }
-                };
-
-                var responseString = await ApiService.PostFormAsync(api + "/player/challengerItems", form);
-
                 items = GLJson.Deserialize<List<GLItem>>(responseString);
             }
-            catch (HttpRequestException ex)
+            catch (System.Exception ex)
             {
-                // Log l'erreur si nécessaire
-                log("Erreur HTTP : " + ex.Message);
-            }
-            catch (Exception ex)
-            {
-                // Pour tout autre type d'erreur
                 log("Erreur : " + ex.Message);
             }
-
-            //using (var client = Utils.getClient())
-            //{
-            //    var values = new NameValueCollection();
-
-            //    try
-            //    {
-            //        values["player"] = getAccountName();
-            //        var response = client.UploadValues(api + "/player/challengerItems", values);
-            //        var responseString = Encoding.Default.GetString(response);
-            //        responseString = System.Text.RegularExpressions.Regex.Unescape(responseString);
-            //        items = GLJson.Deserialize<List<GLItem>>(responseString);
-            //    }
-            //    catch (WebException e)
-            //    {
-
-            //    }
-            //}
         }
 
         public static Boolean isUnlocked(string id)
@@ -165,32 +163,45 @@ namespace GLMod
          * Dlc
          */
 
-        public static async Task reloadDlcOwnerships()
+        public static IEnumerator reloadDlcOwnerships()
         {
-            if (!logged) return;
-            // Load from API using token
+            if (!logged)
+                yield break;
 
+            var form = new Dictionary<string, string> { { "token", token } };
+
+            string responseString = null;
+            string error = null;
+
+            // Appel de la coroutine ApiService
+            yield return ApiService.PostFormAsync(api + "/user/steamownerships", form,
+                result => {
+                    responseString = result;
+                },
+                err => {
+                    error = err;
+                }
+            );
+
+            // Vérifier l'erreur
+            if (error != null)
+            {
+                log("Erreur HTTP : " + error);
+                yield break;
+            }
+
+            // Désérialiser la réponse
             try
             {
-                var form = new Dictionary<string, string>
-                {
-                    { "token", token }
-                };
-
-                var responseString = await ApiService.PostFormAsync(api + "/user/steamownerships", form);
-
                 steamOwnerships = GLJson.Deserialize<List<int>>(responseString);
+                log("Reload DLC ownerships OK — " + steamOwnerships.Count + " items.");
             }
-            catch (HttpRequestException ex)
-            {
-                // Log si besoin
-                log("Erreur HTTP : " + ex.Message);
-            }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 log("Erreur : " + ex.Message);
             }
         }
+
         public static Boolean hasDlc(int appId)
         {
             return steamOwnerships.Count() > 0 && steamOwnerships.Contains(appId);
@@ -341,19 +352,20 @@ namespace GLMod
         }
 
         // Step 3 : Send Game (nothing for non host)
-        public static async Task SendGame()
+        public static IEnumerator SendGame()
         {
             GLMod.log("Sending game...");
+
             if (!AmongUsClient.Instance.AmHost)
             {
                 step = 3;
-                return;
+                yield break;
             }
 
             if (step != 2)
             {
                 log("[SendGame] Duplicate call");
-                return;
+                yield break;
             }
 
             if (currentGame.modName == null)
@@ -361,158 +373,158 @@ namespace GLMod
                 log("[SendGame] Modname null");
             }
 
-            try
+            var form = new Dictionary<string, string>
             {
-                var form = new Dictionary<string, string>
-                {
-                    { "code", currentGame.code },
-                    { "map", currentGame.map },
-                    { "ranked", currentGame.ranked },
-                    { "modName", currentGame.modName },
-                    { "players", GLJson.Serialize<List<GLPlayer>>(currentGame.players) }
-                };
+                { "code", currentGame.code },
+                { "map", currentGame.map },
+                { "ranked", currentGame.ranked },
+                { "modName", currentGame.modName },
+                { "players", GLJson.Serialize<List<GLPlayer>>(currentGame.players) }
+            };
 
-                // DEBUG
-                GLMod.log("startGame: " + GLJson.Serialize<List<GLPlayer>>(currentGame.players));
+            // DEBUG
+            GLMod.log("startGame: " + GLJson.Serialize<List<GLPlayer>>(currentGame.players));
 
-                var responseString = await ApiService.PostFormAsync(api + "/game/start", form);
+            string responseString = null;
+            string error = null;
 
-                currentGame.id = responseString;
-                step = 3;
+            // Appel de la coroutine ApiService
+            yield return ApiService.PostFormAsync(api + "/game/start", form,
+                result => {
+                    responseString = result;
+                },
+                err => {
+                    error = err;
+                }
+            );
 
-                await SyncGameId();
-                GLMod.log("Game sent.");
-            }
-            catch (Exception e)
+            // Gestion du résultat
+            if (error != null)
             {
-                log("[SendGame] fail, error: " + e.Message);
+                log("[SendGame] fail, error: " + error);
+                yield break;
             }
+
+            currentGame.id = responseString;
+            step = 3;
+            CoroutineRunner.Run(SyncGameId());
+            GLMod.log("Game sent.");
         }
 
         // Step 4: Sync Game Id for host
-        public static async Task SyncGameId()
+        public static IEnumerator SyncGameId()
         {
-            if (!AmongUsClient.Instance.AmHost)
-            {
-                step = 4;
-                return;
-            }
+            if (!AmongUsClient.Instance.AmHost) { step = 4; yield break; }
+            if (step != 3) { log("[SyncGameId] Duplicate call"); yield break; }
+            if (currentGame == null || string.IsNullOrEmpty(currentGame.id)) { log("[SyncGameId] Game null/id"); yield break; }
 
-            if (step != 3)
+            GLMod.stepRpc.Value = "NO";
+            yield return new WaitForSeconds(5f);
+
+            bool done = false;
+
+            Task.Run(() =>
             {
-                log("[SyncGameId] Duplicate call");
-                return;
+                try
+                {
+                    List<string> values = new() { GLMod.currentGame.getId().ToString() };
+                    GLRPCProcedure.makeRpcCall(1, values);
+                }
+                catch (Exception ex)
+                {
+                    GLMod.log("[SyncGameId] RPC fail : " + ex.Message);
+                }
+                finally { done = true; }
+            });
+
+            // 🧵 Attend la fin sans bloquer le thread principal
+            while (!done) yield return null;
+
+            GLMod.step = 4;
+        }
+
+        // External process : Add My Player
+        public static IEnumerator AddMyPlayer()
+        {
+            if (logged == false)
+            {
+                yield break;
             }
 
             if (currentGame == null)
             {
-                log("[SyncGameId] Current Game null");
-                return;
+                log("[AddMyPlayer] Current Game null");
+                yield break;
             }
 
-            if (string.IsNullOrEmpty(currentGame.id))
-            {
-                log("[SyncGameId] Game Id null or empty");
-                return;
-            }
+            PlayerControl me;
+            GLPlayer myPlayer;
 
+            // Validation initiale du joueur
             try
             {
-                GLMod.stepRpc.Value = "NO";
-
-                await Task.Delay(5000); // attendre 5 secondes
-
-                await Task.Run(() =>
-                {
-                    try
-                    {
-                        List<string> values = new List<string>() { GLMod.currentGame.getId().ToString() };
-                        GLRPCProcedure.makeRpcCall(1, values);
-                        GLMod.step = 4;
-                    }
-                    catch (Exception ex)
-                    {
-                        GLMod.log("[SyncGameId] RPC fail : " + ex.Message);
-                    }
-                });
-            } catch (Exception e)
-            {
-                log("[SyncGameId] Catch exception " + e.Message);
+                me = PlayerControl.LocalPlayer;
+                myPlayer = GLMod.currentGame.players.FindAll(p => p.playerName == me.Data.PlayerName)[0];
             }
-        }
-
-        // External process : Add My Player
-        public static async Task AddMyPlayer()
-        {
-            if (logged == false)
+            catch (Exception ex)
             {
-                return;
+                GLMod.log("[AddMyPlayer] Catch exception " + ex.Message);
+                yield break;
             }
 
-            if (currentGame == null) {
-                log("[AddMyPlayer] Current Game null");
-                return;
+            if (myPlayer == null)
+            {
+                GLMod.log("[AddMyPlayer] My player null");
+                yield break;
             }
 
-            await Task.Run(async () =>
+            if (myPlayer.role == null)
             {
-                PlayerControl me;
-                GLPlayer myPlayer;
+                GLMod.log("[AddMyPlayer] My role null");
+            }
 
-                try
-                {
-                    me = PlayerControl.LocalPlayer;
-                    myPlayer = GLMod.currentGame.players.FindAll(p => p.playerName == me.Data.PlayerName)[0];
-                }
-                catch (Exception ex)
-                {
-                    GLMod.log("[AddMyPlayer] Catch exception " + ex.Message);
-                    return;
-                }
+            if (myPlayer.team == null)
+            {
+                GLMod.log("[AddMyPlayer] My team null");
+            }
 
-                if (myPlayer == null)
-                {
-                    GLMod.log("[AddMyPlayer] My player null");
-                    return;
-                }
+            if (string.IsNullOrEmpty(myPlayer.playerName))
+            {
+                GLMod.log("[AddMyPlayer] My name null or empty");
+            }
 
-                if (myPlayer.role == null)
-                {
-                    GLMod.log("[AddMyPlayer] My role null");
-                }
+            // Attendre que l'ID du jeu soit disponible
+            while (string.IsNullOrEmpty(GLMod.currentGame.id))
+            {
+                yield return new WaitForSeconds(0.1f);
+            }
 
-                if (myPlayer.team == null)
-                {
-                    GLMod.log("[AddMyPlayer] My team null");
-                }
+            // Préparer le formulaire
+            var form = new Dictionary<string, string>
+            {
+                { "gameId", GLMod.currentGame.id },
+                { "login", GLMod.getAccountName() },
+                { "playerName", me.Data.PlayerName }
+            };
 
-                if (string.IsNullOrEmpty(myPlayer.playerName))
-                {
-                    GLMod.log("[AddMyPlayer] My name null or empty");
-                }
-                
-                while (string.IsNullOrEmpty(GLMod.currentGame.id))
-                {
-                    Thread.Sleep(100);
-                }
+            string responseString = null;
+            string error = null;
 
-                try
-                {
-                    var form = new Dictionary<string, string>
-                {
-                    { "gameId", GLMod.currentGame.id },
-                    { "login", GLMod.getAccountName() },
-                    { "playerName", me.Data.PlayerName }
-                };
+            // Appel de la coroutine ApiService
+            yield return ApiService.PostFormAsync(GLMod.api + "/game/addMyPlayer", form,
+                result => {
+                    responseString = result;
+                },
+                err => {
+                    error = err;
+                }
+            );
 
-                    // On ignore la réponse, comme dans ton code d'origine
-                    await ApiService.PostFormAsync(GLMod.api + "/game/addMyPlayer", form);
-                }
-                catch (Exception e)
-                {
-                    GLMod.log("[AddMyPlayer] Add my player fail, error: " + e.Message);
-                }
-            });
+            // Gestion des erreurs
+            if (error != null)
+            {
+                GLMod.log("[AddMyPlayer] Add my player fail, error: " + error);
+            }
         }
 
         // Step 5 : Set Winner Teams
@@ -589,50 +601,73 @@ namespace GLMod
         }
 
         // Step 6 : End Game
-        public static async Task EndGame()
+
+        public static IEnumerator EndGame()
         {
             GLMod.log("Ending game...");
+
             if (!AmongUsClient.Instance.AmHost)
             {
                 step = 0;
-                return;
+                yield break;
             }
 
             if (step != 5)
             {
                 log("[EndGame] Call when in step " + step);
-                return;
+                yield break;
             }
-            
+
             if (currentGame == null)
             {
                 log("[EndGame] Current Game null");
-                return;
+                yield break;
             }
 
             BackgroundEvents.endBackgroundProcess();
 
-            try
+            string error = null;
+            bool done = false;
+
+            System.Threading.Tasks.Task.Run(async () =>
             {
-                string json = GLJson.Serialize<GLGame>(currentGame);
-                
-                // DEBUG
-                // GLMod.log("endGame: "+ json);
+                try
+                {
+                    string json = GLJson.Serialize<GLGame>(currentGame);
 
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                    // DEBUG
+                    // GLMod.log("endGame: "+ json);
 
-                var response = await HttpHelper.Client.PostAsync(api + "/game/end", content);
-                response.EnsureSuccessStatusCode();
+                    var content = new StringContent(json, Encoding.UTF8, "application/json");
+                    var response = await HttpHelper.Client.PostAsync(api + "/game/end", content);
+                    response.EnsureSuccessStatusCode();
 
-                // Lecture de la réponse si tu en as besoin
-                var result = await response.Content.ReadAsStringAsync();
+                    // Lecture de la réponse si nécessaire
+                    var result = await response.Content.ReadAsStringAsync();
+                }
+                catch (Exception e)
+                {
+                    error = e.Message;
+                }
+                finally
+                {
+                    done = true;
+                }
+            });
 
+            // Attendre la fin de la tâche
+            while (!done)
+                yield return null;
+
+            // Gestion du résultat
+            if (error != null)
+            {
+                log("[EndGame] End Game fail, error: " + error);
+            }
+            else
+            {
                 step = 0;
                 GLMod.log("Game ended.");
-            }
-            catch (Exception e)
-            {
-                log("[EndGame] End Game fail, error: " + e.Message);
             }
         }
 
@@ -707,72 +742,70 @@ namespace GLMod
          * Connnection
          */
 
-        public static async Task login()
+        public static IEnumerator login()
         {
-            try
+            var steamId = SteamUser.GetSteamID().m_SteamID.ToString();
+            var form = new Dictionary<string, string> { { "steamId", steamId } };
+
+            ApiResponse response = null;
+
+            // Appel de la coroutine ApiService
+            yield return ApiService.PostFormWithErrorHandlingAsync(api + "/user/login", form,
+                apiResponse => {
+                    response = apiResponse;
+                }
+            );
+
+            // Vérifier si la réponse est null (ne devrait jamais arriver avec PostFormWithErrorHandlingAsync)
+            if (response == null)
             {
-                var steamId = SteamUser.GetSteamID().ToString();
-                var form = new Dictionary<string, string>
-        {
-            { "steamId", steamId }
-        };
-                var response = await ApiService.PostFormWithErrorHandlingAsync(api + "/user/login", form);
-
-                if (response.IsSuccess)
-                {
-                    log("Login success");
-                    token = response.Content;
-                    connectionState.Value = "Yes";
-                    logged = true;
-                    isBanned = false;
-                    banReason = "";
-                }
-                else if (response.StatusCode == 403)
-                {
-                    // Gestion spécifique de l'erreur 403 (bannissement)
-                    var trimmedContent = response.Content?.Trim();
-
-                    // Retirer les guillemets doubles si présents
-                    if (trimmedContent != null && trimmedContent.StartsWith("\"") && trimmedContent.EndsWith("\""))
-                    {
-                        trimmedContent = trimmedContent.Substring(1, trimmedContent.Length - 2);
-                    }
-
-                    if (!string.IsNullOrEmpty(trimmedContent) && trimmedContent.StartsWith("Banned: ", StringComparison.OrdinalIgnoreCase))
-                    {
-                        isBanned = true;
-                        banReason = trimmedContent.Substring("Banned: ".Length);
-                        log("User banned, reason: " + banReason);
-                    }
-                    else
-                    {
-                        log($"Login failed for unknown reason - Status code: {response.StatusCode}");
-                        isBanned = false;
-                        banReason = "";
-                    }
-                    token = "";
-                    connectionState.Value = "No";
-                    logged = false;
-                }
-                else
-                {
-                    log($"Login failed for unknown reason - Status code: {response.StatusCode}");
-                    token = "";
-                    connectionState.Value = "No";
-                    logged = false;
-                    isBanned = false;
-                    banReason = "";
-                }
+                log("Login failed, no response");
+                SetLoginState(false, "", false, "");
+                yield break;
             }
-            catch (Exception e)
+
+            // Interprète la réponse
+            if (response.IsSuccess)
             {
-                log("Login failed, error: " + e.Message);
-                token = "";
-                connectionState.Value = "No";
-                logged = false;
+                log("Login success");
+                token = response.Content;
+                connectionState.Value = "Yes";
+                logged = true;
                 isBanned = false;
                 banReason = "";
             }
+            else if (response.StatusCode == 403)
+            {
+                var trimmed = response.Content?.Trim('"').Trim();
+                if (!string.IsNullOrEmpty(trimmed) && trimmed.StartsWith("Banned: ", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    isBanned = true;
+                    banReason = trimmed.Substring("Banned: ".Length);
+                    log("User banned, reason: " + banReason);
+                }
+                else
+                {
+                    log($"Login failed 403: {trimmed}");
+                    isBanned = false;
+                    banReason = "";
+                }
+                SetLoginState(false, "", isBanned, banReason);
+            }
+            else
+            {
+                log($"Login failed - Status code: {response.StatusCode}");
+                SetLoginState(false, "", false, "");
+            }
+        }
+
+
+        private static void SetLoginState(bool ok, string tok, bool banned, string reason)
+        {
+            logged = ok;
+            token = tok;
+            isBanned = banned;
+            banReason = reason;
+            connectionState.Value = ok ? "Yes" : "No";
         }
 
         public static void logout()
@@ -796,33 +829,60 @@ namespace GLMod
             return logged;
         }
 
-        public static async Task<GLRank> getRank(string customModName = null)
+        public static IEnumerator getRank(string customModName, System.Action<GLRank> onComplete)
         {
             if (customModName == null)
             {
                 customModName = GLMod.modName;
             }
+
             GLRank errorRank = new GLRank();
+
             if (!logged)
             {
                 errorRank.error = "Offline";
-                return errorRank;
+                onComplete?.Invoke(errorRank);
+                yield break;
             }
+
             var form = new Dictionary<string, string>
             {
                 { "player", getAccountName() },
                 { "mod", customModName }
             };
 
-            try
-            {
-                var responseString = await ApiService.PostFormAsync(api + "/player/rank", form);
-                return GLJson.Deserialize<GLRank>(responseString);
-            }
-            catch (HttpRequestException)
+            string responseString = null;
+            string error = null;
+
+            // Appel de la coroutine ApiService
+            yield return ApiService.PostFormAsync(api + "/player/rank", form,
+                result => {
+                    responseString = result;
+                },
+                err => {
+                    error = err;
+                }
+            );
+
+            // Gestion du résultat
+            if (error != null)
             {
                 errorRank.error = "Login fail";
-                return errorRank;
+                onComplete?.Invoke(errorRank);
+                yield break;
+            }
+
+            // Désérialiser et retourner le rang
+            try
+            {
+                GLRank rank = GLJson.Deserialize<GLRank>(responseString);
+                onComplete?.Invoke(rank);
+            }
+            catch (System.Exception ex)
+            {
+                log("Erreur lors de la désérialisation du rang: " + ex.Message);
+                errorRank.error = "Parse error";
+                onComplete?.Invoke(errorRank);
             }
         }
 
@@ -830,27 +890,119 @@ namespace GLMod
          * Translations
          */
 
-        public static async Task loadTranslations()
+        public static IEnumerator loadTranslations()
         {
             string languagesURL = api + "/trans";
-            string lg = "";
-            try
+            string lg = null;
+            string error = null;
+            bool done = false;
+
+            // Charger la liste des langues
+            System.Threading.Tasks.Task.Run(async () =>
             {
-                lg = await HttpHelper.Client.GetStringAsync(languagesURL);
-            }
-            catch (Exception e)
+                try
+                {
+                    lg = await HttpHelper.Client.GetStringAsync(languagesURL);
+                }
+                catch (Exception e)
+                {
+                    error = e.Message;
+                }
+                finally
+                {
+                    done = true;
+                }
+            });
+
+            // Attendre la fin du chargement
+            while (!done)
+                yield return null;
+
+            // Vérifier l'erreur
+            if (error != null)
             {
-                GLMod.log("Load translations error: " + e.Message);
+                GLMod.log("Load translations error: " + error);
+                yield break;
             }
+
+            // Désérialiser les langues
             languages = GLJson.Deserialize<List<GLLanguage>>(lg);
 
-            List<Task> tasks = new List<Task>();
-
+            // Lancer toutes les coroutines de chargement en parallèle
+            List<Coroutine> loadingCoroutines = new List<Coroutine>();
             foreach (GLLanguage l in languages)
             {
-                tasks.Add(l.load());
+                loadingCoroutines.Add(CoroutineRunner.Run(l.load()));
             }
-            await Task.WhenAll(tasks);
+
+            // Attendre que toutes les coroutines se terminent
+            // (Note: Il n'y a pas de mécanisme natif pour attendre plusieurs coroutines,
+            // donc on attend juste un peu pour laisser le temps aux coroutines de se terminer)
+            // Pour une vraie synchronisation, il faudrait un système de compteur
+            yield return new WaitForSeconds(2f); // Ajustez selon vos besoins
+        }
+
+        // Version améliorée avec compteur pour vraiment attendre la fin :
+        public static IEnumerator loadTranslationsWithCounter()
+        {
+            string languagesURL = api + "/trans";
+            string lg = null;
+            string error = null;
+            bool done = false;
+
+            // Charger la liste des langues
+            System.Threading.Tasks.Task.Run(async () =>
+            {
+                try
+                {
+                    lg = await HttpHelper.Client.GetStringAsync(languagesURL);
+                }
+                catch (Exception e)
+                {
+                    error = e.Message;
+                }
+                finally
+                {
+                    done = true;
+                }
+            });
+
+            // Attendre la fin du chargement
+            while (!done)
+                yield return null;
+
+            // Vérifier l'erreur
+            if (error != null)
+            {
+                GLMod.log("Load translations error: " + error);
+                yield break;
+            }
+
+            // Désérialiser les langues
+            languages = GLJson.Deserialize<List<GLLanguage>>(lg);
+
+            // Compteur pour suivre les chargements terminés
+            int totalLanguages = languages.Count;
+            int loadedLanguages = 0;
+
+            // Lancer toutes les coroutines de chargement en parallèle
+            foreach (GLLanguage l in languages)
+            {
+                CoroutineRunner.Run(loadLanguageWithCallback(l, () => { loadedLanguages++; }));
+            }
+
+            // Attendre que toutes les langues soient chargées
+            while (loadedLanguages < totalLanguages)
+                yield return null;
+
+            GLMod.log($"All {totalLanguages} languages loaded successfully.");
+        }
+
+        // Wrapper pour ajouter un callback à la fin du chargement
+        private static IEnumerator loadLanguageWithCallback(GLLanguage language, System.Action onComplete)
+        {
+            yield return language.load();
+            onComplete?.Invoke();
         }
 
         public static string translate(string toTranslate)
@@ -919,35 +1071,63 @@ namespace GLMod
             }
         }
 
-        public static async Task<string> getApiData(string id)
+        public static IEnumerator getApiData(string id, System.Action<string> onComplete, System.Action<string> onError = null)
         {
-            try
-            {
-                var form = new Dictionary<string, string>
-                {
-                    { "id", id }
-                };
+            var form = new Dictionary<string, string>
+    {
+        { "id", id }
+    };
 
-                var responseString = await ApiService.PostFormAsync(api + "/data", form);
+            string responseString = null;
+            string error = null;
 
-                return responseString;
-            }
-            catch (HttpRequestException ex)
+            // Appel de la coroutine ApiService
+            yield return ApiService.PostFormAsync(api + "/data", form,
+                result => {
+                    responseString = result;
+                },
+                err => {
+                    error = err;
+                }
+            );
+
+            // Gestion du résultat
+            if (error != null)
             {
-                // Log l'erreur si nécessaire
-                log("Erreur HTTP : " + ex.Message);
+                log("Erreur HTTP : " + error);
+                onError?.Invoke(error);
+                onComplete?.Invoke(""); // Retourner une chaîne vide en cas d'erreur (comportement original)
+                yield break;
             }
-            catch (Exception ex)
-            {
-                // Pour tout autre type d'erreur
-                log("Erreur : " + ex.Message);
-            }
-            return "";
+
+            onComplete?.Invoke(responseString);
         }
 
-        public static async Task<string> getChecksum(string checksumId)
+        public static IEnumerator getChecksum(string checksumId, System.Action<string> onComplete, System.Action<string> onError = null)
         {
-            return await getApiData("checksum_"+checksumId);
+            string result = null;
+            string error = null;
+
+            // Appeler getApiData en coroutine
+            yield return getApiData("checksum_" + checksumId,
+                data => {
+                    result = data;
+                },
+                err => {
+                    error = err;
+                }
+            );
+
+            // Gestion du résultat
+            if (error != null)
+            {
+                log($"getChecksum failed for {checksumId}, error: {error}");
+                onError?.Invoke(error);
+            }
+            else
+            {
+                onComplete?.Invoke(result);
+            }
         }
 
         private static string CalculateFileSHA512(string filePath)
@@ -960,27 +1140,84 @@ namespace GLMod
             }
         }
 
-        public static async Task<bool> verifyDll(string checksumId, string dllPath)
+
+        public static IEnumerator verifyDll(string checksumId, string dllPath, System.Action<bool> onComplete, System.Action<string> onError = null)
         {
             string localChecksum = GLMod.CalculateFileSHA512(dllPath);
-            string remoteChecksum = await GLMod.getChecksum(checksumId);
             log("Local checksum: " + localChecksum);
+
+            string remoteChecksum = null;
+            bool hasError = false;
+            string errorMessage = null;
+
+            // Appeler la coroutine getChecksum et attendre son résultat
+            yield return getChecksum(checksumId,
+                checksum => {
+                    remoteChecksum = checksum;
+                },
+                error => {
+                    hasError = true;
+                    errorMessage = error;
+                }
+            );
+
+            // Vérifier si une erreur s'est produite
+            if (hasError)
+            {
+                log($"verifyDll failed for {checksumId}, error: {errorMessage}");
+                onError?.Invoke(errorMessage);
+                yield break;
+            }
+
+            // Comparer les checksums
             log("Remote checksum: " + remoteChecksum);
+
+            bool result;
             if (localChecksum == remoteChecksum)
             {
                 log("Valid checksum");
-                return true;
+                result = true;
             }
-            log("Invalid checksum");
-            return false;
+            else
+            {
+                log("Invalid checksum");
+                result = false;
+            }
+
+            onComplete?.Invoke(result);
         }
 
-        private static async Task<bool> verifyGLMod()
+        private static IEnumerator verifyGLMod(System.Action<bool> onComplete, System.Action<string> onError = null)
         {
             var pluginAttribute = typeof(GLMod).GetCustomAttribute<BepInPlugin>();
             string version = pluginAttribute?.Version.ToString();
             log(version);
-            return await verifyDll("glmod"+ version, "BepInEx/plugins/glmod.dll");
+
+            bool result = false;
+            bool hasError = false;
+            string errorMessage = null;
+
+            // Appeler la coroutine verifyDll et attendre son résultat
+            yield return verifyDll("glmod" + version, "BepInEx/plugins/glmod.dll",
+                isValid => {
+                    result = isValid;
+                },
+                error => {
+                    hasError = true;
+                    errorMessage = error;
+                }
+            );
+
+            // Vérifier si une erreur s'est produite
+            if (hasError)
+            {
+                log($"verifyGLMod failed, error: {errorMessage}");
+                onError?.Invoke(errorMessage);
+                yield break;
+            }
+
+            onComplete?.Invoke(result);
         }
+
     }
 }
