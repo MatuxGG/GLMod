@@ -26,7 +26,7 @@ using Random = System.Random;
 
 namespace GLMod
 {
-    [BepInPlugin(Id, "GLMod", "5.1.7")]
+    [BepInPlugin(Id, "GLMod", "5.2.0")]
     [BepInProcess("Among Us.exe")]
     public class GLMod : BasePlugin
     {
