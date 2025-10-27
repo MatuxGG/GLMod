@@ -26,7 +26,7 @@ using Random = System.Random;
 
 namespace GLMod
 {
-    [BepInPlugin(Id, "GLMod", "5.2.0")]
+    [BepInPlugin(Id, "GLMod", "5.2.1")]
     [BepInProcess("Among Us.exe")]
     public class GLMod : BasePlugin
     {
@@ -108,6 +108,11 @@ namespace GLMod
 
             CoroutineRunner.Init();
 
+            CoroutineRunner.Run(GLMod.verifyGLMod(null, result =>
+            {
+                log("GLMod verified: " +  result);
+            }));
+
             Harmony.PatchAll();
         }
 
@@ -136,6 +141,7 @@ namespace GLMod
                 }
             );
 
+
             // Vérifier l'erreur
             if (error != null)
             {
@@ -147,6 +153,7 @@ namespace GLMod
             try
             {
                 items = GLJson.Deserialize<List<GLItem>>(responseString);
+                log("Reload successes OK — " + items.Count + " successes.");
             }
             catch (System.Exception ex)
             {
@@ -352,19 +359,21 @@ namespace GLMod
         }
 
         // Step 3 : Send Game (nothing for non host)
-        public static IEnumerator SendGame()
+        public static IEnumerator SendGame(System.Action<bool> onComplete = null)
         {
             GLMod.log("Sending game...");
 
             if (!AmongUsClient.Instance.AmHost)
             {
                 step = 3;
+                onComplete?.Invoke(false);
                 yield break;
             }
 
             if (step != 2)
             {
                 log("[SendGame] Duplicate call");
+                onComplete?.Invoke(false);
                 yield break;
             }
 
@@ -402,21 +411,25 @@ namespace GLMod
             if (error != null)
             {
                 log("[SendGame] fail, error: " + error);
+                onComplete?.Invoke(false);
                 yield break;
             }
 
             currentGame.id = responseString;
             step = 3;
-            CoroutineRunner.Run(SyncGameId());
-            GLMod.log("Game sent.");
+            CoroutineRunner.Run(SyncGameId(result =>
+            {
+                GLMod.log("Game sent.");
+                onComplete?.Invoke(result);
+            }));
         }
 
         // Step 4: Sync Game Id for host
-        public static IEnumerator SyncGameId()
+        public static IEnumerator SyncGameId(System.Action<bool> onComplete = null)
         {
-            if (!AmongUsClient.Instance.AmHost) { step = 4; yield break; }
-            if (step != 3) { log("[SyncGameId] Duplicate call"); yield break; }
-            if (currentGame == null || string.IsNullOrEmpty(currentGame.id)) { log("[SyncGameId] Game null/id"); yield break; }
+            if (!AmongUsClient.Instance.AmHost) { step = 4; onComplete?.Invoke(false); yield break; }
+            if (step != 3) { log("[SyncGameId] Duplicate call"); onComplete?.Invoke(false); yield break; }
+            if (currentGame == null || string.IsNullOrEmpty(currentGame.id)) { log("[SyncGameId] Game null/id"); onComplete?.Invoke(false); yield break; }
 
             GLMod.stepRpc.Value = "NO";
             yield return new WaitForSeconds(5f);
@@ -441,19 +454,22 @@ namespace GLMod
             while (!done) yield return null;
 
             GLMod.step = 4;
+            onComplete?.Invoke(true);
         }
 
         // External process : Add My Player
-        public static IEnumerator AddMyPlayer()
+        public static IEnumerator AddMyPlayer(System.Action<bool> onComplete = null)
         {
             if (logged == false)
             {
+                onComplete?.Invoke(false);
                 yield break;
             }
 
             if (currentGame == null)
             {
                 log("[AddMyPlayer] Current Game null");
+                onComplete?.Invoke(false);
                 yield break;
             }
 
@@ -469,12 +485,14 @@ namespace GLMod
             catch (Exception ex)
             {
                 GLMod.log("[AddMyPlayer] Catch exception " + ex.Message);
+                onComplete?.Invoke(false);
                 yield break;
             }
 
             if (myPlayer == null)
             {
                 GLMod.log("[AddMyPlayer] My player null");
+                onComplete?.Invoke(false);
                 yield break;
             }
 
@@ -525,6 +543,7 @@ namespace GLMod
             {
                 GLMod.log("[AddMyPlayer] Add my player fail, error: " + error);
             }
+            onComplete?.Invoke(true);
         }
 
         // Step 5 : Set Winner Teams
@@ -742,7 +761,7 @@ namespace GLMod
          * Connnection
          */
 
-        public static IEnumerator login()
+        public static IEnumerator login(System.Action<bool> onComplete = null)
         {
             var steamId = SteamUser.GetSteamID().m_SteamID.ToString();
             var form = new Dictionary<string, string> { { "steamId", steamId } };
@@ -773,6 +792,7 @@ namespace GLMod
                 logged = true;
                 isBanned = false;
                 banReason = "";
+                onComplete?.Invoke(true); // Succès
             }
             else if (response.StatusCode == 403)
             {
@@ -790,11 +810,13 @@ namespace GLMod
                     banReason = "";
                 }
                 SetLoginState(false, "", isBanned, banReason);
+                onComplete?.Invoke(false); // Échec
             }
             else
             {
                 log($"Login failed - Status code: {response.StatusCode}");
                 SetLoginState(false, "", false, "");
+                onComplete?.Invoke(false); // Échec
             }
         }
 
@@ -1074,9 +1096,9 @@ namespace GLMod
         public static IEnumerator getApiData(string id, System.Action<string> onComplete, System.Action<string> onError = null)
         {
             var form = new Dictionary<string, string>
-    {
-        { "id", id }
-    };
+            {
+                { "id", id }
+            };
 
             string responseString = null;
             string error = null;
@@ -1107,6 +1129,7 @@ namespace GLMod
         {
             string result = null;
             string error = null;
+            log("getChecksum:" + checksumId);
 
             // Appeler getApiData en coroutine
             yield return getApiData("checksum_" + checksumId,
@@ -1200,9 +1223,11 @@ namespace GLMod
             // Appeler la coroutine verifyDll et attendre son résultat
             yield return verifyDll("glmod" + version, "BepInEx/plugins/glmod.dll",
                 isValid => {
+                    log("test1");
                     result = isValid;
                 },
                 error => {
+                    log("test2");
                     hasError = true;
                     errorMessage = error;
                 }

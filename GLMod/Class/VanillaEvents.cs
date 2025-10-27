@@ -31,9 +31,13 @@ namespace GLMod
                         GLMod.AddPlayer(p?.Data?.PlayerName, role, team, color);
                     }
 
-                    CoroutineRunner.Run(GLMod.SendGame());
-                    CoroutineRunner.Run(GLMod.AddMyPlayer());
-                    GLMod.log("Game started.");
+                    CoroutineRunner.Run(GLMod.SendGame(result =>
+                    {
+                        CoroutineRunner.Run(GLMod.AddMyPlayer(result =>
+                        {
+                            GLMod.log("Game started.");
+                        }));
+                    }));
                 }
                 catch (Exception e)
                 {

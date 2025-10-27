@@ -27,19 +27,20 @@ namespace GLMod
 
                     try
                     {
-                        CoroutineRunner.Run(GLMod.login());
-                        if (!GLMod.withUnityExplorer)
+                        CoroutineRunner.Run(GLMod.login(success =>
                         {
-                            CoroutineRunner.Run(GLMod.reloadItems());
-                            CoroutineRunner.Run(GLMod.reloadDlcOwnerships());
-                        }
+                            if (!GLMod.withUnityExplorer)
+                            {
+                                CoroutineRunner.Run(GLMod.reloadItems());
+                                CoroutineRunner.Run(GLMod.reloadDlcOwnerships());
+                            }
+                        }));
                     }
                     catch (Exception e)
                     {
                         GLMod.disableAllServices();
                         GLMod.log(e.Source.ToString() + " / " + e.InnerException.ToString() + " / " + e.Message.ToString());
                     }
-
                 }
                 else
                 {
@@ -50,25 +51,27 @@ namespace GLMod
                 
             }
 
-            if (SteamManager.Initialized)
-            {
-                if (GLMod.token == null)
-                {
-                    try
-                    {
-                        CoroutineRunner.Run(GLMod.login());
-                        if (!GLMod.withUnityExplorer)
-                        {
-                            CoroutineRunner.Run(GLMod.reloadItems());
-                            CoroutineRunner.Run(GLMod.reloadDlcOwnerships());
-                        }
-                    } catch (Exception e)
-                    {
-                        GLMod.disableAllServices();
-                        GLMod.log(e.Source.ToString() + " / " + e.InnerException.ToString() + " / " + e.Message.ToString());
-                    }
-                }
-            }
+            //if (SteamManager.Initialized)
+            //{
+            //    if (GLMod.token == null)
+            //    {
+            //        try
+            //        {
+            //            CoroutineRunner.Run(GLMod.login(success =>
+            //            {
+            //                if (!GLMod.withUnityExplorer)
+            //                {
+            //                    CoroutineRunner.Run(GLMod.reloadItems());
+            //                    CoroutineRunner.Run(GLMod.reloadDlcOwnerships());
+            //                }
+            //            }));
+            //        } catch (Exception e)
+            //        {
+            //            GLMod.disableAllServices();
+            //            GLMod.log(e.Source.ToString() + " / " + e.InnerException.ToString() + " / " + e.Message.ToString());
+            //        }
+            //    }
+            //}
         }
     }
 }

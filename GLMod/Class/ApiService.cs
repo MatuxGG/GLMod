@@ -26,13 +26,11 @@ namespace GLMod
                     response.EnsureSuccessStatusCode();
                     var responseString = await response.Content.ReadAsStringAsync();
                     result = System.Text.RegularExpressions.Regex.Unescape(responseString);
+                    done = true;
                 }
                 catch (System.Exception ex)
                 {
                     error = ex.Message;
-                }
-                finally
-                {
                     done = true;
                 }
             });
