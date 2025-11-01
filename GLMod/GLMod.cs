@@ -23,6 +23,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 using GLMod.Enums;
+using GLMod.Constants;
+using GLMod.Services;
 using Random = System.Random;
 
 namespace GLMod
@@ -35,6 +37,9 @@ namespace GLMod
 
         public Harmony Harmony { get; } = new Harmony(Id);
 
+        // Services
+        public static IAuthenticationService AuthService { get; private set; }
+
         public static ConfigEntry<string> connectionState { get; private set; }
         public static ConfigEntry<string> translations { get; private set; }
         public static ConfigEntry<string> stepConf { get; private set; }
@@ -42,11 +47,8 @@ namespace GLMod
         public static ConfigEntry<string> enabled { get; private set; }
         public static ConfigEntry<string> supportId { get; private set; }
 
-        public static string token = null;
-
         public const string api = GameConstants.API_ENDPOINT;
 
-        public static Boolean logged;
         public static GLGame currentGame;
         public static List<string> enabledServices;
         public static string gameCode = GameConstants.DEFAULT_GAME_CODE;
@@ -61,8 +63,19 @@ namespace GLMod
         public static bool withUnityExplorer = false;
         internal static BepInEx.Logging.ManualLogSource Logger;
         public static List<GLItem> items = new List<GLItem>() { };
-        public static bool isBanned = false;
-        public static string banReason = "";
+
+        // Deprecated - Use AuthService instead
+        [Obsolete("Use AuthService.Token instead")]
+        public static string token => AuthService?.Token;
+
+        [Obsolete("Use AuthService.IsLoggedIn instead")]
+        public static bool logged => AuthService?.IsLoggedIn ?? false;
+
+        [Obsolete("Use AuthService.IsBanned instead")]
+        public static bool isBanned => AuthService?.IsBanned ?? false;
+
+        [Obsolete("Use AuthService.BanReason instead")]
+        public static string banReason => AuthService?.BanReason ?? "";
 
         public override void Load()
         {
@@ -74,6 +87,9 @@ namespace GLMod
             stepConf = Config.Bind("Validation", "steps", "");
             stepRpc = Config.Bind("Validation", "RPC", "");
             configPath = Path.GetDirectoryName(Config.ConfigFilePath);
+
+            // Initialize services
+            AuthService = new AuthenticationService(connectionState);
           
             Random random = new Random();
             string newSupportId = new string(Enumerable.Repeat(GameConstants.SUPPORT_ID_CHARS, GameConstants.SUPPORT_ID_LENGTH)
@@ -122,7 +138,7 @@ namespace GLMod
 
         public static IEnumerator reloadItems()
         {
-            if (!logged)
+            if (!AuthService.IsLoggedIn)
                 yield break;
 
             var form = new Dictionary<string, string> { { "player", getAccountName() } };
@@ -171,10 +187,10 @@ namespace GLMod
 
         public static IEnumerator reloadDlcOwnerships()
         {
-            if (!logged)
+            if (!AuthService.IsLoggedIn)
                 yield break;
 
-            var form = new Dictionary<string, string> { { "token", token } };
+            var form = new Dictionary<string, string> { { "token", AuthService.Token } };
 
             string responseString = null;
             string error = null;
@@ -459,7 +475,7 @@ namespace GLMod
         // External process : Add My Player
         public static IEnumerator AddMyPlayer(System.Action<bool> onComplete = null)
         {
-            if (logged == false)
+            if (!AuthService.IsLoggedIn)
             {
                 onComplete?.Invoke(false);
                 yield break;
@@ -761,22 +777,7 @@ namespace GLMod
 
         public static string getAccountName()
         {
-            try
-            {
-                if (!logged || token == "")
-                {
-                    return "";
-                }
-                else
-                {
-                    return token.Substring(0, token.IndexOf("#"));
-                }
-            } catch (Exception e)
-            {
-                log("[getAccountName] Catch exception " + e.Message);
-                return "";
-            }
-            
+            return AuthService?.GetAccountName() ?? "";
         }
 
         /*
@@ -785,92 +786,24 @@ namespace GLMod
 
         public static IEnumerator login(System.Action<bool> onComplete = null)
         {
-            var steamId = SteamUser.GetSteamID().m_SteamID.ToString();
-            var form = new Dictionary<string, string> { { "steamId", steamId } };
-
-            ApiResponse response = null;
-
-            // Appel de la coroutine ApiService
-            yield return ApiService.PostFormWithErrorHandlingAsync(api + "/user/login", form,
-                apiResponse => {
-                    response = apiResponse;
-                }
-            );
-
-            // Vérifier si la réponse est null (ne devrait jamais arriver avec PostFormWithErrorHandlingAsync)
-            if (response == null)
+            if (AuthService == null)
             {
-                log("Login failed, no response");
-                SetLoginState(false, "", false, "");
+                log("AuthService not initialized");
+                onComplete?.Invoke(false);
                 yield break;
             }
 
-            // Interprète la réponse
-            if (response.IsSuccess)
-            {
-                log("Login success");
-                token = response.Content;
-                connectionState.Value = "Yes";
-                logged = true;
-                isBanned = false;
-                banReason = "";
-                onComplete?.Invoke(true); // Succès
-            }
-            else if (response.StatusCode == 403)
-            {
-                var trimmed = response.Content?.Trim('"').Trim();
-                if (!string.IsNullOrEmpty(trimmed) && trimmed.StartsWith("Banned: ", System.StringComparison.OrdinalIgnoreCase))
-                {
-                    isBanned = true;
-                    banReason = trimmed.Substring("Banned: ".Length);
-                    log("User banned, reason: " + banReason);
-                }
-                else
-                {
-                    log($"Login failed 403: {trimmed}");
-                    isBanned = false;
-                    banReason = "";
-                }
-                SetLoginState(false, "", isBanned, banReason);
-                onComplete?.Invoke(false); // Échec
-            }
-            else
-            {
-                log($"Login failed - Status code: {response.StatusCode}");
-                SetLoginState(false, "", false, "");
-                onComplete?.Invoke(false); // Échec
-            }
-        }
-
-
-        private static void SetLoginState(bool ok, string tok, bool banned, string reason)
-        {
-            logged = ok;
-            token = tok;
-            isBanned = banned;
-            banReason = reason;
-            connectionState.Value = ok ? "Yes" : "No";
+            yield return AuthService.Login(onComplete);
         }
 
         public static void logout()
         {
-            try
-            {
-                if (token != "")
-                {
-                    logged = false;
-                    token = "";
-                }
-            } catch (Exception e)
-            {
-                log("[logout] Catch exception " + e.Message);
-            }
-           
+            AuthService?.Logout();
         }
 
-        public static Boolean isLoggedIn()
+        public static bool isLoggedIn()
         {
-            return logged;
+            return AuthService?.IsLoggedIn ?? false;
         }
 
         public static IEnumerator getRank(string customModName, System.Action<GLRank> onComplete)
@@ -882,7 +815,7 @@ namespace GLMod
 
             GLRank errorRank = new GLRank();
 
-            if (!logged)
+            if (!AuthService.IsLoggedIn)
             {
                 errorRank.error = "Offline";
                 onComplete?.Invoke(errorRank);
