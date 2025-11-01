@@ -19,7 +19,7 @@ namespace GLMod
                 List<string> values = new List<string> { reason.ToString(), playerName ?? "" };
                 GLRPCProcedure.makeRpcCall(2, values);
                 BackgroundEvents.handleDc(reason.ToString(), playerName);
-                GLMod.step = GameStep.Initial;
+                GLMod.GameStateManager.Step = GameStep.Initial;
             }
         }
         [HarmonyPatch(typeof(InnerNetClient), nameof(InnerNetClient.HandleDisconnect))]
@@ -31,7 +31,7 @@ namespace GLMod
                 List<string> values = new List<string> { reason.ToString(), playerName ?? "" };
                 GLRPCProcedure.makeRpcCall(3, values);
                 BackgroundEvents.handleDc(reason.ToString(), playerName);
-                GLMod.step = GameStep.Initial;
+                GLMod.GameStateManager.Step = GameStep.Initial;
             }
 
         }
@@ -44,7 +44,7 @@ namespace GLMod
                 List<string> values = new List<string> { playerName ?? "" };
                 GLRPCProcedure.makeRpcCall(3, values);
                 BackgroundEvents.handleDc("On Disconnect", playerName);
-                GLMod.step = GameStep.Initial;
+                GLMod.GameStateManager.Step = GameStep.Initial;
             }
 
         }

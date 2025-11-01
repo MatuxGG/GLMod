@@ -17,7 +17,7 @@ namespace GLMod
             this.x = x;
             this.y = y;
             this.triggerTime = triggerTime;
-            this.turn = GLMod.currentGame.turns;
+            this.turn = GLMod.GameStateManager.CurrentGame.turns;
         }
     }
 }

@@ -14,7 +14,7 @@ namespace GLMod
         {
             if (GLMod.existService("StartGame") || GLMod.debug)
             {
-                if (GLMod.step != GameStep.Initial)
+                if (GLMod.GameStateManager.Step != GameStep.Initial)
                 {
                     yield break;
                 }
@@ -22,7 +22,7 @@ namespace GLMod
                 try
                 {
                     GLMod.log("Starting game...");
-                    GLMod.StartGame("******", GLMod.gameMap, false);
+                    GLMod.StartGame("******", GLMod.GameStateManager.GameMap, false);
 
                     foreach (PlayerControl p in PlayerControl.AllPlayerControls)
                     {

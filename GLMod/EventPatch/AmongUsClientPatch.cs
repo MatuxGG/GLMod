@@ -17,7 +17,7 @@ namespace GLMod
                 {
                     foreach (PlayerControl player in PlayerControl.AllPlayerControls)
                     {
-                        GLMod.currentGame.players.FindAll(p => p.playerName == player.Data.PlayerName).ForEach(p => p.setTasksMax(player.Data.Tasks.Count));
+                        GLMod.GameStateManager.CurrentGame.players.FindAll(p => p.playerName == player.Data.PlayerName).ForEach(p => p.setTasksMax(player.Data.Tasks.Count));
                     }
                 }
 

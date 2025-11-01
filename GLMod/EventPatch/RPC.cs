@@ -58,15 +58,15 @@ namespace GLMod
             {
                 case 1: // Step 4 : Receive Game Id for non host
                         // Attendre que le jeu soit au bon step et que currentGame existe
-                    while (GLMod.step != GameStep.GameIdSynced || GLMod.currentGame == null)
+                    while (GLMod.GameStateManager.Step != GameStep.GameIdSynced || GLMod.GameStateManager.CurrentGame == null)
                     {
                         yield return new WaitForSeconds(GameConstants.RPC_POLLING_INTERVAL);
                     }
 
                     try
                     {
-                        GLMod.currentGame.setId(int.Parse(values[0]));
-                        GLMod.step = GameStep.PlayersRecorded;
+                        GLMod.GameStateManager.CurrentGame.setId(int.Parse(values[0]));
+                        GLMod.GameStateManager.Step = GameStep.PlayersRecorded;
                     }
                     catch (Exception ex)
                     {
