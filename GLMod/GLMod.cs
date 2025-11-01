@@ -22,6 +22,9 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
+using GLMod.Enums;
+using GLMod.Constants;
+using GLMod.Services;
 using Random = System.Random;
 
 namespace GLMod
@@ -34,6 +37,10 @@ namespace GLMod
 
         public Harmony Harmony { get; } = new Harmony(Id);
 
+        // Services
+        public static IAuthenticationService AuthService { get; private set; }
+        public static ITranslationService TranslationService { get; private set; }
+
         public static ConfigEntry<string> connectionState { get; private set; }
         public static ConfigEntry<string> translations { get; private set; }
         public static ConfigEntry<string> stepConf { get; private set; }
@@ -41,28 +48,48 @@ namespace GLMod
         public static ConfigEntry<string> enabled { get; private set; }
         public static ConfigEntry<string> supportId { get; private set; }
 
-        public static string token = null;
+        public const string api = GameConstants.API_ENDPOINT;
 
-        public const string api = "https://goodloss.fr/api";
-
-        public static Boolean logged;
         public static GLGame currentGame;
         public static List<string> enabledServices;
-        public static string gameCode = "XXXXXX";
-        public static string gameMap = "Unknown";
+        public static string gameCode = GameConstants.DEFAULT_GAME_CODE;
+        public static string gameMap = GameConstants.DEFAULT_MAP_NAME;
         public static string configPath;
         public static string modName = "Vanilla";
-        public static List<GLLanguage> languages;
-        public static string lg = "en";
-        public static int step = 0;
-        public static string supportIdChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz123456789";
+        public static GameStep step = GameStep.Initial;
+
+        // Deprecated - Use TranslationService instead
+        [Obsolete("Use TranslationService.Languages instead")]
+        public static List<GLLanguage> languages => TranslationService?.Languages;
+
+        [Obsolete("Use TranslationService.CurrentLanguage instead")]
+        public static string lg
+        {
+            get => TranslationService?.CurrentLanguage ?? GameConstants.DEFAULT_LANGUAGE;
+            set
+            {
+                if (TranslationService != null)
+                    TranslationService.CurrentLanguage = value;
+            }
+        }
         public static List<int> steamOwnerships = new List<int>() { };
         public static bool debug = false;
         public static bool withUnityExplorer = false;
         internal static BepInEx.Logging.ManualLogSource Logger;
         public static List<GLItem> items = new List<GLItem>() { };
-        public static bool isBanned = false;
-        public static string banReason = "";
+
+        // Deprecated - Use AuthService instead
+        [Obsolete("Use AuthService.Token instead")]
+        public static string token => AuthService?.Token;
+
+        [Obsolete("Use AuthService.IsLoggedIn instead")]
+        public static bool logged => AuthService?.IsLoggedIn ?? false;
+
+        [Obsolete("Use AuthService.IsBanned instead")]
+        public static bool isBanned => AuthService?.IsBanned ?? false;
+
+        [Obsolete("Use AuthService.BanReason instead")]
+        public static string banReason => AuthService?.BanReason ?? "";
 
         public override void Load()
         {
@@ -74,9 +101,13 @@ namespace GLMod
             stepConf = Config.Bind("Validation", "steps", "");
             stepRpc = Config.Bind("Validation", "RPC", "");
             configPath = Path.GetDirectoryName(Config.ConfigFilePath);
+
+            // Initialize services
+            AuthService = new AuthenticationService(connectionState);
+            TranslationService = new TranslationService();
           
             Random random = new Random();
-            string newSupportId = new string(Enumerable.Repeat(supportIdChars, 10)
+            string newSupportId = new string(Enumerable.Repeat(GameConstants.SUPPORT_ID_CHARS, GameConstants.SUPPORT_ID_LENGTH)
                 .Select(s => s[random.Next(s.Length)]).ToArray());
             supportId = Config.Bind("GoodLoss", "Support Id", newSupportId);
 
@@ -84,25 +115,24 @@ namespace GLMod
             log("Mod " + modName + " configured");
 
             GLMod.enabledServices = new List<string>() { };
-            GLMod.enableService("StartGame");
-            GLMod.enableService("EndGame");
-            GLMod.enableService("Tasks");
-            GLMod.enableService("TasksMax");
-            GLMod.enableService("Exiled");
-            GLMod.enableService("Kills");
-            GLMod.enableService("BodyReported");
-            GLMod.enableService("Emergencies");
-            GLMod.enableService("Turns");
-            GLMod.enableService("Votes");
-            GLMod.enableService("Roles");
-            GLMod.enableService("Tasks");
+            GLMod.enableService(ServiceType.StartGame);
+            GLMod.enableService(ServiceType.EndGame);
+            GLMod.enableService(ServiceType.Tasks);
+            GLMod.enableService(ServiceType.TasksMax);
+            GLMod.enableService(ServiceType.Exiled);
+            GLMod.enableService(ServiceType.Kills);
+            GLMod.enableService(ServiceType.BodyReported);
+            GLMod.enableService(ServiceType.Emergencies);
+            GLMod.enableService(ServiceType.Turns);
+            GLMod.enableService(ServiceType.Votes);
+            GLMod.enableService(ServiceType.Roles);
 
             stepConf.Value = "YES";
             stepRpc.Value = "YES";
 
             if (translations.Value.ToLower() == "yes")
             {
-                _ = GLMod.loadTranslations();
+                CoroutineRunner.Run(TranslationService.LoadTranslations());
             }
             log("Mod loaded");
 
@@ -123,7 +153,7 @@ namespace GLMod
 
         public static IEnumerator reloadItems()
         {
-            if (!logged)
+            if (!AuthService.IsLoggedIn)
                 yield break;
 
             var form = new Dictionary<string, string> { { "player", getAccountName() } };
@@ -172,10 +202,10 @@ namespace GLMod
 
         public static IEnumerator reloadDlcOwnerships()
         {
-            if (!logged)
+            if (!AuthService.IsLoggedIn)
                 yield break;
 
-            var form = new Dictionary<string, string> { { "token", token } };
+            var form = new Dictionary<string, string> { { "token", AuthService.Token } };
 
             string responseString = null;
             string error = null;
@@ -273,10 +303,10 @@ namespace GLMod
         public static void StartGame(string code, string map, Boolean ranked)
         {
             GLMod.log("Creating game...");
-            if (step != 0)
+            if (step != GameStep.Initial)
             {
                 log("[CreateGame] Duplicate call");
-                step = 0;
+                step = GameStep.Initial;
             }
             if (string.IsNullOrEmpty(code))
             {
@@ -290,7 +320,7 @@ namespace GLMod
             try
             {
                 currentGame = new GLGame(code, map, ranked, modName);
-                step = 1;
+                step = GameStep.PlayersAdded;
                 GLMod.log("Game created.");
             }
             catch (Exception e)
@@ -304,7 +334,7 @@ namespace GLMod
         // Step 2 : Add Player until all players recorded
         public static void AddPlayer(string playerName, string role, string team, string color)
         {
-            if (step != 1)
+            if (step != GameStep.PlayersAdded)
             {
                 log("[AddPlayer] Call when in step " + step);
                 return;
@@ -347,7 +377,7 @@ namespace GLMod
             {
                 if (currentGame.players.Count() == PlayerControl.AllPlayerControls.Count)
                 {
-                    step = 2;
+                    step = GameStep.GameSent;
                 }
             }
             catch (Exception e)
@@ -365,12 +395,12 @@ namespace GLMod
 
             if (!AmongUsClient.Instance.AmHost)
             {
-                step = 3;
+                step = GameStep.GameIdSynced;
                 onComplete?.Invoke(false);
                 yield break;
             }
 
-            if (step != 2)
+            if (step != GameStep.GameSent)
             {
                 log("[SendGame] Duplicate call");
                 onComplete?.Invoke(false);
@@ -416,7 +446,7 @@ namespace GLMod
             }
 
             currentGame.id = responseString;
-            step = 3;
+            step = GameStep.GameIdSynced;
             CoroutineRunner.Run(SyncGameId(result =>
             {
                 GLMod.log("Game sent.");
@@ -427,12 +457,12 @@ namespace GLMod
         // Step 4: Sync Game Id for host
         public static IEnumerator SyncGameId(System.Action<bool> onComplete = null)
         {
-            if (!AmongUsClient.Instance.AmHost) { step = 4; onComplete?.Invoke(false); yield break; }
-            if (step != 3) { log("[SyncGameId] Duplicate call"); onComplete?.Invoke(false); yield break; }
+            if (!AmongUsClient.Instance.AmHost) { step = GameStep.PlayersRecorded; onComplete?.Invoke(false); yield break; }
+            if (step != GameStep.GameIdSynced) { log("[SyncGameId] Duplicate call"); onComplete?.Invoke(false); yield break; }
             if (currentGame == null || string.IsNullOrEmpty(currentGame.id)) { log("[SyncGameId] Game null/id"); onComplete?.Invoke(false); yield break; }
 
             GLMod.stepRpc.Value = "NO";
-            yield return new WaitForSeconds(5f);
+            yield return new WaitForSeconds(GameConstants.RPC_SYNC_TIMEOUT);
 
             bool done = false;
 
@@ -453,14 +483,14 @@ namespace GLMod
             // 🧵 Attend la fin sans bloquer le thread principal
             while (!done) yield return null;
 
-            GLMod.step = 4;
+            GLMod.step = GameStep.PlayersRecorded;
             onComplete?.Invoke(true);
         }
 
         // External process : Add My Player
         public static IEnumerator AddMyPlayer(System.Action<bool> onComplete = null)
         {
-            if (logged == false)
+            if (!AuthService.IsLoggedIn)
             {
                 onComplete?.Invoke(false);
                 yield break;
@@ -551,10 +581,10 @@ namespace GLMod
         {
             if (!AmongUsClient.Instance.AmHost)
             {
-                step = 0;
+                step = GameStep.Initial;
                 return;
             }
-            if (step != 4 && step != 5)
+            if (step != GameStep.PlayersRecorded && step != GameStep.WinnerSet)
             {
                 log("[SetWinnerTeams] Call when in step " + step);
                 return;
@@ -574,7 +604,7 @@ namespace GLMod
             try
             {
                 currentGame.setWinners(winners);
-                step = 5;
+                step = GameStep.WinnerSet;
             }
             catch (Exception e)
             {
@@ -588,10 +618,10 @@ namespace GLMod
         {
             if (!AmongUsClient.Instance.AmHost)
             {
-                step = 0;
+                step = GameStep.Initial;
                 return;
             }
-            if (step != 4 && step != 5)
+            if (step != GameStep.PlayersRecorded && step != GameStep.WinnerSet)
             {
                 log("[AddWinnerPlayer] Call when in step " + step);
                 return;
@@ -611,7 +641,7 @@ namespace GLMod
             try
             {
                 currentGame.players.FindAll(p => p.playerName == playerName).ForEach(p => p.setWin());
-                step = 5;
+                step = GameStep.WinnerSet;
             } catch (Exception e)
             {
                 log("[AddWinnerPlayer] Add Winner Player fail, error: " + e.Message);
@@ -627,11 +657,11 @@ namespace GLMod
 
             if (!AmongUsClient.Instance.AmHost)
             {
-                step = 0;
+                step = GameStep.Initial;
                 yield break;
             }
 
-            if (step != 5)
+            if (step != GameStep.WinnerSet)
             {
                 log("[EndGame] Call when in step " + step);
                 yield break;
@@ -685,7 +715,7 @@ namespace GLMod
             }
             else
             {
-                step = 0;
+                step = GameStep.Initial;
                 GLMod.log("Game ended.");
             }
         }
@@ -694,6 +724,15 @@ namespace GLMod
          * Services
          */
 
+
+        public static void disableService(ServiceType service)
+        {
+            string serviceName = service.ToString();
+            if (enabledServices.Contains(serviceName))
+            {
+                enabledServices.Remove(serviceName);
+            }
+        }
 
         public static void disableService(string service)
         {
@@ -708,6 +747,15 @@ namespace GLMod
             enabledServices = new List<string>() { };
         }
 
+        public static void enableService(ServiceType service)
+        {
+            string serviceName = service.ToString();
+            if (!enabledServices.Contains(serviceName))
+            {
+                enabledServices.Add(serviceName);
+            }
+        }
+
         public static void enableService(string service)
         {
             if (!enabledServices.Contains(service))
@@ -716,7 +764,12 @@ namespace GLMod
             }
         }
 
-        public static Boolean existService(string service)
+        public static bool existService(ServiceType service)
+        {
+            return enabledServices.Contains(service.ToString());
+        }
+
+        public static bool existService(string service)
         {
             return enabledServices.Contains(service);
         }
@@ -739,22 +792,7 @@ namespace GLMod
 
         public static string getAccountName()
         {
-            try
-            {
-                if (!logged || token == "")
-                {
-                    return "";
-                }
-                else
-                {
-                    return token.Substring(0, token.IndexOf("#"));
-                }
-            } catch (Exception e)
-            {
-                log("[getAccountName] Catch exception " + e.Message);
-                return "";
-            }
-            
+            return AuthService?.GetAccountName() ?? "";
         }
 
         /*
@@ -763,92 +801,24 @@ namespace GLMod
 
         public static IEnumerator login(System.Action<bool> onComplete = null)
         {
-            var steamId = SteamUser.GetSteamID().m_SteamID.ToString();
-            var form = new Dictionary<string, string> { { "steamId", steamId } };
-
-            ApiResponse response = null;
-
-            // Appel de la coroutine ApiService
-            yield return ApiService.PostFormWithErrorHandlingAsync(api + "/user/login", form,
-                apiResponse => {
-                    response = apiResponse;
-                }
-            );
-
-            // Vérifier si la réponse est null (ne devrait jamais arriver avec PostFormWithErrorHandlingAsync)
-            if (response == null)
+            if (AuthService == null)
             {
-                log("Login failed, no response");
-                SetLoginState(false, "", false, "");
+                log("AuthService not initialized");
+                onComplete?.Invoke(false);
                 yield break;
             }
 
-            // Interprète la réponse
-            if (response.IsSuccess)
-            {
-                log("Login success");
-                token = response.Content;
-                connectionState.Value = "Yes";
-                logged = true;
-                isBanned = false;
-                banReason = "";
-                onComplete?.Invoke(true); // Succès
-            }
-            else if (response.StatusCode == 403)
-            {
-                var trimmed = response.Content?.Trim('"').Trim();
-                if (!string.IsNullOrEmpty(trimmed) && trimmed.StartsWith("Banned: ", System.StringComparison.OrdinalIgnoreCase))
-                {
-                    isBanned = true;
-                    banReason = trimmed.Substring("Banned: ".Length);
-                    log("User banned, reason: " + banReason);
-                }
-                else
-                {
-                    log($"Login failed 403: {trimmed}");
-                    isBanned = false;
-                    banReason = "";
-                }
-                SetLoginState(false, "", isBanned, banReason);
-                onComplete?.Invoke(false); // Échec
-            }
-            else
-            {
-                log($"Login failed - Status code: {response.StatusCode}");
-                SetLoginState(false, "", false, "");
-                onComplete?.Invoke(false); // Échec
-            }
-        }
-
-
-        private static void SetLoginState(bool ok, string tok, bool banned, string reason)
-        {
-            logged = ok;
-            token = tok;
-            isBanned = banned;
-            banReason = reason;
-            connectionState.Value = ok ? "Yes" : "No";
+            yield return AuthService.Login(onComplete);
         }
 
         public static void logout()
         {
-            try
-            {
-                if (token != "")
-                {
-                    logged = false;
-                    token = "";
-                }
-            } catch (Exception e)
-            {
-                log("[logout] Catch exception " + e.Message);
-            }
-           
+            AuthService?.Logout();
         }
 
-        public static Boolean isLoggedIn()
+        public static bool isLoggedIn()
         {
-            return logged;
+            return AuthService?.IsLoggedIn ?? false;
         }
 
         public static IEnumerator getRank(string customModName, System.Action<GLRank> onComplete)
@@ -860,7 +830,7 @@ namespace GLMod
 
             GLRank errorRank = new GLRank();
 
-            if (!logged)
+            if (!AuthService.IsLoggedIn)
             {
                 errorRank.error = "Offline";
                 onComplete?.Invoke(errorRank);
@@ -914,179 +884,54 @@ namespace GLMod
 
         public static IEnumerator loadTranslations()
         {
-            string languagesURL = api + "/trans";
-            string lg = null;
-            string error = null;
-            bool done = false;
-
-            // Charger la liste des langues
-            System.Threading.Tasks.Task.Run(async () =>
+            if (TranslationService == null)
             {
-                try
-                {
-                    lg = await HttpHelper.Client.GetStringAsync(languagesURL);
-                }
-                catch (Exception e)
-                {
-                    error = e.Message;
-                }
-                finally
-                {
-                    done = true;
-                }
-            });
-
-            // Attendre la fin du chargement
-            while (!done)
-                yield return null;
-
-            // Vérifier l'erreur
-            if (error != null)
-            {
-                GLMod.log("Load translations error: " + error);
+                log("TranslationService not initialized");
                 yield break;
             }
 
-            // Désérialiser les langues
-            languages = GLJson.Deserialize<List<GLLanguage>>(lg);
-
-            // Lancer toutes les coroutines de chargement en parallèle
-            List<Coroutine> loadingCoroutines = new List<Coroutine>();
-            foreach (GLLanguage l in languages)
-            {
-                loadingCoroutines.Add(CoroutineRunner.Run(l.load()));
-            }
-
-            // Attendre que toutes les coroutines se terminent
-            // (Note: Il n'y a pas de mécanisme natif pour attendre plusieurs coroutines,
-            // donc on attend juste un peu pour laisser le temps aux coroutines de se terminer)
-            // Pour une vraie synchronisation, il faudrait un système de compteur
-            yield return new WaitForSeconds(2f); // Ajustez selon vos besoins
-        }
-
-        // Version améliorée avec compteur pour vraiment attendre la fin :
-        public static IEnumerator loadTranslationsWithCounter()
-        {
-            string languagesURL = api + "/trans";
-            string lg = null;
-            string error = null;
-            bool done = false;
-
-            // Charger la liste des langues
-            System.Threading.Tasks.Task.Run(async () =>
-            {
-                try
-                {
-                    lg = await HttpHelper.Client.GetStringAsync(languagesURL);
-                }
-                catch (Exception e)
-                {
-                    error = e.Message;
-                }
-                finally
-                {
-                    done = true;
-                }
-            });
-
-            // Attendre la fin du chargement
-            while (!done)
-                yield return null;
-
-            // Vérifier l'erreur
-            if (error != null)
-            {
-                GLMod.log("Load translations error: " + error);
-                yield break;
-            }
-
-            // Désérialiser les langues
-            languages = GLJson.Deserialize<List<GLLanguage>>(lg);
-
-            // Compteur pour suivre les chargements terminés
-            int totalLanguages = languages.Count;
-            int loadedLanguages = 0;
-
-            // Lancer toutes les coroutines de chargement en parallèle
-            foreach (GLLanguage l in languages)
-            {
-                CoroutineRunner.Run(loadLanguageWithCallback(l, () => { loadedLanguages++; }));
-            }
-
-            // Attendre que toutes les langues soient chargées
-            while (loadedLanguages < totalLanguages)
-                yield return null;
-
-            GLMod.log($"All {totalLanguages} languages loaded successfully.");
-        }
-
-        // Wrapper pour ajouter un callback à la fin du chargement
-        private static IEnumerator loadLanguageWithCallback(GLLanguage language, System.Action onComplete)
-        {
-            yield return language.load();
-            onComplete?.Invoke();
+            yield return TranslationService.LoadTranslations();
         }
 
         public static string translate(string toTranslate)
         {
-            List<GLTranslation> current = languages.Find(l => l.code == lg).translations;
-            GLTranslation tr = current.Find(t => t.original == toTranslate);
-            if (tr != null)
-            {
-                return tr.translation;
-            }
-            else
-            {
-                return toTranslate;
-            }
-
+            return TranslationService?.Translate(toTranslate) ?? toTranslate;
         }
 
-        public static bool setLg(string lg)
+        public static bool setLg(string languageCode)
         {
-            GLMod.lg = lg.ToLower();
-            return true;
+            return TranslationService?.SetLanguage(languageCode) ?? false;
         }
 
         public static string getLg()
         {
-            return lg;
+            return TranslationService?.CurrentLanguage ?? GameConstants.DEFAULT_LANGUAGE;
         }
 
         public static string getNameFromCode(string code)
         {
-            return languages.Find(l => l.code == code).name;
+            return TranslationService?.GetLanguageName(code);
         }
 
         public static string getCodeFromName(string name)
         {
-            return languages.Find(l => l.name == name).code;
+            return TranslationService?.GetLanguageCode(name);
         }
 
         public static string getMapName()
         {
             try
             {
-                if (GameOptionsManager.Instance.currentGameOptions.MapId == (byte)MapNames.Skeld)
-                    return "The Skeld";
+                byte mapId = GameOptionsManager.Instance.currentGameOptions.MapId;
 
-                if (GameOptionsManager.Instance.currentGameOptions.MapId == (byte)MapNames.MiraHQ)
-                    return "MiraHQ";
-
-                if (GameOptionsManager.Instance.currentGameOptions.MapId == (byte)MapNames.Polus)
-                    return "Polus";
-
-                if (GameOptionsManager.Instance.currentGameOptions.MapId == (byte)MapNames.Dleks)
+                // Handle special case for dlekSehT (reversed Skeld)
+                if (mapId == (byte)MapNames.Dleks)
                     return "dlekSehT";
 
-                if (GameOptionsManager.Instance.currentGameOptions.MapId == (byte)MapNames.Airship)
-                    return "Airship";
-
-                if (GameOptionsManager.Instance.currentGameOptions.MapId == (byte)MapNames.Fungle)
-                    return "The Fungle";
-
-                return "Unknown";
-            } catch (Exception e)
+                GameMapType mapType = GameMapTypeExtensions.FromMapId(mapId);
+                return mapType.ToDisplayName();
+            }
+            catch (Exception e)
             {
                 log("[getMapName] Catch exception " + e.Message);
                 return "Unknown";

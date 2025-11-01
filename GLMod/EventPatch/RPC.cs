@@ -12,6 +12,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
+using GLMod.Enums;
+using GLMod.Constants;
 using static Il2CppSystem.Linq.Expressions.Interpreter.CastInstruction.CastInstructionNoT;
 
 namespace GLMod
@@ -56,15 +58,15 @@ namespace GLMod
             {
                 case 1: // Step 4 : Receive Game Id for non host
                         // Attendre que le jeu soit au bon step et que currentGame existe
-                    while (GLMod.step != 3 || GLMod.currentGame == null)
+                    while (GLMod.step != GameStep.GameIdSynced || GLMod.currentGame == null)
                     {
-                        yield return new WaitForSeconds(0.1f);
+                        yield return new WaitForSeconds(GameConstants.RPC_POLLING_INTERVAL);
                     }
 
                     try
                     {
                         GLMod.currentGame.setId(int.Parse(values[0]));
-                        GLMod.step = 4;
+                        GLMod.step = GameStep.PlayersRecorded;
                     }
                     catch (Exception ex)
                     {
@@ -95,7 +97,7 @@ namespace GLMod
                 // Ajoutez les autres cases ici...
 
                 default:
-                    GLMod.log("Prefix non géré: " + id);
+                    GLMod.log("Prefix non gï¿½rï¿½: " + id);
                     break;
             }
         }

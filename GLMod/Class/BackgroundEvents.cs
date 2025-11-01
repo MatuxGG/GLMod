@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using UnityEngine;
+using GLMod.Enums;
+using GLMod.Constants;
 
 namespace GLMod
 {
@@ -12,12 +14,12 @@ namespace GLMod
     {
         private static List<string> playersDc;
         private static bool processEnabled = false;
-        private static string cachedSabotage = null;
+        private static SabotageType? cachedSabotage = null;
         private static Coroutine backgroundCoroutine = null;
 
         public static void handleDc(string reason, string playerName)
         {
-            if (GLMod.step == 0) return;
+            if (GLMod.step == GameStep.Initial) return;
             try
             {
                 GLMod.log("handleDc: " + reason + " / " + playerName);
@@ -71,90 +73,115 @@ namespace GLMod
         {
             while (processEnabled)
             {
-                // Attendre 500ms (équivalent de Task.Delay(500))
-                yield return new WaitForSeconds(0.5f);
+                yield return new WaitForSeconds(GameConstants.BACKGROUND_POLLING_INTERVAL);
 
                 // Check if not in meeting
                 int turn = int.Parse(GLMod.currentGame.turns);
                 if (turn > 1000) continue;
 
-                long timestampSeconds = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-
-                foreach (PlayerControl player in PlayerControl.AllPlayerControls)
-                {
-                    if (player.Data.IsDead) continue;
-                    float x = player.MyPhysics.body.transform.position.x;
-                    float y = player.MyPhysics.body.transform.position.y;
-                    GLMod.currentGame.addPosition(player.Data.PlayerName, x, y, timestampSeconds.ToString());
-                }
-
-                List<string> playersIndexed = new List<string>() { };
-                foreach (PlayerControl p in PlayerControl.AllPlayerControls)
-                {
-                    playersIndexed.Add(p.Data.PlayerName);
-                }
-
-                foreach (GLPlayer currentGamePlayer in GLMod.currentGame.players)
-                {
-                    if (!playersDc.Contains(currentGamePlayer.playerName) && !playersIndexed.Contains(currentGamePlayer.playerName))
-                    {
-                        handleDc("DC_PROCESS_", currentGamePlayer.playerName);
-                        playersDc.Add(currentGamePlayer.playerName);
-                    }
-                }
-
-                if (PlayerControl.LocalPlayer?.myTasks != null)
-                {
-                    string currentSabotage = null;
-                    foreach (PlayerTask playerTask in PlayerControl.LocalPlayer.myTasks)
-                    {
-                        switch (playerTask.TaskType)
-                        {
-                            case TaskTypes.ResetSeismic:
-                            case TaskTypes.ResetReactor:
-                                currentSabotage = "Reactor";
-                                break;
-                            case TaskTypes.FixComms:
-                                currentSabotage = "Coms";
-                                break;
-                            case TaskTypes.FixLights:
-                                currentSabotage = "Lights";
-                                break;
-                            case TaskTypes.CleanO2Filter:
-                                currentSabotage = "O2";
-                                break;
-                        }
-
-                        if (currentSabotage != null) break;
-                    }
-
-                    if (cachedSabotage == null)
-                    {
-                        if (currentSabotage != cachedSabotage) // Nouveau sabotage
-                        {
-                            GLMod.addAction("", "", "SAB_START_" + currentSabotage);
-                            cachedSabotage = currentSabotage;
-                        }
-                    }
-                    else
-                    {
-                        if (currentSabotage == null) // Fin d'un sabotage
-                        {
-                            GLMod.addAction("", "", "SAB_END_" + cachedSabotage);
-                            cachedSabotage = null;
-                        }
-                        else if (cachedSabotage != currentSabotage) // Remplacement de sabotage
-                        {
-                            GLMod.addAction("", "", "SAB_END_" + cachedSabotage);
-                            cachedSabotage = null;
-                            GLMod.addAction("", "", "SAB_START_" + currentSabotage);
-                            cachedSabotage = currentSabotage;
-                        }
-                    }
-                }
+                TrackPlayerPositions();
+                DetectPlayerDisconnections();
+                TrackSabotageState();
             }
 
             backgroundCoroutine = null;
+        }
+
+        /// <summary>
+        /// Tracks and records positions of all alive players
+        /// </summary>
+        private static void TrackPlayerPositions()
+        {
+            long timestamp = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+            foreach (PlayerControl player in PlayerControl.AllPlayerControls)
+            {
+                if (player.Data.IsDead) continue;
+
+                float x = player.MyPhysics.body.transform.position.x;
+                float y = player.MyPhysics.body.transform.position.y;
+                GLMod.currentGame.addPosition(player.Data.PlayerName, x, y, timestamp.ToString());
+            }
+        }
+
+        /// <summary>
+        /// Detects players who have disconnected during the game
+        /// </summary>
+        private static void DetectPlayerDisconnections()
+        {
+            // Get list of currently active players
+            List<string> activePlayers = new List<string>();
+            foreach (PlayerControl player in PlayerControl.AllPlayerControls)
+            {
+                activePlayers.Add(player.Data.PlayerName);
+            }
+
+            // Check for disconnected players
+            foreach (GLPlayer gamePlayer in GLMod.currentGame.players)
+            {
+                if (!playersDc.Contains(gamePlayer.playerName) && !activePlayers.Contains(gamePlayer.playerName))
+                {
+                    handleDc("DC_PROCESS_", gamePlayer.playerName);
+                    playersDc.Add(gamePlayer.playerName);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Tracks sabotage state changes (start/end)
+        /// </summary>
+        private static void TrackSabotageState()
+        {
+            if (PlayerControl.LocalPlayer?.myTasks == null)
+                return;
+
+            SabotageType? currentSabotage = DetectCurrentSabotage();
+
+            // Handle sabotage state transitions
+            if (!cachedSabotage.HasValue && currentSabotage.HasValue)
+            {
+                // New sabotage started
+                GLMod.addAction("", "", "SAB_START_" + currentSabotage.Value.ToActionString());
+                cachedSabotage = currentSabotage;
+            }
+            else if (cachedSabotage.HasValue && !currentSabotage.HasValue)
+            {
+                // Sabotage ended
+                GLMod.addAction("", "", "SAB_END_" + cachedSabotage.Value.ToActionString());
+                cachedSabotage = null;
+            }
+            else if (cachedSabotage.HasValue && currentSabotage.HasValue && cachedSabotage != currentSabotage)
+            {
+                // Sabotage changed
+                GLMod.addAction("", "", "SAB_END_" + cachedSabotage.Value.ToActionString());
+                GLMod.addAction("", "", "SAB_START_" + currentSabotage.Value.ToActionString());
+                cachedSabotage = currentSabotage;
+            }
+        }
+
+        /// <summary>
+        /// Detects the current active sabotage type
+        /// </summary>
+        /// <returns>Sabotage type or null if no sabotage</returns>
+        private static SabotageType? DetectCurrentSabotage()
+        {
+            foreach (PlayerTask playerTask in PlayerControl.LocalPlayer.myTasks)
+            {
+                switch (playerTask.TaskType)
+                {
+                    case TaskTypes.ResetSeismic:
+                    case TaskTypes.ResetReactor:
+                        return SabotageType.Reactor;
+                    case TaskTypes.FixComms:
+                        return SabotageType.Coms;
+                    case TaskTypes.FixLights:
+                        return SabotageType.Lights;
+                    case TaskTypes.CleanO2Filter:
+                        return SabotageType.O2;
+                }
+            }
+
+            return null;
         }
     }
 }

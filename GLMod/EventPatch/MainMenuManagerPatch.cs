@@ -42,36 +42,11 @@ namespace GLMod
                         GLMod.log(e.Source.ToString() + " / " + e.InnerException.ToString() + " / " + e.Message.ToString());
                     }
                 }
-                else
-                {
-                }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                
+                GLMod.log($"[MainMenuManager] Error during initialization: {ex.Message}");
             }
-
-            //if (SteamManager.Initialized)
-            //{
-            //    if (GLMod.token == null)
-            //    {
-            //        try
-            //        {
-            //            CoroutineRunner.Run(GLMod.login(success =>
-            //            {
-            //                if (!GLMod.withUnityExplorer)
-            //                {
-            //                    CoroutineRunner.Run(GLMod.reloadItems());
-            //                    CoroutineRunner.Run(GLMod.reloadDlcOwnerships());
-            //                }
-            //            }));
-            //        } catch (Exception e)
-            //        {
-            //            GLMod.disableAllServices();
-            //            GLMod.log(e.Source.ToString() + " / " + e.InnerException.ToString() + " / " + e.Message.ToString());
-            //        }
-            //    }
-            //}
         }
     }
 }
