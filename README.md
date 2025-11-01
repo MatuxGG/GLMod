@@ -83,7 +83,7 @@ If you want to combine GLMod with another mod, you can do it by following the in
 Note that only vanilla actions and roles will be recorded. If you want to record custom actions and roles, you will have to modify the other mod to use GLMod functions.
 If you're a mod developper, see the "Integration with other mods" section below.
 
-# Integrate GLMod to you own mod
+# Integrate GLMod to your own mod
 
 See [dev](docs/dev.MD).
 
