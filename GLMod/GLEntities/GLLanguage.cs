@@ -4,6 +4,7 @@ using System.Collections;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using GLMod.Class;
 
 namespace GLMod.GLEntities
 {

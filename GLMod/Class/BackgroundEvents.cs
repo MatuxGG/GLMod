@@ -9,7 +9,7 @@ using GLMod.Enums;
 using GLMod.Constants;
 using GLMod.GLEntities;
 
-namespace GLMod
+namespace GLMod.Class
 {
     public static class BackgroundEvents
     {

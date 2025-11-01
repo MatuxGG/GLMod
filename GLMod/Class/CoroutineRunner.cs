@@ -3,7 +3,7 @@ using Il2CppInterop.Runtime.Injection;
 using System.Collections;
 using UnityEngine;
 
-namespace GLMod
+namespace GLMod.Class
 {
     public class CoroutineRunner : MonoBehaviour
     {

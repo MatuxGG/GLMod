@@ -1,3 +1,4 @@
+using GLMod.Class;
 using GLMod.Constants;
 using GLMod.GLEntities;
 using System;

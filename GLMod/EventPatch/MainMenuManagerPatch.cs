@@ -1,4 +1,6 @@
 ﻿using BepInEx.Unity.IL2CPP.Utils;
+using GLMod.Class;
+using GLMod.Services;
 using HarmonyLib;
 using Steamworks;
 using System;

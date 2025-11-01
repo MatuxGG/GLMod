@@ -1,4 +1,5 @@
 using BepInEx.Configuration;
+using GLMod.Class;
 using GLMod.Constants;
 using Steamworks;
 using System;

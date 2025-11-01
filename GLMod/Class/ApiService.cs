@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using UnityEngine.Networking.Match;
 
-namespace GLMod
+namespace GLMod.Class
 {
     public static class ApiService
     {

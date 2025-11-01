@@ -15,6 +15,7 @@ using UnityEngine;
 using GLMod.Enums;
 using GLMod.Constants;
 using static Il2CppSystem.Linq.Expressions.Interpreter.CastInstruction.CastInstructionNoT;
+using GLMod.Class;
 
 namespace GLMod
 {

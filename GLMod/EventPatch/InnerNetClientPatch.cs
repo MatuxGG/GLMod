@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using GLMod.Enums;
+using GLMod.Class;
 
 namespace GLMod
 {

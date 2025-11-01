@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using GLMod.Enums;
 
-namespace GLMod
+namespace GLMod.Class
 {
     public static class VanillaEvents
     {

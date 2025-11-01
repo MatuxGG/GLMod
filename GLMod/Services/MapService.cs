@@ -1,5 +1,6 @@
 using AmongUs.GameOptions;
 using BepInEx.Logging;
+using GLMod.Enums;
 using System;
 
 namespace GLMod.Services

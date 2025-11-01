@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using static UnityEngine.GraphicsBuffer;
 using GLMod.GLEntities;
+using GLMod.Class;
 
 namespace GLMod
 {

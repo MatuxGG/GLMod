@@ -12,6 +12,7 @@ using GLMod.Constants;
 using GLMod.Services;
 using Random = System.Random;
 using GLMod.GLEntities;
+using GLMod.Class;
 
 namespace GLMod
 {

@@ -5,7 +5,7 @@ using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace GLMod
+namespace GLMod.Class
 {
     public static class HttpHelper
     {
