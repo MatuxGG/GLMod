@@ -55,6 +55,7 @@ namespace GLMod
 
             InitializeConfiguration();
             InitializeServices();
+            VerifyStartupServices();
             ConfigureDefaultSettings();
 
             log("Mod " + ConfigService.ModName + " configured");
@@ -92,6 +93,114 @@ namespace GLMod
             RankService = new RankService(Logger, AuthService, ConfigService, api);
             IntegrityService = new IntegrityService(Logger, api);
             MapService = new MapService(Logger);
+        }
+
+        private void VerifyStartupServices()
+        {
+            log("=== Startup Services Verification ===");
+
+            // 1. ConfigurationService
+            if (ConfigService != null)
+            {
+                log($"[✓] ConfigurationService: Initialized");
+                log($"    - Mod Name: {ConfigService.ModName}");
+                log($"    - Config Path: {ConfigService.ConfigPath}");
+
+                if (ConfigService.ModName == "Vanilla")
+                {
+                    log("    [!] Warning: No .glmod file found, using Vanilla mode");
+                }
+            }
+            else
+            {
+                log("[✗] ConfigurationService: Failed to initialize");
+            }
+
+            // 2. AuthenticationService
+            if (AuthService != null)
+            {
+                log("[✓] AuthenticationService: Initialized");
+                log($"    - Ready for Steam authentication");
+            }
+            else
+            {
+                log("[✗] AuthenticationService: Failed to initialize");
+            }
+
+            // 3. TranslationService
+            if (TranslationService != null)
+            {
+                log("[✓] TranslationService: Initialized");
+                log($"    - Ready for translation loading");
+            }
+            else
+            {
+                log("[✗] TranslationService: Failed to initialize");
+            }
+
+            // 4. IntegrityService
+            if (IntegrityService != null)
+            {
+                log("[✓] IntegrityService: Initialized");
+                log($"    - Ready for verification");
+            }
+            else
+            {
+                log("[✗] IntegrityService: Failed to initialize");
+            }
+
+            // 5. ServiceManager
+            if (ServiceManager != null)
+            {
+                log("[✓] ServiceManager: Initialized");
+                log($"    - Enabled services: {ServiceManager.EnabledServices.Count}");
+            }
+            else
+            {
+                log("[✗] ServiceManager: Failed to initialize");
+            }
+
+            // 6. GameStateManager (cannot test game features)
+            if (GameStateManager != null)
+            {
+                log("[✓] GameStateManager: Initialized (game features require active game)");
+            }
+            else
+            {
+                log("[✗] GameStateManager: Failed to initialize");
+            }
+
+            // 7. ItemService (requires authentication)
+            if (ItemService != null)
+            {
+                log("[✓] ItemService: Initialized (requires authentication to use)");
+            }
+            else
+            {
+                log("[✗] ItemService: Failed to initialize");
+            }
+
+            // 8. RankService (requires authentication)
+            if (RankService != null)
+            {
+                log("[✓] RankService: Initialized (requires authentication to use)");
+            }
+            else
+            {
+                log("[✗] RankService: Failed to initialize");
+            }
+
+            // 9. MapService (requires game)
+            if (MapService != null)
+            {
+                log("[✓] MapService: Initialized (requires active game to use)");
+            }
+            else
+            {
+                log("[✗] MapService: Failed to initialize");
+            }
+
+            log("=== All services verified ===");
         }
 
         private void ConfigureDefaultSettings()
