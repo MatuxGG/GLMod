@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using UnityEngine;
+using GLMod.Enums;
+using GLMod.Constants;
 
 namespace GLMod
 {
@@ -17,7 +19,7 @@ namespace GLMod
 
         public static void handleDc(string reason, string playerName)
         {
-            if (GLMod.step == 0) return;
+            if (GLMod.step == GameStep.Initial) return;
             try
             {
                 GLMod.log("handleDc: " + reason + " / " + playerName);

@@ -4,6 +4,7 @@ using InnerNet;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using GLMod.Enums;
 
 namespace GLMod
 {
@@ -18,7 +19,7 @@ namespace GLMod
                 List<string> values = new List<string> { reason.ToString(), playerName ?? "" };
                 GLRPCProcedure.makeRpcCall(2, values);
                 BackgroundEvents.handleDc(reason.ToString(), playerName);
-                GLMod.step = 0;
+                GLMod.step = GameStep.Initial;
             }
         }
         [HarmonyPatch(typeof(InnerNetClient), nameof(InnerNetClient.HandleDisconnect))]
@@ -30,7 +31,7 @@ namespace GLMod
                 List<string> values = new List<string> { reason.ToString(), playerName ?? "" };
                 GLRPCProcedure.makeRpcCall(3, values);
                 BackgroundEvents.handleDc(reason.ToString(), playerName);
-                GLMod.step = 0;
+                GLMod.step = GameStep.Initial;
             }
 
         }
@@ -43,7 +44,7 @@ namespace GLMod
                 List<string> values = new List<string> { playerName ?? "" };
                 GLRPCProcedure.makeRpcCall(3, values);
                 BackgroundEvents.handleDc("On Disconnect", playerName);
-                GLMod.step = 0;
+                GLMod.step = GameStep.Initial;
             }
 
         }

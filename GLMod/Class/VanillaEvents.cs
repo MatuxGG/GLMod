@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Text;
 using System.Threading.Tasks;
+using GLMod.Enums;
 
 namespace GLMod
 {
@@ -13,7 +14,7 @@ namespace GLMod
         {
             if (GLMod.existService("StartGame") || GLMod.debug)
             {
-                if (GLMod.step != 0)
+                if (GLMod.step != GameStep.Initial)
                 {
                     yield break;
                 }
