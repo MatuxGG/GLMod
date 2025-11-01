@@ -134,7 +134,10 @@ namespace GLMod.Services
         public IEnumerator VerifyGLMod(System.Action<bool> onComplete)
         {
             var pluginAttribute = typeof(GLMod).GetCustomAttribute<BepInPlugin>();
-            string version = pluginAttribute?.Version.ToString();
+            // Format version as Major.Minor.Build (3 components) to match server expectations
+            string version = pluginAttribute?.Version != null
+                ? $"{pluginAttribute.Version.Major}.{pluginAttribute.Version.Minor}.{pluginAttribute.Version.Build}"
+                : null;
             Log(version);
 
             bool result = false;
