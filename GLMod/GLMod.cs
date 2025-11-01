@@ -40,6 +40,10 @@ namespace GLMod
         // Services
         public static IAuthenticationService AuthService { get; private set; }
         public static ITranslationService TranslationService { get; private set; }
+        public static IGameStateManager GameStateManager { get; private set; }
+        public static IServiceManager ServiceManager { get; private set; }
+        public static IItemService ItemService { get; private set; }
+        public static IConfigurationService ConfigService { get; private set; }
 
         public static ConfigEntry<string> connectionState { get; private set; }
         public static ConfigEntry<string> translations { get; private set; }
@@ -50,13 +54,39 @@ namespace GLMod
 
         public const string api = GameConstants.API_ENDPOINT;
 
-        public static GLGame currentGame;
-        public static List<string> enabledServices;
-        public static string gameCode = GameConstants.DEFAULT_GAME_CODE;
-        public static string gameMap = GameConstants.DEFAULT_MAP_NAME;
-        public static string configPath;
-        public static string modName = "Vanilla";
-        public static GameStep step = GameStep.Initial;
+        // Deprecated - Use GameStateManager instead
+        [Obsolete("Use GameStateManager.CurrentGame instead")]
+        public static GLGame currentGame => GameStateManager?.CurrentGame;
+
+        [Obsolete("Use ServiceManager.EnabledServices instead")]
+        public static List<string> enabledServices => ServiceManager?.EnabledServices;
+
+        [Obsolete("Use GameStateManager.GameCode instead")]
+        public static string gameCode
+        {
+            get => GameStateManager?.GameCode ?? GameConstants.DEFAULT_GAME_CODE;
+            set { if (GameStateManager != null) GameStateManager.GameCode = value; }
+        }
+
+        [Obsolete("Use GameStateManager.GameMap instead")]
+        public static string gameMap
+        {
+            get => GameStateManager?.GameMap ?? GameConstants.DEFAULT_MAP_NAME;
+            set { if (GameStateManager != null) GameStateManager.GameMap = value; }
+        }
+
+        [Obsolete("Use ConfigService.ConfigPath instead")]
+        public static string configPath => ConfigService?.ConfigPath;
+
+        [Obsolete("Use ConfigService.ModName instead")]
+        public static string modName => ConfigService?.ModName ?? "Vanilla";
+
+        [Obsolete("Use GameStateManager.Step instead")]
+        public static GameStep step
+        {
+            get => GameStateManager?.Step ?? GameStep.Initial;
+            set { if (GameStateManager != null) GameStateManager.Step = value; }
+        }
 
         // Deprecated - Use TranslationService instead
         [Obsolete("Use TranslationService.Languages instead")]
@@ -72,11 +102,16 @@ namespace GLMod
                     TranslationService.CurrentLanguage = value;
             }
         }
-        public static List<int> steamOwnerships = new List<int>() { };
+        // Deprecated - Use ItemService instead
+        [Obsolete("Use ItemService.SteamOwnerships instead")]
+        public static List<int> steamOwnerships => ItemService?.SteamOwnerships ?? new List<int>();
+
         public static bool debug = false;
         public static bool withUnityExplorer = false;
         internal static BepInEx.Logging.ManualLogSource Logger;
-        public static List<GLItem> items = new List<GLItem>() { };
+
+        [Obsolete("Use ItemService.Items instead")]
+        public static List<GLItem> items => ItemService?.Items ?? new List<GLItem>();
 
         // Deprecated - Use AuthService instead
         [Obsolete("Use AuthService.Token instead")]
@@ -100,32 +135,36 @@ namespace GLMod
             translations = Config.Bind("GoodLoss", "translations", "No");
             stepConf = Config.Bind("Validation", "steps", "");
             stepRpc = Config.Bind("Validation", "RPC", "");
-            configPath = Path.GetDirectoryName(Config.ConfigFilePath);
+            string configPathValue = Path.GetDirectoryName(Config.ConfigFilePath);
 
             // Initialize services
             AuthService = new AuthenticationService(connectionState);
             TranslationService = new TranslationService();
-          
+            ConfigService = new ConfigurationService(Logger, configPathValue);
+            GameStateManager = new GameStateManager(Logger, AuthService, api, stepRpc);
+            ServiceManager = new ServiceManager();
+            ItemService = new ItemService(Logger, AuthService, api);
+
             Random random = new Random();
             string newSupportId = new string(Enumerable.Repeat(GameConstants.SUPPORT_ID_CHARS, GameConstants.SUPPORT_ID_LENGTH)
                 .Select(s => s[random.Next(s.Length)]).ToArray());
             supportId = Config.Bind("GoodLoss", "Support Id", newSupportId);
 
-            GLMod.findModName();
-            log("Mod " + modName + " configured");
+            ConfigService.FindModName();
+            log("Mod " + ConfigService.ModName + " configured");
 
-            GLMod.enabledServices = new List<string>() { };
-            GLMod.enableService(ServiceType.StartGame);
-            GLMod.enableService(ServiceType.EndGame);
-            GLMod.enableService(ServiceType.Tasks);
-            GLMod.enableService(ServiceType.TasksMax);
-            GLMod.enableService(ServiceType.Exiled);
-            GLMod.enableService(ServiceType.Kills);
-            GLMod.enableService(ServiceType.BodyReported);
-            GLMod.enableService(ServiceType.Emergencies);
-            GLMod.enableService(ServiceType.Turns);
-            GLMod.enableService(ServiceType.Votes);
-            GLMod.enableService(ServiceType.Roles);
+            // Enable default services
+            ServiceManager.EnableService(ServiceType.StartGame);
+            ServiceManager.EnableService(ServiceType.EndGame);
+            ServiceManager.EnableService(ServiceType.Tasks);
+            ServiceManager.EnableService(ServiceType.TasksMax);
+            ServiceManager.EnableService(ServiceType.Exiled);
+            ServiceManager.EnableService(ServiceType.Kills);
+            ServiceManager.EnableService(ServiceType.BodyReported);
+            ServiceManager.EnableService(ServiceType.Emergencies);
+            ServiceManager.EnableService(ServiceType.Turns);
+            ServiceManager.EnableService(ServiceType.Votes);
+            ServiceManager.EnableService(ServiceType.Roles);
 
             stepConf.Value = "YES";
             stepRpc.Value = "YES";
@@ -153,47 +192,15 @@ namespace GLMod
 
         public static IEnumerator reloadItems()
         {
-            if (!AuthService.IsLoggedIn)
+            if (ItemService == null)
                 yield break;
 
-            var form = new Dictionary<string, string> { { "player", getAccountName() } };
-
-            string responseString = null;
-            string error = null;
-
-            // Appel de la coroutine ApiService
-            yield return ApiService.PostFormAsync(api + "/player/challengerItems", form,
-                result => {
-                    responseString = result;
-                },
-                err => {
-                    error = err;
-                }
-            );
-
-
-            // Vérifier l'erreur
-            if (error != null)
-            {
-                log("Erreur HTTP : " + error);
-                yield break;
-            }
-
-            // Désérialiser la réponse
-            try
-            {
-                items = GLJson.Deserialize<List<GLItem>>(responseString);
-                log("Reload successes OK — " + items.Count + " successes.");
-            }
-            catch (System.Exception ex)
-            {
-                log("Erreur : " + ex.Message);
-            }
+            yield return ItemService.ReloadItems();
         }
 
         public static Boolean isUnlocked(string id)
         {
-            return GLMod.items.FindAll(s => s.id == id) != null && GLMod.items.FindAll(s => s.id == id).Count > 0;
+            return ItemService?.IsUnlocked(id) ?? false;
         }
 
         /*
@@ -202,46 +209,15 @@ namespace GLMod
 
         public static IEnumerator reloadDlcOwnerships()
         {
-            if (!AuthService.IsLoggedIn)
+            if (ItemService == null)
                 yield break;
 
-            var form = new Dictionary<string, string> { { "token", AuthService.Token } };
-
-            string responseString = null;
-            string error = null;
-
-            // Appel de la coroutine ApiService
-            yield return ApiService.PostFormAsync(api + "/user/steamownerships", form,
-                result => {
-                    responseString = result;
-                },
-                err => {
-                    error = err;
-                }
-            );
-
-            // Vérifier l'erreur
-            if (error != null)
-            {
-                log("Erreur HTTP : " + error);
-                yield break;
-            }
-
-            // Désérialiser la réponse
-            try
-            {
-                steamOwnerships = GLJson.Deserialize<List<int>>(responseString);
-                log("Reload DLC ownerships OK — " + steamOwnerships.Count + " items.");
-            }
-            catch (System.Exception ex)
-            {
-                log("Erreur : " + ex.Message);
-            }
+            yield return ItemService.ReloadDlcOwnerships();
         }
 
         public static Boolean hasDlc(int appId)
         {
-            return steamOwnerships.Count() > 0 && steamOwnerships.Contains(appId);
+            return ItemService?.HasDlc(appId) ?? false;
         }
 
         public static void enableTranslations()
@@ -255,21 +231,12 @@ namespace GLMod
 
         public static void findModName()
         {
-            DirectoryInfo dir = new DirectoryInfo(configPath);
-            FileInfo[] files = dir.GetFiles();
-            foreach (FileInfo file in files)
-            {
-                if (file.Name.EndsWith(".glmod"))
-                {
-                    modName = Path.GetFileNameWithoutExtension(file.Name);
-                    return;
-                }
-            }
+            ConfigService?.FindModName();
         }
 
         public static void setModName(string modName)
         {
-            GLMod.modName = modName;
+            ConfigService?.SetModName(modName);
         }
 
         /*
@@ -302,488 +269,106 @@ namespace GLMod
 
         public static void StartGame(string code, string map, Boolean ranked)
         {
-            GLMod.log("Creating game...");
-            if (step != GameStep.Initial)
-            {
-                log("[CreateGame] Duplicate call");
-                step = GameStep.Initial;
-            }
-            if (string.IsNullOrEmpty(code))
-            {
-                log("[CreateGame] Code null or empty");
-            }
-            if (string.IsNullOrEmpty(map))
-            {
-                log("[CreateGame] Map null or empty");
-            }
-
-            try
-            {
-                currentGame = new GLGame(code, map, ranked, modName);
-                step = GameStep.PlayersAdded;
-                GLMod.log("Game created.");
-            }
-            catch (Exception e)
-            {
-                log("[CreateGame] Catch exception " + e.Message);
-                return;
-            }
-
+            GameStateManager?.StartGame(code, map, ranked);
         }
 
         // Step 2 : Add Player until all players recorded
         public static void AddPlayer(string playerName, string role, string team, string color)
         {
-            if (step != GameStep.PlayersAdded)
-            {
-                log("[AddPlayer] Call when in step " + step);
-                return;
-            }
-
-            if (currentGame == null)
-            {
-                log("[AddPlayer] Current Game null");
-                return;
-            }
-
-            if (string.IsNullOrEmpty(playerName))
-            {
-                log("[AddPlayer] PlayerName null or empty");
-                return;
-            }
-
-            if (string.IsNullOrEmpty(role))
-            {
-                log("[AddPlayer] Role null or empty");
-                return;
-            }
-
-            if (string.IsNullOrEmpty(team))
-            {
-                log("[AddPlayer] Team null or empty");
-                return;
-            }
-
-            try
-            {
-                currentGame.addPlayer(null, playerName, role, team, color);
-            } catch (Exception e)
-            {
-                log("[AddPlayer] Catch exception " + e.Message);
-                return;
-            }
-
-            try
-            {
-                if (currentGame.players.Count() == PlayerControl.AllPlayerControls.Count)
-                {
-                    step = GameStep.GameSent;
-                }
-            }
-            catch (Exception e)
-            {
-                log("[AddPlayer] Catch exception check " + e.Message);
-                return;
-            }
-
+            GameStateManager?.AddPlayer(playerName, role, team, color);
         }
 
         // Step 3 : Send Game (nothing for non host)
         public static IEnumerator SendGame(System.Action<bool> onComplete = null)
         {
-            GLMod.log("Sending game...");
-
-            if (!AmongUsClient.Instance.AmHost)
-            {
-                step = GameStep.GameIdSynced;
-                onComplete?.Invoke(false);
+            if (GameStateManager == null)
                 yield break;
-            }
 
-            if (step != GameStep.GameSent)
-            {
-                log("[SendGame] Duplicate call");
-                onComplete?.Invoke(false);
-                yield break;
-            }
-
-            if (currentGame.modName == null)
-            {
-                log("[SendGame] Modname null");
-            }
-
-            var form = new Dictionary<string, string>
-            {
-                { "code", currentGame.code },
-                { "map", currentGame.map },
-                { "ranked", currentGame.ranked },
-                { "modName", currentGame.modName },
-                { "players", GLJson.Serialize<List<GLPlayer>>(currentGame.players) }
-            };
-
-            // DEBUG
-            GLMod.log("startGame: " + GLJson.Serialize<List<GLPlayer>>(currentGame.players));
-
-            string responseString = null;
-            string error = null;
-
-            // Appel de la coroutine ApiService
-            yield return ApiService.PostFormAsync(api + "/game/start", form,
-                result => {
-                    responseString = result;
-                },
-                err => {
-                    error = err;
-                }
-            );
-
-            // Gestion du résultat
-            if (error != null)
-            {
-                log("[SendGame] fail, error: " + error);
-                onComplete?.Invoke(false);
-                yield break;
-            }
-
-            currentGame.id = responseString;
-            step = GameStep.GameIdSynced;
-            CoroutineRunner.Run(SyncGameId(result =>
-            {
-                GLMod.log("Game sent.");
-                onComplete?.Invoke(result);
-            }));
+            yield return GameStateManager.SendGame(onComplete);
         }
 
         // Step 4: Sync Game Id for host
         public static IEnumerator SyncGameId(System.Action<bool> onComplete = null)
         {
-            if (!AmongUsClient.Instance.AmHost) { step = GameStep.PlayersRecorded; onComplete?.Invoke(false); yield break; }
-            if (step != GameStep.GameIdSynced) { log("[SyncGameId] Duplicate call"); onComplete?.Invoke(false); yield break; }
-            if (currentGame == null || string.IsNullOrEmpty(currentGame.id)) { log("[SyncGameId] Game null/id"); onComplete?.Invoke(false); yield break; }
+            if (GameStateManager == null)
+                yield break;
 
-            GLMod.stepRpc.Value = "NO";
-            yield return new WaitForSeconds(GameConstants.RPC_SYNC_TIMEOUT);
-
-            bool done = false;
-
-            Task.Run(() =>
-            {
-                try
-                {
-                    List<string> values = new() { GLMod.currentGame.getId().ToString() };
-                    GLRPCProcedure.makeRpcCall(1, values);
-                }
-                catch (Exception ex)
-                {
-                    GLMod.log("[SyncGameId] RPC fail : " + ex.Message);
-                }
-                finally { done = true; }
-            });
-
-            // 🧵 Attend la fin sans bloquer le thread principal
-            while (!done) yield return null;
-
-            GLMod.step = GameStep.PlayersRecorded;
-            onComplete?.Invoke(true);
+            yield return GameStateManager.SyncGameId(onComplete);
         }
 
         // External process : Add My Player
         public static IEnumerator AddMyPlayer(System.Action<bool> onComplete = null)
         {
-            if (!AuthService.IsLoggedIn)
-            {
-                onComplete?.Invoke(false);
+            if (GameStateManager == null)
                 yield break;
-            }
 
-            if (currentGame == null)
-            {
-                log("[AddMyPlayer] Current Game null");
-                onComplete?.Invoke(false);
-                yield break;
-            }
-
-            PlayerControl me;
-            GLPlayer myPlayer;
-
-            // Validation initiale du joueur
-            try
-            {
-                me = PlayerControl.LocalPlayer;
-                myPlayer = GLMod.currentGame.players.FindAll(p => p.playerName == me.Data.PlayerName)[0];
-            }
-            catch (Exception ex)
-            {
-                GLMod.log("[AddMyPlayer] Catch exception " + ex.Message);
-                onComplete?.Invoke(false);
-                yield break;
-            }
-
-            if (myPlayer == null)
-            {
-                GLMod.log("[AddMyPlayer] My player null");
-                onComplete?.Invoke(false);
-                yield break;
-            }
-
-            if (myPlayer.role == null)
-            {
-                GLMod.log("[AddMyPlayer] My role null");
-            }
-
-            if (myPlayer.team == null)
-            {
-                GLMod.log("[AddMyPlayer] My team null");
-            }
-
-            if (string.IsNullOrEmpty(myPlayer.playerName))
-            {
-                GLMod.log("[AddMyPlayer] My name null or empty");
-            }
-
-            // Attendre que l'ID du jeu soit disponible
-            while (string.IsNullOrEmpty(GLMod.currentGame.id))
-            {
-                yield return new WaitForSeconds(0.1f);
-            }
-
-            // Préparer le formulaire
-            var form = new Dictionary<string, string>
-            {
-                { "gameId", GLMod.currentGame.id },
-                { "login", GLMod.getAccountName() },
-                { "playerName", me.Data.PlayerName }
-            };
-
-            string responseString = null;
-            string error = null;
-
-            // Appel de la coroutine ApiService
-            yield return ApiService.PostFormAsync(GLMod.api + "/game/addMyPlayer", form,
-                result => {
-                    responseString = result;
-                },
-                err => {
-                    error = err;
-                }
-            );
-
-            // Gestion des erreurs
-            if (error != null)
-            {
-                GLMod.log("[AddMyPlayer] Add my player fail, error: " + error);
-            }
-            onComplete?.Invoke(true);
+            yield return GameStateManager.AddMyPlayer(onComplete);
         }
 
         // Step 5 : Set Winner Teams
         public static void SetWinnerTeams(List<string> winners)
         {
-            if (!AmongUsClient.Instance.AmHost)
-            {
-                step = GameStep.Initial;
-                return;
-            }
-            if (step != GameStep.PlayersRecorded && step != GameStep.WinnerSet)
-            {
-                log("[SetWinnerTeams] Call when in step " + step);
-                return;
-            }
-            if (currentGame == null)
-            {
-                log("[SetWinnerTeams] Current Game null");
-                return;
-            }
-
-            if (winners.Count <= 0)
-            {
-                log("[SetWinnerTeams] Winners empty");
-                return;
-            }
-
-            try
-            {
-                currentGame.setWinners(winners);
-                step = GameStep.WinnerSet;
-            }
-            catch (Exception e)
-            {
-                log("[SetWinnerTeams] Set Winner Teams fail, error: " + e.Message);
-            }
-            
+            GameStateManager?.SetWinnerTeams(winners);
         }
 
         // Step 5 : Set Winner Player
         public static void AddWinnerPlayer(string playerName)
         {
-            if (!AmongUsClient.Instance.AmHost)
-            {
-                step = GameStep.Initial;
-                return;
-            }
-            if (step != GameStep.PlayersRecorded && step != GameStep.WinnerSet)
-            {
-                log("[AddWinnerPlayer] Call when in step " + step);
-                return;
-            }
-            if (currentGame == null)
-            {
-                log("[AddWinnerPlayer] Current Game null");
-                return;
-            }
-
-            if (string.IsNullOrEmpty(playerName))
-            {
-                log("[AddWinnerPlayer] Player name null or empty empty");
-                return;
-            }
-
-            try
-            {
-                currentGame.players.FindAll(p => p.playerName == playerName).ForEach(p => p.setWin());
-                step = GameStep.WinnerSet;
-            } catch (Exception e)
-            {
-                log("[AddWinnerPlayer] Add Winner Player fail, error: " + e.Message);
-            }
-            
+            GameStateManager?.AddWinnerPlayer(playerName);
         }
 
         // Step 6 : End Game
 
         public static IEnumerator EndGame()
         {
-            GLMod.log("Ending game...");
-
-            if (!AmongUsClient.Instance.AmHost)
-            {
-                step = GameStep.Initial;
+            if (GameStateManager == null)
                 yield break;
-            }
 
-            if (step != GameStep.WinnerSet)
-            {
-                log("[EndGame] Call when in step " + step);
-                yield break;
-            }
-
-            if (currentGame == null)
-            {
-                log("[EndGame] Current Game null");
-                yield break;
-            }
-
-            BackgroundEvents.endBackgroundProcess();
-
-            string error = null;
-            bool done = false;
-
-            System.Threading.Tasks.Task.Run(async () =>
-            {
-                try
-                {
-                    string json = GLJson.Serialize<GLGame>(currentGame);
-
-                    // DEBUG
-                    // GLMod.log("endGame: "+ json);
-
-                    var content = new StringContent(json, Encoding.UTF8, "application/json");
-                    var response = await HttpHelper.Client.PostAsync(api + "/game/end", content);
-                    response.EnsureSuccessStatusCode();
-
-                    // Lecture de la réponse si nécessaire
-                    var result = await response.Content.ReadAsStringAsync();
-                }
-                catch (Exception e)
-                {
-                    error = e.Message;
-                }
-                finally
-                {
-                    done = true;
-                }
-            });
-
-            // Attendre la fin de la tâche
-            while (!done)
-                yield return null;
-
-            // Gestion du résultat
-            if (error != null)
-            {
-                log("[EndGame] End Game fail, error: " + error);
-            }
-            else
-            {
-                step = GameStep.Initial;
-                GLMod.log("Game ended.");
-            }
+            yield return GameStateManager.EndGame();
         }
 
         /*
          * Services
          */
 
-
         public static void disableService(ServiceType service)
         {
-            string serviceName = service.ToString();
-            if (enabledServices.Contains(serviceName))
-            {
-                enabledServices.Remove(serviceName);
-            }
+            ServiceManager?.DisableService(service);
         }
 
         public static void disableService(string service)
         {
-            if (enabledServices.Contains(service))
-            {
-                enabledServices.Remove(service);
-            }
+            ServiceManager?.DisableService(service);
         }
 
         public static void disableAllServices()
         {
-            enabledServices = new List<string>() { };
+            ServiceManager?.DisableAllServices();
         }
 
         public static void enableService(ServiceType service)
         {
-            string serviceName = service.ToString();
-            if (!enabledServices.Contains(serviceName))
-            {
-                enabledServices.Add(serviceName);
-            }
+            ServiceManager?.EnableService(service);
         }
 
         public static void enableService(string service)
         {
-            if (!enabledServices.Contains(service))
-            {
-                enabledServices.Add(service);
-            }
+            ServiceManager?.EnableService(service);
         }
 
         public static bool existService(ServiceType service)
         {
-            return enabledServices.Contains(service.ToString());
+            return ServiceManager?.ExistsService(service) ?? false;
         }
 
         public static bool existService(string service)
         {
-            return enabledServices.Contains(service);
+            return ServiceManager?.ExistsService(service) ?? false;
         }
 
         public static void addAction(string source, string target, string action)
         {
-            try
-            {
-                currentGame.addAction(source, target, action);
-            } catch (Exception e)
-            {
-                log("[AddAction] Catch exception " + e.Message);
-            }
-            
+            GameStateManager?.AddAction(source, target, action);
         }
 
         /*
