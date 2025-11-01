@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Text.Json;
 
-namespace GLMod
+namespace GLMod.GLEntities
 {
     public static class GLJson
     {

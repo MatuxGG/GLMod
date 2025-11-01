@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace GLMod
+namespace GLMod.GLEntities
 {
     public class GLTranslation
     {

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using GLMod.Enums;
 using GLMod.Constants;
+using GLMod.GLEntities;
 
 namespace GLMod
 {

@@ -26,6 +26,7 @@ using GLMod.Enums;
 using GLMod.Constants;
 using GLMod.Services;
 using Random = System.Random;
+using GLMod.GLEntities;
 
 namespace GLMod
 {

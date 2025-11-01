@@ -3,6 +3,7 @@ using InnerNet;
 using System;
 using System.Collections.Generic;
 using static UnityEngine.GraphicsBuffer;
+using GLMod.GLEntities;
 
 namespace GLMod
 {
