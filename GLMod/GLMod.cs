@@ -230,11 +230,6 @@ namespace GLMod
 
         private void StartVerificationAndPatching()
         {
-            CoroutineRunner.Run(IntegrityService.VerifyGLMod(result =>
-            {
-                log("GLMod verified: " + result);
-            }));
-
             Harmony.PatchAll();
         }
 

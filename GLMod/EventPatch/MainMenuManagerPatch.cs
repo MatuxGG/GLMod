@@ -27,24 +27,15 @@ namespace GLMod
                 GLMod.log("  Verifying GLMod integrity...");
 
                 bool? verificationResult = null;
-                string errorMessage = null;
 
                 yield return GLMod.IntegrityService.VerifyGLMod(
                     result =>
                     {
                         verificationResult = result;
-                    },
-                    error =>
-                    {
-                        errorMessage = error;
                     }
                 );
 
-                if (errorMessage != null)
-                {
-                    GLMod.log($"  [✗] Verification failed with error: {errorMessage}");
-                }
-                else if (verificationResult.HasValue)
+                if (verificationResult.HasValue)
                 {
                     if (verificationResult.Value)
                     {
@@ -52,7 +43,7 @@ namespace GLMod
                     }
                     else
                     {
-                        GLMod.log("  [✗] GLMod integrity check failed - checksum mismatch");
+                        GLMod.log("  [✗] GLMod integrity check failed (checksum mismatch or error)");
                     }
                 }
                 else

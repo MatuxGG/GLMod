@@ -100,14 +100,13 @@ namespace GLMod.Services
             }
         }
 
-        public IEnumerator VerifyDll(string checksumId, string dllPath, System.Action<bool> onComplete, System.Action<string> onError = null)
+        public IEnumerator VerifyDll(string checksumId, string dllPath, System.Action<bool> onComplete)
         {
             string localChecksum = CalculateFileSHA512(dllPath);
             Log("Local checksum: " + localChecksum);
 
             string remoteChecksum = null;
             bool hasError = false;
-            string errorMessage = null;
 
             yield return GetChecksum(checksumId,
                 checksum => {
@@ -115,14 +114,12 @@ namespace GLMod.Services
                 },
                 error => {
                     hasError = true;
-                    errorMessage = error;
                 }
             );
 
             if (hasError)
             {
-                Log($"verifyDll failed for {checksumId}, error: {errorMessage}");
-                onError?.Invoke(errorMessage);
+                onComplete?.Invoke(false);
                 yield break;
             }
 
@@ -134,32 +131,19 @@ namespace GLMod.Services
             onComplete?.Invoke(result);
         }
 
-        public IEnumerator VerifyGLMod(System.Action<bool> onComplete, System.Action<string> onError = null)
+        public IEnumerator VerifyGLMod(System.Action<bool> onComplete)
         {
             var pluginAttribute = typeof(GLMod).GetCustomAttribute<BepInPlugin>();
             string version = pluginAttribute?.Version.ToString();
             Log(version);
 
             bool result = false;
-            bool hasError = false;
-            string errorMessage = null;
 
             yield return VerifyDll("glmod" + version, "BepInEx/plugins/glmod.dll",
                 isValid => {
                     result = isValid;
-                },
-                error => {
-                    hasError = true;
-                    errorMessage = error;
                 }
             );
-
-            if (hasError)
-            {
-                Log($"verifyGLMod failed, error: {errorMessage}");
-                onError?.Invoke(errorMessage);
-                yield break;
-            }
 
             onComplete?.Invoke(result);
         }
