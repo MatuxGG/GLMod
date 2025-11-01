@@ -14,6 +14,61 @@ namespace GLMod
     [HarmonyPatch(typeof(MainMenuManager), nameof(MainMenuManager.Start))]
     public class MainMenuManagerStartPatch
     {
+        private static IEnumerator TestIntegrityService()
+        {
+            GLMod.log("=== Testing IntegrityService ===");
+            GLMod.log("");
+
+            // Test IntegrityService
+            GLMod.log("[IntegrityService]");
+            if (GLMod.IntegrityService != null)
+            {
+                GLMod.log("  Status: Available");
+                GLMod.log("  Verifying GLMod integrity...");
+
+                bool? verificationResult = null;
+                string errorMessage = null;
+
+                yield return GLMod.IntegrityService.VerifyGLMod(
+                    result =>
+                    {
+                        verificationResult = result;
+                    },
+                    error =>
+                    {
+                        errorMessage = error;
+                    }
+                );
+
+                if (errorMessage != null)
+                {
+                    GLMod.log($"  [✗] Verification failed with error: {errorMessage}");
+                }
+                else if (verificationResult.HasValue)
+                {
+                    if (verificationResult.Value)
+                    {
+                        GLMod.log("  [✓] GLMod integrity verified successfully");
+                    }
+                    else
+                    {
+                        GLMod.log("  [✗] GLMod integrity check failed - checksum mismatch");
+                    }
+                }
+                else
+                {
+                    GLMod.log("  [✗] Verification completed but no result received");
+                }
+            }
+            else
+            {
+                GLMod.log("  [✗] Service not available");
+            }
+
+            GLMod.log("");
+            GLMod.log("=== IntegrityService Test Completed ===");
+        }
+
         private static IEnumerator TestAuthenticationServices()
         {
             GLMod.log("=== Testing Services Requiring Authentication ===");
@@ -112,6 +167,12 @@ namespace GLMod
                                 {
                                     GLMod.log($"    - Ban Reason: {GLMod.AuthService.BanReason}");
                                 }
+                            }
+
+                            // Test IntegrityService (does not require authentication)
+                            if (!GLMod.withUnityExplorer)
+                            {
+                                CoroutineRunner.Run(TestIntegrityService());
                             }
 
                             if (GLMod.AuthService.IsLoggedIn)

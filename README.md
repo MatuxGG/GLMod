@@ -17,6 +17,32 @@
 
 Among us GLMod is an open source mod that collects data inside the game to provide a complete match history and various stats on [Good Loss](https://goodloss.fr).
 
+## Features
+
+GLMod provides a comprehensive set of services for tracking game data and enhancing the Among Us experience:
+
+### Core Services
+
+- **Authentication Service**: Manages Steam authentication, login/logout functionality, and ban status handling
+- **Translation Service**: Supports multiple languages with dynamic translation loading from the Good Loss API
+- **Configuration Service**: Handles mod configuration and custom mod name detection
+- **Integrity Service**: Verifies file integrity and checksums to ensure mod authenticity
+- **Item Service**: Manages in-game items and DLC ownership tracking
+- **Rank Service**: Fetches and displays player ranks from Good Loss
+- **Map Service**: Handles map detection and information
+- **Service Manager**: Centralized service management with enable/disable capabilities
+- **Game State Manager**: Tracks game state, player actions, and match progression
+
+### Data Collection
+
+GLMod automatically collects and synchronizes:
+- Match history with detailed player statistics
+- Role assignments and team compositions
+- In-game actions (kills, reports, votes, sabotages, etc.)
+- Task completion progress
+- Custom role actions and events
+- Player ranks and achievements
+
 # Downloads
 
 | Among Us - Version | Link |
