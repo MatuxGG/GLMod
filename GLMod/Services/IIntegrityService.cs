@@ -30,17 +30,15 @@ namespace GLMod.Services
         /// </summary>
         /// <param name="checksumId">Checksum ID</param>
         /// <param name="dllPath">Path to DLL file</param>
-        /// <param name="onComplete">Callback with verification result</param>
-        /// <param name="onError">Callback on error</param>
+        /// <param name="onComplete">Callback with verification result (true if valid, false if invalid or error)</param>
         /// <returns>Coroutine</returns>
-        IEnumerator VerifyDll(string checksumId, string dllPath, System.Action<bool> onComplete, System.Action<string> onError = null);
+        IEnumerator VerifyDll(string checksumId, string dllPath, System.Action<bool> onComplete);
 
         /// <summary>
         /// Verifies GLMod integrity
         /// </summary>
-        /// <param name="onComplete">Callback with verification result</param>
-        /// <param name="onError">Callback on error</param>
+        /// <param name="onComplete">Callback with verification result (true if valid, false if invalid or error)</param>
         /// <returns>Coroutine</returns>
-        IEnumerator VerifyGLMod(System.Action<bool> onComplete, System.Action<string> onError = null);
+        IEnumerator VerifyGLMod(System.Action<bool> onComplete);
     }
 }
