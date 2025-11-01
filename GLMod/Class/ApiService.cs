@@ -13,30 +13,35 @@ namespace GLMod.Class
     {
         public static IEnumerator PostFormAsync(string url, Dictionary<string, string> formValues, System.Action<string> onComplete, System.Action<string> onError = null)
         {
+            // Variables partagées entre threads
+            bool done = false;
             string error = null;
             string result = null;
-            bool done = false;
 
-            System.Threading.Tasks.Task.Run(async () =>
+            // Stocker la référence à la tâche pour une meilleure gestion
+            var task = System.Threading.Tasks.Task.Run(async () =>
             {
                 try
                 {
                     var content = new FormUrlEncodedContent(formValues);
-                    var response = await HttpHelper.Client.PostAsync(url, content);
+                    var response = await HttpHelper.Client.PostAsync(url, content).ConfigureAwait(false);
                     response.EnsureSuccessStatusCode();
-                    var responseString = await response.Content.ReadAsStringAsync();
+                    var responseString = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                     result = System.Text.RegularExpressions.Regex.Unescape(responseString);
-                    done = true;
                 }
                 catch (System.Exception ex)
                 {
                     error = ex.Message;
-                    done = true;
+                }
+                finally
+                {
+                    // S'assurer que done est défini en dernier pour garantir la visibilité des autres variables
+                    System.Threading.Volatile.Write(ref done, true);
                 }
             });
 
-            // Attendre la fin de la tâche
-            while (!done)
+            // Attendre la fin de la tâche avec une lecture volatile
+            while (!System.Threading.Volatile.Read(ref done))
                 yield return null;
 
             // Gestion du résultat
@@ -52,16 +57,18 @@ namespace GLMod.Class
 
         public static IEnumerator PostFormWithErrorHandlingAsync(string url, Dictionary<string, string> formValues, System.Action<ApiResponse> onComplete)
         {
+            // Variables partagées entre threads
             ApiResponse apiResponse = null;
             bool done = false;
 
-            System.Threading.Tasks.Task.Run(async () =>
+            // Stocker la référence à la tâche pour une meilleure gestion
+            var task = System.Threading.Tasks.Task.Run(async () =>
             {
                 try
                 {
                     var content = new FormUrlEncodedContent(formValues);
-                    var response = await HttpHelper.Client.PostAsync(url, content);
-                    var responseString = await response.Content.ReadAsStringAsync();
+                    var response = await HttpHelper.Client.PostAsync(url, content).ConfigureAwait(false);
+                    var responseString = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
                     apiResponse = new ApiResponse
                     {
@@ -82,12 +89,13 @@ namespace GLMod.Class
                 }
                 finally
                 {
-                    done = true;
+                    // S'assurer que done est défini en dernier pour garantir la visibilité des autres variables
+                    System.Threading.Volatile.Write(ref done, true);
                 }
             });
 
-            // Attendre la fin de la tâche
-            while (!done)
+            // Attendre la fin de la tâche avec une lecture volatile
+            while (!System.Threading.Volatile.Read(ref done))
                 yield return null;
 
             // Retourner le résultat via le callback
