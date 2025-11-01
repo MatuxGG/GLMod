@@ -55,7 +55,6 @@ namespace GLMod.Services
 
             if (error != null)
             {
-                Log("Erreur HTTP : " + error);
                 onError?.Invoke(error);
                 onComplete?.Invoke("");
                 yield break;
