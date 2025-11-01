@@ -23,13 +23,11 @@ GLMod provides a comprehensive set of services for tracking game data and enhanc
 
 ### Core Services
 
-- **Authentication Service**: Manages Steam authentication, login/logout functionality, and ban status handling
+- **Authentication Service**: Manages Good Loss authentication with Steam, login/logout functionality, and ban status handling
 - **Translation Service**: Supports multiple languages with dynamic translation loading from the Good Loss API
-- **Configuration Service**: Handles mod configuration and custom mod name detection
 - **Integrity Service**: Verifies file integrity and checksums to ensure mod authenticity
-- **Item Service**: Manages in-game items and DLC ownership tracking
+- **Item Service**: Manages in-game items (successes) and DLC ownership tracking
 - **Rank Service**: Fetches and displays player ranks from Good Loss
-- **Map Service**: Handles map detection and information
 - **Service Manager**: Centralized service management with enable/disable capabilities
 - **Game State Manager**: Tracks game state, player actions, and match progression
 
