@@ -20,7 +20,7 @@ namespace GLMod
 
         public static void handleDc(string reason, string playerName)
         {
-            if (GLMod.step == GameStep.Initial) return;
+            if (GLMod.GameStateManager.Step == GameStep.Initial) return;
             try
             {
                 GLMod.log("handleDc: " + reason + " / " + playerName);
@@ -77,7 +77,7 @@ namespace GLMod
                 yield return new WaitForSeconds(GameConstants.BACKGROUND_POLLING_INTERVAL);
 
                 // Check if not in meeting
-                int turn = int.Parse(GLMod.currentGame.turns);
+                int turn = int.Parse(GLMod.GameStateManager.CurrentGame.turns);
                 if (turn > 1000) continue;
 
                 TrackPlayerPositions();
@@ -101,7 +101,7 @@ namespace GLMod
 
                 float x = player.MyPhysics.body.transform.position.x;
                 float y = player.MyPhysics.body.transform.position.y;
-                GLMod.currentGame.addPosition(player.Data.PlayerName, x, y, timestamp.ToString());
+                GLMod.GameStateManager.CurrentGame.addPosition(player.Data.PlayerName, x, y, timestamp.ToString());
             }
         }
 
@@ -118,7 +118,7 @@ namespace GLMod
             }
 
             // Check for disconnected players
-            foreach (GLPlayer gamePlayer in GLMod.currentGame.players)
+            foreach (GLPlayer gamePlayer in GLMod.GameStateManager.CurrentGame.players)
             {
                 if (!playersDc.Contains(gamePlayer.playerName) && !activePlayers.Contains(gamePlayer.playerName))
                 {

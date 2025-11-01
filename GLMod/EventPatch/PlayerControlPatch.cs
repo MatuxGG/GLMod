@@ -17,7 +17,7 @@ namespace GLMod
             {
                 if (GLMod.existService("Exiled") || GLMod.debug)
                 {
-                    GLMod.currentGame.addAction("Lobby", __instance.Data.PlayerName, "exiled");
+                    GLMod.GameStateManager.CurrentGame.addAction("Lobby", __instance.Data.PlayerName, "exiled");
                 }
             } catch (Exception e)
             {
@@ -39,14 +39,14 @@ namespace GLMod
                 // Set positions before kill
                 float x = __instance.MyPhysics.body.transform.position.x;
                 float y = __instance.MyPhysics.body.transform.position.y;
-                GLMod.currentGame.addPosition(__instance.Data.PlayerName, x, y, timestampSeconds.ToString());
+                GLMod.GameStateManager.CurrentGame.addPosition(__instance.Data.PlayerName, x, y, timestampSeconds.ToString());
                 x = target.MyPhysics.body.transform.position.x;
                 y = target.MyPhysics.body.transform.position.y;
-                GLMod.currentGame.addPosition(target.Data.PlayerName, x, y, timestampSeconds.ToString());
+                GLMod.GameStateManager.CurrentGame.addPosition(target.Data.PlayerName, x, y, timestampSeconds.ToString());
 
                 if (GLMod.existService("Kills") || GLMod.debug)
                 {
-                    GLMod.currentGame.addAction(__instance.Data.PlayerName, target.Data.PlayerName != null ? target.Data.PlayerName : "", "killed");
+                    GLMod.GameStateManager.CurrentGame.addAction(__instance.Data.PlayerName, target.Data.PlayerName != null ? target.Data.PlayerName : "", "killed");
                 }
             }
             catch (Exception e)
@@ -68,7 +68,7 @@ namespace GLMod
                     {
                         try
                         {
-                            List<GLPlayer> players = GLMod.currentGame.players.FindAll(p => p.playerName == __instance.Data.PlayerName);
+                            List<GLPlayer> players = GLMod.GameStateManager.CurrentGame.players.FindAll(p => p.playerName == __instance.Data.PlayerName);
                             if (players.Count > 0)
                             {
                                 players.ForEach(p => p.addTasksDead());
@@ -83,7 +83,7 @@ namespace GLMod
                     {
                         try
                         {
-                        List<GLPlayer> players = GLMod.currentGame.players.FindAll(p => p.playerName == __instance.Data.PlayerName);
+                        List<GLPlayer> players = GLMod.GameStateManager.CurrentGame.players.FindAll(p => p.playerName == __instance.Data.PlayerName);
                             if (players.Count > 0)
                             {
                                 players.ForEach(p => p.addTasks());
@@ -110,7 +110,7 @@ namespace GLMod
                 {
                     if (GLMod.existService("Roles") || GLMod.debug)
                     {
-                        GLMod.currentGame.addAction(__instance.Data.PlayerName, "", "unshifted");
+                        GLMod.GameStateManager.CurrentGame.addAction(__instance.Data.PlayerName, "", "unshifted");
                     }
                 }
                 catch (Exception e)
@@ -123,7 +123,7 @@ namespace GLMod
                 {
                     if (GLMod.existService("Roles") || GLMod.debug)
                     {
-                        GLMod.currentGame.addAction(__instance.Data.PlayerName, targetPlayer.Data.PlayerName != null ? targetPlayer.Data.PlayerName : "", "shapeshifted into");
+                        GLMod.GameStateManager.CurrentGame.addAction(__instance.Data.PlayerName, targetPlayer.Data.PlayerName != null ? targetPlayer.Data.PlayerName : "", "shapeshifted into");
                     }
                 }
                 catch (Exception e)
@@ -145,7 +145,7 @@ namespace GLMod
             {
                 if (GLMod.existService("Roles") || GLMod.debug)
                 {
-                    GLMod.currentGame.addAction(__instance.Data.PlayerName, target.Data.PlayerName != null ? target.Data.PlayerName : "", "protected");
+                    GLMod.GameStateManager.CurrentGame.addAction(__instance.Data.PlayerName, target.Data.PlayerName != null ? target.Data.PlayerName : "", "protected");
                 }
             }
             catch (Exception e)
@@ -165,7 +165,7 @@ namespace GLMod
             {
                 if (GLMod.existService("Roles") || GLMod.debug)
                 {
-                    GLMod.currentGame.addAction(__instance.Data.PlayerName, playerToTrack.Data.PlayerName, "started tracking");
+                    GLMod.GameStateManager.CurrentGame.addAction(__instance.Data.PlayerName, playerToTrack.Data.PlayerName, "started tracking");
                 }
             }
             catch (Exception e)
@@ -185,7 +185,7 @@ namespace GLMod
             {
                 if (GLMod.existService("Roles") || GLMod.debug)
                 {
-                    GLMod.currentGame.addAction(__instance.Data.PlayerName, "", "stopped tracking");
+                    GLMod.GameStateManager.CurrentGame.addAction(__instance.Data.PlayerName, "", "stopped tracking");
                 }
             }
             catch (Exception e)
@@ -211,8 +211,8 @@ namespace GLMod
                         // Set positions before kill
                         float x = __instance.MyPhysics.body.transform.position.x;
                         float y = __instance.MyPhysics.body.transform.position.y;
-                        GLMod.currentGame.addPosition(__instance.Data.PlayerName, x, y, timestampSeconds.ToString());
-                        GLMod.currentGame.addAction(__instance.Data.PlayerName, "", "called an emergency");
+                        GLMod.GameStateManager.CurrentGame.addPosition(__instance.Data.PlayerName, x, y, timestampSeconds.ToString());
+                        GLMod.GameStateManager.CurrentGame.addAction(__instance.Data.PlayerName, "", "called an emergency");
                     }
                 }
                 else
@@ -222,13 +222,13 @@ namespace GLMod
                         // Set positions before kill
                         float x = __instance.MyPhysics.body.transform.position.x;
                         float y = __instance.MyPhysics.body.transform.position.y;
-                        GLMod.currentGame.addPosition(__instance.Data.PlayerName, x, y, timestampSeconds.ToString());
-                        GLMod.currentGame.addAction(__instance.Data.PlayerName, target.PlayerName, "reported");
+                        GLMod.GameStateManager.CurrentGame.addPosition(__instance.Data.PlayerName, x, y, timestampSeconds.ToString());
+                        GLMod.GameStateManager.CurrentGame.addAction(__instance.Data.PlayerName, target.PlayerName, "reported");
                     }
                 }
                 if (GLMod.existService("Turns") || GLMod.debug)
                 {
-                    GLMod.currentGame.addTurn();
+                    GLMod.GameStateManager.CurrentGame.addTurn();
                 }
             }
             catch (Exception e)
@@ -248,7 +248,7 @@ namespace GLMod
             {
                 if (GLMod.existService("Tasks") || GLMod.debug)
                 {
-                    GLMod.currentGame.addAction(__instance.Data.PlayerName, "", "completedTask");
+                    GLMod.GameStateManager.CurrentGame.addAction(__instance.Data.PlayerName, "", "completedTask");
                 }
             }
             catch (Exception e)
@@ -292,7 +292,7 @@ namespace GLMod
                 if (nbImp != realImp) return;
 
                 // Start game
-                GLMod.gameMap = GLMod.getMapName();
+                GLMod.GameStateManager.GameMap = GLMod.MapService.GetMapName();
 
                 CoroutineRunner.Run(VanillaEvents.startGameVanilla());
                 gameStarted = true;
