@@ -244,7 +244,7 @@ namespace GLMod.Services
 
             bool done = false;
 
-            Task.Run(() =>
+            var task = Task.Run(() =>
             {
                 try
                 {
@@ -255,11 +255,15 @@ namespace GLMod.Services
                 {
                     Log("[SyncGameId] RPC fail : " + ex.Message);
                 }
-                finally { done = true; }
+                finally
+                {
+                    System.Threading.Volatile.Write(ref done, true);
+                }
             });
 
-            // Attend la fin sans bloquer le thread principal
-            while (!done) yield return null;
+            // Attend la fin sans bloquer le thread principal avec une lecture volatile
+            while (!System.Threading.Volatile.Read(ref done))
+                yield return null;
 
             Step = GameStep.PlayersRecorded;
             onComplete?.Invoke(true);
@@ -454,18 +458,18 @@ namespace GLMod.Services
             string error = null;
             bool done = false;
 
-            Task.Run(async () =>
+            var task = Task.Run(async () =>
             {
                 try
                 {
                     string json = GLJson.Serialize<GLGame>(CurrentGame);
 
                     var content = new StringContent(json, Encoding.UTF8, "application/json");
-                    var response = await HttpHelper.Client.PostAsync(_apiEndpoint + "/game/end", content);
+                    var response = await HttpHelper.Client.PostAsync(_apiEndpoint + "/game/end", content).ConfigureAwait(false);
                     response.EnsureSuccessStatusCode();
 
                     // Lecture de la réponse si nécessaire
-                    var result = await response.Content.ReadAsStringAsync();
+                    var result = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 }
                 catch (Exception e)
                 {
@@ -473,12 +477,12 @@ namespace GLMod.Services
                 }
                 finally
                 {
-                    done = true;
+                    System.Threading.Volatile.Write(ref done, true);
                 }
             });
 
-            // Attendre la fin de la tâche
-            while (!done)
+            // Attendre la fin de la tâche avec une lecture volatile
+            while (!System.Threading.Volatile.Read(ref done))
                 yield return null;
 
             // Gestion du résultat
