@@ -291,7 +291,7 @@ namespace GLMod
                 if (nbImp != realImp) return;
 
                 // Start game
-                GLMod.GameStateManager.GameMap = GLMod.getMapName();
+                GLMod.GameStateManager.GameMap = GLMod.MapService.GetMapName();
 
                 CoroutineRunner.Run(VanillaEvents.startGameVanilla());
                 gameStarted = true;
