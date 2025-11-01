@@ -25,6 +25,7 @@ namespace GLMod.Services
     {
         private readonly ManualLogSource _logger;
         private readonly IAuthenticationService _authService;
+        private readonly IConfigurationService _configService;
         private readonly string _apiEndpoint;
         private readonly ConfigEntry<string> _stepRpcConfig;
 
@@ -36,11 +37,13 @@ namespace GLMod.Services
         public GameStateManager(
             ManualLogSource logger,
             IAuthenticationService authService,
+            IConfigurationService configService,
             string apiEndpoint,
             ConfigEntry<string> stepRpcConfig)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _authService = authService ?? throw new ArgumentNullException(nameof(authService));
+            _configService = configService ?? throw new ArgumentNullException(nameof(configService));
             _apiEndpoint = apiEndpoint ?? throw new ArgumentNullException(nameof(apiEndpoint));
             _stepRpcConfig = stepRpcConfig ?? throw new ArgumentNullException(nameof(stepRpcConfig));
 
@@ -81,7 +84,7 @@ namespace GLMod.Services
 
             try
             {
-                CurrentGame = new GLGame(code, map, ranked, GLMod.modName);
+                CurrentGame = new GLGame(code, map, ranked, _configService.ModName);
                 Step = GameStep.PlayersAdded;
                 Log("Game created.");
             }

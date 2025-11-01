@@ -16,7 +16,7 @@ namespace GLMod
                 {
                     if (GLMod.existService("Turns") || GLMod.debug)
                     {
-                        GLMod.currentGame.addTurn();
+                        GLMod.GameStateManager.CurrentGame.addTurn();
                     }
                 } catch (Exception e)
                 {

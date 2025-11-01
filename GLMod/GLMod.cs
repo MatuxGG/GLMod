@@ -54,77 +54,9 @@ namespace GLMod
 
         public const string api = GameConstants.API_ENDPOINT;
 
-        // Deprecated - Use GameStateManager instead
-        [Obsolete("Use GameStateManager.CurrentGame instead")]
-        public static GLGame currentGame => GameStateManager?.CurrentGame;
-
-        [Obsolete("Use ServiceManager.EnabledServices instead")]
-        public static List<string> enabledServices => ServiceManager?.EnabledServices;
-
-        [Obsolete("Use GameStateManager.GameCode instead")]
-        public static string gameCode
-        {
-            get => GameStateManager?.GameCode ?? GameConstants.DEFAULT_GAME_CODE;
-            set { if (GameStateManager != null) GameStateManager.GameCode = value; }
-        }
-
-        [Obsolete("Use GameStateManager.GameMap instead")]
-        public static string gameMap
-        {
-            get => GameStateManager?.GameMap ?? GameConstants.DEFAULT_MAP_NAME;
-            set { if (GameStateManager != null) GameStateManager.GameMap = value; }
-        }
-
-        [Obsolete("Use ConfigService.ConfigPath instead")]
-        public static string configPath => ConfigService?.ConfigPath;
-
-        [Obsolete("Use ConfigService.ModName instead")]
-        public static string modName => ConfigService?.ModName ?? "Vanilla";
-
-        [Obsolete("Use GameStateManager.Step instead")]
-        public static GameStep step
-        {
-            get => GameStateManager?.Step ?? GameStep.Initial;
-            set { if (GameStateManager != null) GameStateManager.Step = value; }
-        }
-
-        // Deprecated - Use TranslationService instead
-        [Obsolete("Use TranslationService.Languages instead")]
-        public static List<GLLanguage> languages => TranslationService?.Languages;
-
-        [Obsolete("Use TranslationService.CurrentLanguage instead")]
-        public static string lg
-        {
-            get => TranslationService?.CurrentLanguage ?? GameConstants.DEFAULT_LANGUAGE;
-            set
-            {
-                if (TranslationService != null)
-                    TranslationService.CurrentLanguage = value;
-            }
-        }
-        // Deprecated - Use ItemService instead
-        [Obsolete("Use ItemService.SteamOwnerships instead")]
-        public static List<int> steamOwnerships => ItemService?.SteamOwnerships ?? new List<int>();
-
         public static bool debug = false;
         public static bool withUnityExplorer = false;
         internal static BepInEx.Logging.ManualLogSource Logger;
-
-        [Obsolete("Use ItemService.Items instead")]
-        public static List<GLItem> items => ItemService?.Items ?? new List<GLItem>();
-
-        // Deprecated - Use AuthService instead
-        [Obsolete("Use AuthService.Token instead")]
-        public static string token => AuthService?.Token;
-
-        [Obsolete("Use AuthService.IsLoggedIn instead")]
-        public static bool logged => AuthService?.IsLoggedIn ?? false;
-
-        [Obsolete("Use AuthService.IsBanned instead")]
-        public static bool isBanned => AuthService?.IsBanned ?? false;
-
-        [Obsolete("Use AuthService.BanReason instead")]
-        public static string banReason => AuthService?.BanReason ?? "";
 
         public override void Load()
         {
@@ -141,7 +73,8 @@ namespace GLMod
             AuthService = new AuthenticationService(connectionState);
             TranslationService = new TranslationService();
             ConfigService = new ConfigurationService(Logger, configPathValue);
-            GameStateManager = new GameStateManager(Logger, AuthService, api, stepRpc);
+            ConfigService.FindModName();
+            GameStateManager = new GameStateManager(Logger, AuthService, ConfigService, api, stepRpc);
             ServiceManager = new ServiceManager();
             ItemService = new ItemService(Logger, AuthService, api);
 
@@ -150,7 +83,6 @@ namespace GLMod
                 .Select(s => s[random.Next(s.Length)]).ToArray());
             supportId = Config.Bind("GoodLoss", "Support Id", newSupportId);
 
-            ConfigService.FindModName();
             log("Mod " + ConfigService.ModName + " configured");
 
             // Enable default services
