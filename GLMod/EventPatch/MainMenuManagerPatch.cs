@@ -1,9 +1,11 @@
 ﻿using BepInEx.Unity.IL2CPP.Utils;
 using GLMod.Class;
+using GLMod.GLEntities;
 using GLMod.Services;
 using HarmonyLib;
 using Steamworks;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 
@@ -12,6 +14,67 @@ namespace GLMod
     [HarmonyPatch(typeof(MainMenuManager), nameof(MainMenuManager.Start))]
     public class MainMenuManagerStartPatch
     {
+        private static IEnumerator TestAuthenticationServices()
+        {
+            GLMod.log("=== Testing Services Requiring Authentication ===");
+            GLMod.log("");
+
+            // Test ItemService
+            GLMod.log("[ItemService]");
+            if (GLMod.ItemService != null)
+            {
+                GLMod.log("  Status: Available");
+                GLMod.log("  Loading items...");
+
+                int itemsBefore = GLMod.ItemService.Items.Count;
+                yield return GLMod.ItemService.ReloadItems();
+                int itemsAfter = GLMod.ItemService.Items.Count;
+
+                GLMod.log($"  [✓] Items loaded: {itemsAfter} items");
+
+                GLMod.log("  Loading DLC ownerships...");
+                int dlcBefore = GLMod.ItemService.SteamOwnerships.Count;
+                yield return GLMod.ItemService.ReloadDlcOwnerships();
+                int dlcAfter = GLMod.ItemService.SteamOwnerships.Count;
+
+                GLMod.log($"  [✓] DLC ownerships loaded: {dlcAfter} DLCs");
+            }
+            else
+            {
+                GLMod.log("  [✗] Service not available");
+            }
+
+            GLMod.log("");
+
+            // Test RankService
+            GLMod.log("[RankService]");
+            if (GLMod.RankService != null)
+            {
+                GLMod.log("  Status: Available");
+                GLMod.log($"  Account: {GLMod.AuthService.GetAccountName()}");
+                GLMod.log($"  Mod: {GLMod.ConfigService.ModName}");
+                GLMod.log("  Fetching rank...");
+
+                GLRank rankResult = null;
+                yield return GLMod.RankService.GetRank(null, rank => { rankResult = rank; });
+
+                if (rankResult != null && string.IsNullOrEmpty(rankResult.error))
+                {
+                    GLMod.log($"  [✓] Rank: #{rankResult.id} | Percent: {rankResult.percent}% | Name: {rankResult.name}");
+                }
+                else
+                {
+                    GLMod.log($"  [✗] Failed to fetch rank: {rankResult?.error ?? "Unknown error"}");
+                }
+            }
+            else
+            {
+                GLMod.log("  [✗] Service not available");
+            }
+
+            GLMod.log("");
+            GLMod.log("=== Authentication Services Test Completed ===");
+        }
 
         public static void Postfix(MainMenuManager __instance)
         {
@@ -53,55 +116,10 @@ namespace GLMod
 
                             if (GLMod.AuthService.IsLoggedIn)
                             {
-                                GLMod.log("=== Testing Services Requiring Authentication ===");
-
-                                // Test ItemService
-                                GLMod.log("[Testing] ItemService...");
-                                if (GLMod.ItemService != null)
+                                if (!GLMod.withUnityExplorer)
                                 {
-                                    GLMod.log($"    - Service available: Yes");
-                                    GLMod.log($"    - Current items count: {GLMod.ItemService.Items.Count}");
-
-                                    if (!GLMod.withUnityExplorer)
-                                    {
-                                        GLMod.log("    - Loading items...");
-                                        CoroutineRunner.Run(GLMod.ItemService.ReloadItems());
-                                        GLMod.log("    - Loading DLC ownerships...");
-                                        CoroutineRunner.Run(GLMod.ItemService.ReloadDlcOwnerships());
-                                    }
+                                    CoroutineRunner.Run(TestAuthenticationServices());
                                 }
-                                else
-                                {
-                                    GLMod.log($"    - Service available: No");
-                                }
-
-                                // Test RankService
-                                GLMod.log("[Testing] RankService...");
-                                if (GLMod.RankService != null)
-                                {
-                                    GLMod.log($"    - Service available: Yes");
-                                    GLMod.log($"    - Account name for rank query: {GLMod.AuthService.GetAccountName()}");
-                                    GLMod.log($"    - Mod name for rank query: {GLMod.ConfigService.ModName}");
-                                    GLMod.log("    - Fetching rank...");
-
-                                    CoroutineRunner.Run(GLMod.RankService.GetRank(null, rank =>
-                                    {
-                                        if (rank != null && string.IsNullOrEmpty(rank.error))
-                                        {
-                                            GLMod.log($"    [✓] Rank fetched successfully");
-                                        }
-                                        else
-                                        {
-                                            GLMod.log($"    [✗] Rank fetch failed: {rank?.error ?? "Unknown error"}");
-                                        }
-                                    }));
-                                }
-                                else
-                                {
-                                    GLMod.log($"    - Service available: No");
-                                }
-
-                                GLMod.log("=== Authentication-dependent services test completed ===");
                             }
                             else
                             {

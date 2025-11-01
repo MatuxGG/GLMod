@@ -78,11 +78,10 @@ namespace GLMod.Services
                 _items.Clear();
                 var newItems = GLJson.Deserialize<List<GLItem>>(responseString);
                 _items.AddRange(newItems);
-                Log("Reload successes OK — " + _items.Count + " successes.");
             }
             catch (Exception ex)
             {
-                Log("Erreur : " + ex.Message);
+                Log("Erreur lors du chargement des items: " + ex.Message);
             }
         }
 
@@ -124,11 +123,10 @@ namespace GLMod.Services
                 _steamOwnerships.Clear();
                 var newOwnerships = GLJson.Deserialize<List<int>>(responseString);
                 _steamOwnerships.AddRange(newOwnerships);
-                Log("Reload DLC ownerships OK — " + _steamOwnerships.Count + " items.");
             }
             catch (Exception ex)
             {
-                Log("Erreur : " + ex.Message);
+                Log("Erreur lors du chargement des DLC ownerships: " + ex.Message);
             }
         }
 
