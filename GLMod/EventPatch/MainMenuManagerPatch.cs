@@ -29,12 +29,12 @@ namespace GLMod
 
                     try
                     {
-                        CoroutineRunner.Run(GLMod.login(success =>
+                        CoroutineRunner.Run(GLMod.AuthService.Login(success =>
                         {
                             if (!GLMod.withUnityExplorer)
                             {
-                                CoroutineRunner.Run(GLMod.reloadItems());
-                                CoroutineRunner.Run(GLMod.reloadDlcOwnerships());
+                                CoroutineRunner.Run(GLMod.ItemService.ReloadItems());
+                                CoroutineRunner.Run(GLMod.ItemService.ReloadDlcOwnerships());
                             }
                         }));
                     }
