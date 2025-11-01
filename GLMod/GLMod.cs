@@ -39,6 +39,7 @@ namespace GLMod
 
         // Services
         public static IAuthenticationService AuthService { get; private set; }
+        public static ITranslationService TranslationService { get; private set; }
 
         public static ConfigEntry<string> connectionState { get; private set; }
         public static ConfigEntry<string> translations { get; private set; }
@@ -55,9 +56,22 @@ namespace GLMod
         public static string gameMap = GameConstants.DEFAULT_MAP_NAME;
         public static string configPath;
         public static string modName = "Vanilla";
-        public static List<GLLanguage> languages;
-        public static string lg = GameConstants.DEFAULT_LANGUAGE;
         public static GameStep step = GameStep.Initial;
+
+        // Deprecated - Use TranslationService instead
+        [Obsolete("Use TranslationService.Languages instead")]
+        public static List<GLLanguage> languages => TranslationService?.Languages;
+
+        [Obsolete("Use TranslationService.CurrentLanguage instead")]
+        public static string lg
+        {
+            get => TranslationService?.CurrentLanguage ?? GameConstants.DEFAULT_LANGUAGE;
+            set
+            {
+                if (TranslationService != null)
+                    TranslationService.CurrentLanguage = value;
+            }
+        }
         public static List<int> steamOwnerships = new List<int>() { };
         public static bool debug = false;
         public static bool withUnityExplorer = false;
@@ -90,6 +104,7 @@ namespace GLMod
 
             // Initialize services
             AuthService = new AuthenticationService(connectionState);
+            TranslationService = new TranslationService();
           
             Random random = new Random();
             string newSupportId = new string(Enumerable.Repeat(GameConstants.SUPPORT_ID_CHARS, GameConstants.SUPPORT_ID_LENGTH)
@@ -117,7 +132,7 @@ namespace GLMod
 
             if (translations.Value.ToLower() == "yes")
             {
-                _ = GLMod.loadTranslations();
+                CoroutineRunner.Run(TranslationService.LoadTranslations());
             }
             log("Mod loaded");
 
@@ -869,100 +884,38 @@ namespace GLMod
 
         public static IEnumerator loadTranslations()
         {
-            string languagesURL = api + "/trans";
-            string lg = null;
-            string error = null;
-            bool done = false;
-
-            // Charger la liste des langues
-            System.Threading.Tasks.Task.Run(async () =>
+            if (TranslationService == null)
             {
-                try
-                {
-                    lg = await HttpHelper.Client.GetStringAsync(languagesURL);
-                }
-                catch (Exception e)
-                {
-                    error = e.Message;
-                }
-                finally
-                {
-                    done = true;
-                }
-            });
-
-            // Attendre la fin du chargement
-            while (!done)
-                yield return null;
-
-            // Vérifier l'erreur
-            if (error != null)
-            {
-                GLMod.log("Load translations error: " + error);
+                log("TranslationService not initialized");
                 yield break;
             }
 
-            // Désérialiser les langues
-            languages = GLJson.Deserialize<List<GLLanguage>>(lg);
-
-            // Compteur pour suivre les chargements terminés
-            int totalLanguages = languages.Count;
-            int loadedLanguages = 0;
-
-            // Lancer toutes les coroutines de chargement en parallèle
-            foreach (GLLanguage l in languages)
-            {
-                CoroutineRunner.Run(loadLanguageWithCallback(l, () => { loadedLanguages++; }));
-            }
-
-            // Attendre que toutes les langues soient chargées
-            while (loadedLanguages < totalLanguages)
-                yield return null;
-
-            GLMod.log($"All {totalLanguages} languages loaded successfully.");
-        }
-
-        // Wrapper pour ajouter un callback à la fin du chargement
-        private static IEnumerator loadLanguageWithCallback(GLLanguage language, System.Action onComplete)
-        {
-            yield return language.load();
-            onComplete?.Invoke();
+            yield return TranslationService.LoadTranslations();
         }
 
         public static string translate(string toTranslate)
         {
-            List<GLTranslation> current = languages.Find(l => l.code == lg).translations;
-            GLTranslation tr = current.Find(t => t.original == toTranslate);
-            if (tr != null)
-            {
-                return tr.translation;
-            }
-            else
-            {
-                return toTranslate;
-            }
-
+            return TranslationService?.Translate(toTranslate) ?? toTranslate;
         }
 
-        public static bool setLg(string lg)
+        public static bool setLg(string languageCode)
         {
-            GLMod.lg = lg.ToLower();
-            return true;
+            return TranslationService?.SetLanguage(languageCode) ?? false;
         }
 
         public static string getLg()
         {
-            return lg;
+            return TranslationService?.CurrentLanguage ?? GameConstants.DEFAULT_LANGUAGE;
         }
 
         public static string getNameFromCode(string code)
         {
-            return languages.Find(l => l.code == code).name;
+            return TranslationService?.GetLanguageName(code);
         }
 
         public static string getCodeFromName(string name)
         {
-            return languages.Find(l => l.name == name).code;
+            return TranslationService?.GetLanguageCode(name);
         }
 
         public static string getMapName()
