@@ -1,4 +1,5 @@
 using BepInEx.Logging;
+using GLMod.Services.Interfaces;
 using GLMod.Class;
 using GLMod.GLEntities;
 using System;
@@ -6,7 +7,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace GLMod.Services
+namespace GLMod.Services.Implementations
 {
     /// <summary>
     /// Service responsible for managing items and DLC ownership

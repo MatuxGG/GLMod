@@ -1,11 +1,12 @@
 using BepInEx.Logging;
+using GLMod.Services.Interfaces;
 using GLMod.Class;
 using GLMod.GLEntities;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 
-namespace GLMod.Services
+namespace GLMod.Services.Implementations
 {
     /// <summary>
     /// Service responsible for managing player ranks

@@ -1,4 +1,5 @@
 using AmongUs.GameOptions;
+using GLMod.Services.Interfaces;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using BepInEx.Unity.IL2CPP.Utils.Collections;
@@ -16,7 +17,7 @@ using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
 
-namespace GLMod.Services
+namespace GLMod.Services.Implementations
 {
     /// <summary>
     /// Service responsible for managing game state and flow

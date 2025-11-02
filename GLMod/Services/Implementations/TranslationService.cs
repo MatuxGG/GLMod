@@ -1,4 +1,5 @@
 using GLMod.Class;
+using GLMod.Services.Interfaces;
 using GLMod.Constants;
 using GLMod.GLEntities;
 using System;
@@ -6,7 +7,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace GLMod.Services
+namespace GLMod.Services.Implementations
 {
     /// <summary>
     /// Handles translations and language management

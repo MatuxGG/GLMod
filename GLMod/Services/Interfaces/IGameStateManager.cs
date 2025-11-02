@@ -3,7 +3,7 @@ using GLMod.GLEntities;
 using System.Collections;
 using System.Collections.Generic;
 
-namespace GLMod.Services
+namespace GLMod.Services.Interfaces
 {
     /// <summary>
     /// Interface for managing game state and flow

@@ -1,7 +1,8 @@
 using GLMod.Enums;
+using GLMod.Services.Interfaces;
 using System.Collections.Generic;
 
-namespace GLMod.Services
+namespace GLMod.Services.Implementations
 {
     /// <summary>
     /// Service responsible for managing enabled/disabled services

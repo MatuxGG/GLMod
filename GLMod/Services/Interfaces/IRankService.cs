@@ -1,7 +1,7 @@
 using GLMod.GLEntities;
 using System.Collections;
 
-namespace GLMod.Services
+namespace GLMod.Services.Interfaces
 {
     /// <summary>
     /// Interface for managing player ranks
