@@ -7,6 +7,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Security.Cryptography;
+using System.Threading.Tasks;
+using System.Net.Http;
 
 namespace GLMod.Services
 {
@@ -149,5 +151,102 @@ namespace GLMod.Services
 
             onComplete?.Invoke(result);
         }
+
+        #region Alternative Methods Without Coroutines (Async/Await)
+
+        /// <summary>
+        /// Alternative version of GetApiData using async/await instead of coroutines
+        /// </summary>
+        public async Task<string> GetApiDataAsync(string id)
+        {
+            var form = new Dictionary<string, string>
+            {
+                { "id", id }
+            };
+
+            try
+            {
+                var content = new FormUrlEncodedContent(form);
+                var response = await HttpHelper.Client.PostAsync(_apiEndpoint + "/data", content).ConfigureAwait(false);
+                response.EnsureSuccessStatusCode();
+                var responseString = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                return System.Text.RegularExpressions.Regex.Unescape(responseString);
+            }
+            catch (Exception ex)
+            {
+                Log($"GetApiDataAsync failed for {id}, error: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Alternative version of GetChecksum using async/await instead of coroutines
+        /// </summary>
+        public async Task<string> GetChecksumAsync(string checksumId)
+        {
+            Log("getChecksumAsync:" + checksumId);
+
+            try
+            {
+                string result = await GetApiDataAsync("checksum_" + checksumId).ConfigureAwait(false);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Log($"getChecksumAsync failed for {checksumId}, error: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Alternative version of VerifyDll using async/await instead of coroutines
+        /// </summary>
+        public async Task<bool> VerifyDllAsync(string checksumId, string dllPath)
+        {
+            try
+            {
+                string localChecksum = CalculateFileSHA512(dllPath);
+                Log("Local checksum: " + localChecksum);
+
+                string remoteChecksum = await GetChecksumAsync(checksumId).ConfigureAwait(false);
+                Log("Remote checksum: " + remoteChecksum);
+
+                bool result = localChecksum == remoteChecksum;
+                Log(result ? "Valid checksum" : "Invalid checksum");
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Log($"VerifyDllAsync failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Alternative version of VerifyGLMod using async/await instead of coroutines
+        /// </summary>
+        public async Task<bool> VerifyGLModAsync()
+        {
+            try
+            {
+                var pluginAttribute = typeof(GLMod).GetCustomAttribute<BepInPlugin>();
+                // Format version as Major.Minor.Build (3 components) to match server expectations
+                string version = pluginAttribute?.Version != null
+                    ? $"{pluginAttribute.Version.Major}.{pluginAttribute.Version.Minor}.{pluginAttribute.Version.Build}"
+                    : null;
+                Log(version);
+
+                bool result = await VerifyDllAsync("glmod" + version, "BepInEx/plugins/glmod.dll").ConfigureAwait(false);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Log($"VerifyGLModAsync failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        #endregion
     }
 }
