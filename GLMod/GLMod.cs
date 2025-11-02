@@ -17,7 +17,7 @@ using GLMod.Class;
 
 namespace GLMod
 {
-    [BepInPlugin(Id, "GLMod", "5.3.0")]
+    [BepInPlugin(Id, "GLMod", "5.3.1")]
     [BepInProcess("Among Us.exe")]
     public class GLMod : BasePlugin
     {
