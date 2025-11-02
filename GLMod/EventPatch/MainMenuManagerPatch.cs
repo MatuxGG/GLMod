@@ -1,7 +1,7 @@
 ﻿using BepInEx.Unity.IL2CPP.Utils;
 using GLMod.Class;
 using GLMod.GLEntities;
-using GLMod.Services;
+using GLMod.Services.Interfaces;
 using HarmonyLib;
 using Steamworks;
 using System;

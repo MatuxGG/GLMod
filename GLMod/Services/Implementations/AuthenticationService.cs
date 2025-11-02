@@ -1,12 +1,13 @@
 using BepInEx.Configuration;
 using GLMod.Class;
 using GLMod.Constants;
+using GLMod.Services.Interfaces;
 using Steamworks;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 
-namespace GLMod.Services
+namespace GLMod.Services.Implementations
 {
     /// <summary>
     /// Handles user authentication and session management

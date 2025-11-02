@@ -1,7 +1,7 @@
 using GLMod.Enums;
 using System.Collections.Generic;
 
-namespace GLMod.Services
+namespace GLMod.Services.Interfaces
 {
     /// <summary>
     /// Interface for managing enabled services

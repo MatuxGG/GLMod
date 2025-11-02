@@ -1,4 +1,4 @@
-namespace GLMod.Services
+namespace GLMod.Services.Interfaces
 {
     /// <summary>
     /// Interface for managing map-related operations

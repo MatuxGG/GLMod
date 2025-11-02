@@ -1,9 +1,10 @@
 using BepInEx.Logging;
+using GLMod.Services.Interfaces;
 using GLMod.Constants;
 using System;
 using System.IO;
 
-namespace GLMod.Services
+namespace GLMod.Services.Implementations
 {
     /// <summary>
     /// Service responsible for managing mod configuration

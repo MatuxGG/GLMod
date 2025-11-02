@@ -1,4 +1,5 @@
 using BepInEx;
+using GLMod.Services.Interfaces;
 using BepInEx.Logging;
 using GLMod.Class;
 using System;
@@ -10,7 +11,7 @@ using System.Security.Cryptography;
 using System.Threading.Tasks;
 using System.Net.Http;
 
-namespace GLMod.Services
+namespace GLMod.Services.Implementations
 {
     /// <summary>
     /// Service responsible for file integrity verification

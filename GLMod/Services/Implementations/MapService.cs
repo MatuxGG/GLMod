@@ -1,9 +1,10 @@
 using AmongUs.GameOptions;
+using GLMod.Services.Interfaces;
 using BepInEx.Logging;
 using GLMod.Enums;
 using System;
 
-namespace GLMod.Services
+namespace GLMod.Services.Implementations
 {
     /// <summary>
     /// Service responsible for map-related operations
