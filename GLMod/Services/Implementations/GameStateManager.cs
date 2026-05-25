@@ -190,7 +190,7 @@ namespace GLMod.Services.Implementations
             string responseString = null;
             string error = null;
 
-            // Appel de la coroutine ApiService
+            // Call the ApiService coroutine
             yield return ApiService.PostFormAsync(_apiEndpoint + "/game/start", form,
                 result => {
                     responseString = result;
@@ -200,7 +200,7 @@ namespace GLMod.Services.Implementations
                 }
             );
 
-            // Gestion du résultat
+            // Result handling
             if (error != null)
             {
                 Log("[SendGame] fail, error: " + error);
@@ -262,7 +262,7 @@ namespace GLMod.Services.Implementations
                 }
             });
 
-            // Attend la fin sans bloquer le thread principal avec une lecture volatile
+            // Wait without blocking the main thread, using a volatile read
             while (!System.Threading.Volatile.Read(ref done))
                 yield return null;
 
@@ -288,7 +288,7 @@ namespace GLMod.Services.Implementations
             PlayerControl me;
             GLPlayer myPlayer;
 
-            // Validation initiale du joueur
+            // Initial player validation
             try
             {
                 me = PlayerControl.LocalPlayer;
@@ -323,13 +323,13 @@ namespace GLMod.Services.Implementations
                 Log("[AddMyPlayer] My name null or empty");
             }
 
-            // Attendre que l'ID du jeu soit disponible
+            // Wait for the game ID to become available
             while (string.IsNullOrEmpty(CurrentGame.id))
             {
                 yield return new WaitForSeconds(0.1f);
             }
 
-            // Préparer le formulaire
+            // Prepare the form
             var form = new Dictionary<string, string>
             {
                 { "gameId", CurrentGame.id },
@@ -340,7 +340,7 @@ namespace GLMod.Services.Implementations
             string responseString = null;
             string error = null;
 
-            // Appel de la coroutine ApiService
+            // Call the ApiService coroutine
             yield return ApiService.PostFormAsync(_apiEndpoint + "/game/addMyPlayer", form,
                 result => {
                     responseString = result;
@@ -350,7 +350,7 @@ namespace GLMod.Services.Implementations
                 }
             );
 
-            // Gestion des erreurs
+            // Error handling
             if (error != null)
             {
                 Log("[AddMyPlayer] Add my player fail, error: " + error);
@@ -515,7 +515,7 @@ namespace GLMod.Services.Implementations
                     var response = await HttpHelper.Client.PostAsync(_apiEndpoint + "/game/end", content).ConfigureAwait(false);
                     response.EnsureSuccessStatusCode();
 
-                    // Lecture de la réponse si nécessaire
+                    // Read the response if needed
                     var result = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 }
                 catch (Exception e)
@@ -528,11 +528,11 @@ namespace GLMod.Services.Implementations
                 }
             });
 
-            // Attendre la fin de la tâche avec une lecture volatile
+            // Wait for the task to complete with a volatile read
             while (!System.Threading.Volatile.Read(ref done))
                 yield return null;
 
-            // Gestion du résultat
+            // Result handling
             if (error != null)
             {
                 Log("[EndGame] End Game fail, error: " + error);

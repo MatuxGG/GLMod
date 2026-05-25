@@ -13,7 +13,7 @@ namespace GLMod.Class
         {
             if (_instance != null) return;
 
-            // Enregistrement du type pour IL2CPP
+            // Register the type for IL2CPP
             ClassInjector.RegisterTypeInIl2Cpp<CoroutineRunner>();
 
             GameObject go = new GameObject("CoroutineRunner");

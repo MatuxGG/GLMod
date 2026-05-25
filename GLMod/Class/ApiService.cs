@@ -12,12 +12,12 @@ namespace GLMod.Class
     {
         public static IEnumerator PostFormAsync(string url, Dictionary<string, string> formValues, System.Action<string> onComplete, System.Action<string> onError = null)
         {
-            // Variables partagées entre threads
+            // Variables shared across threads
             bool done = false;
             string error = null;
             string result = null;
 
-            // Stocker la référence à la tâche pour une meilleure gestion
+            // Keep a reference to the task for proper handling
             var task = System.Threading.Tasks.Task.Run(async () =>
             {
                 try
@@ -34,16 +34,16 @@ namespace GLMod.Class
                 }
                 finally
                 {
-                    // S'assurer que done est défini en dernier pour garantir la visibilité des autres variables
+                    // Set done last to guarantee visibility of the other variables
                     System.Threading.Volatile.Write(ref done, true);
                 }
             });
 
-            // Attendre la fin de la tâche avec une lecture volatile
+            // Wait for completion with a volatile read
             while (!System.Threading.Volatile.Read(ref done))
                 yield return null;
 
-            // Gestion du résultat
+            // Result handling
             if (error != null)
             {
                 onError?.Invoke(error);
@@ -56,11 +56,11 @@ namespace GLMod.Class
 
         public static IEnumerator PostFormWithErrorHandlingAsync(string url, Dictionary<string, string> formValues, System.Action<ApiResponse> onComplete)
         {
-            // Variables partagées entre threads
+            // Variables shared across threads
             ApiResponse apiResponse = null;
             bool done = false;
 
-            // Stocker la référence à la tâche pour une meilleure gestion
+            // Keep a reference to the task for proper handling
             var task = System.Threading.Tasks.Task.Run(async () =>
             {
                 try
@@ -78,7 +78,7 @@ namespace GLMod.Class
                 }
                 catch (System.Exception ex)
                 {
-                    // En cas d'exception réseau, créer une réponse d'erreur
+                    // On network exception, build an error response
                     apiResponse = new ApiResponse
                     {
                         IsSuccess = false,
@@ -88,16 +88,16 @@ namespace GLMod.Class
                 }
                 finally
                 {
-                    // S'assurer que done est défini en dernier pour garantir la visibilité des autres variables
+                    // Set done last to guarantee visibility of the other variables
                     System.Threading.Volatile.Write(ref done, true);
                 }
             });
 
-            // Attendre la fin de la tâche avec une lecture volatile
+            // Wait for completion with a volatile read
             while (!System.Threading.Volatile.Read(ref done))
                 yield return null;
 
-            // Retourner le résultat via le callback
+            // Return the result via callback
             onComplete?.Invoke(apiResponse);
         }
     }

@@ -51,18 +51,18 @@ namespace GLMod.GLEntities
                 }
             });
 
-            // Attendre la fin du chargement
+            // Wait for the load to complete
             while (!done)
                 yield return null;
 
-            // Vérifier l'erreur
+            // Check for error
             if (error != null)
             {
                 GLMod.log("Error language load: " + error);
                 yield break;
             }
 
-            // Désérialiser les traductions
+            // Deserialize the translations
             translations = GLJson.Deserialize<List<GLTranslation>>(tr);
         }
     }

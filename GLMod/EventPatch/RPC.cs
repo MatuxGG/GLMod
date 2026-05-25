@@ -57,8 +57,8 @@ namespace GLMod
 
             switch (id)
             {
-                case 1: // Step 4 : Receive Game Id for non host
-                        // Attendre que le jeu soit au bon step et que currentGame existe
+                case 1: // Step 4: Receive Game Id for non host
+                        // Wait until the game is on the right step and currentGame exists
                     while (GLMod.GameStateManager.Step != GameStep.GameIdSynced || GLMod.GameStateManager.CurrentGame == null)
                     {
                         yield return new WaitForSeconds(GameConstants.RPC_POLLING_INTERVAL);
@@ -95,10 +95,10 @@ namespace GLMod
                     BackgroundEvents.handleDc(reason3, playerName3);
                     break;
 
-                // Ajoutez les autres cases ici...
+                // Add other cases here...
 
                 default:
-                    GLMod.log("Prefix non g�r�: " + id);
+                    GLMod.log("Unhandled prefix: " + id);
                     break;
             }
         }
