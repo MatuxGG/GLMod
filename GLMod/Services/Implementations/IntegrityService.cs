@@ -6,7 +6,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
 using System.Net.Http;
@@ -135,11 +134,7 @@ namespace GLMod.Services.Implementations
 
         public IEnumerator VerifyGLMod(System.Action<bool> onComplete)
         {
-            var pluginAttribute = typeof(GLMod).GetCustomAttribute<BepInPlugin>();
-            // Format version as Major.Minor.Build (3 components) to match server expectations
-            string version = pluginAttribute?.Version != null
-                ? $"{pluginAttribute.Version.Major}.{pluginAttribute.Version.Minor}.{pluginAttribute.Version.Build}"
-                : null;
+            string version = GLMod.Version;
             Log(version);
 
             bool result = false;
@@ -231,11 +226,7 @@ namespace GLMod.Services.Implementations
         {
             try
             {
-                var pluginAttribute = typeof(GLMod).GetCustomAttribute<BepInPlugin>();
-                // Format version as Major.Minor.Build (3 components) to match server expectations
-                string version = pluginAttribute?.Version != null
-                    ? $"{pluginAttribute.Version.Major}.{pluginAttribute.Version.Minor}.{pluginAttribute.Version.Build}"
-                    : null;
+                string version = GLMod.Version;
                 Log(version);
 
                 bool result = await VerifyDllAsync("glmod" + version, "BepInEx/plugins/glmod.dll").ConfigureAwait(false);

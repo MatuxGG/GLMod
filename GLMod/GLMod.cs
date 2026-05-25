@@ -17,11 +17,12 @@ using GLMod.Class;
 
 namespace GLMod
 {
-    [BepInPlugin(Id, "GLMod", "5.3.1")]
+    [BepInPlugin(Id, "GLMod", Version)]
     [BepInProcess("Among Us.exe")]
     public class GLMod : BasePlugin
     {
         public const string Id = "glmod";
+        public const string Version = "5.4.0";
 
         public Harmony Harmony { get; } = new Harmony(Id);
 
