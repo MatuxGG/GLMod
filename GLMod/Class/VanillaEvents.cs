@@ -37,6 +37,14 @@ namespace GLMod.Class
                         CoroutineRunner.Run(GLMod.AddMyPlayer(result =>
                         {
                             GLMod.log("Game started.");
+
+                            if (AmongUsClient.Instance.AmHost && (GLMod.existService("Shield") || GLMod.debug))
+                            {
+                                CoroutineRunner.Run(GLMod.GetShieldPlayer(
+                                    shieldPlayer => GLMod.log("[VanillaShieldT1] Player who would have benefited from a T1 shield: " + shieldPlayer),
+                                    err => GLMod.log("[VanillaShieldT1] Could not get shield player: " + err)
+                                ));
+                            }
                         }));
                     }));
                 }

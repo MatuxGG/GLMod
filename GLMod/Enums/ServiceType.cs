@@ -15,6 +15,7 @@ namespace GLMod.Enums
         Emergencies,
         Turns,
         Votes,
-        Roles
+        Roles,
+        Shield
     }
 }

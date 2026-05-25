@@ -358,6 +358,52 @@ namespace GLMod.Services.Implementations
             onComplete?.Invoke(true);
         }
 
+        public IEnumerator GetShieldPlayer(System.Action<string> onComplete = null, System.Action<string> onError = null)
+        {
+            if (CurrentGame == null || string.IsNullOrEmpty(CurrentGame.id))
+            {
+                Log("[GetShieldPlayer] Current game null or missing id");
+                onError?.Invoke("game not ready");
+                yield break;
+            }
+
+            string gameId = CurrentGame.id;
+            const int maxAttempts = 10;
+            const float retryDelay = 1.0f;
+
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                var form = new Dictionary<string, string>
+                {
+                    { "gameId", gameId }
+                };
+
+                ApiResponse response = null;
+                yield return ApiService.PostFormWithErrorHandlingAsync(_apiEndpoint + "/game/getShieldPlayer", form,
+                    result => { response = result; });
+
+                if (response != null && response.IsSuccess)
+                {
+                    onComplete?.Invoke(response.Content);
+                    yield break;
+                }
+
+                if (response != null && response.StatusCode == 400)
+                {
+                    yield return new WaitForSeconds(retryDelay);
+                    continue;
+                }
+
+                string errMsg = response?.Content ?? "no response";
+                Log($"[GetShieldPlayer] fail (status {response?.StatusCode}): {errMsg}");
+                onError?.Invoke(errMsg);
+                yield break;
+            }
+
+            Log("[GetShieldPlayer] max attempts reached, players still not all registered");
+            onError?.Invoke("max attempts reached");
+        }
+
         public void SetWinnerTeams(List<string> winners)
         {
             if (!AmongUsClient.Instance.AmHost)

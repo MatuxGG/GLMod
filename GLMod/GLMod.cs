@@ -219,6 +219,7 @@ namespace GLMod
             ServiceManager.EnableService(ServiceType.Turns);
             ServiceManager.EnableService(ServiceType.Votes);
             ServiceManager.EnableService(ServiceType.Roles);
+            ServiceManager.EnableService(ServiceType.Shield);
 
             stepConf.Value = "YES";
             stepRpc.Value = "YES";
@@ -263,6 +264,7 @@ namespace GLMod
         public static IEnumerator SendGame(System.Action<bool> onComplete = null) => GameStateManager?.SendGame(onComplete);
         public static IEnumerator SyncGameId(System.Action<bool> onComplete = null) => GameStateManager?.SyncGameId(onComplete);
         public static IEnumerator AddMyPlayer(System.Action<bool> onComplete = null) => GameStateManager?.AddMyPlayer(onComplete);
+        public static IEnumerator GetShieldPlayer(System.Action<string> onComplete = null, System.Action<string> onError = null) => GameStateManager?.GetShieldPlayer(onComplete, onError);
         public static void SetWinnerTeams(List<string> winners) => GameStateManager?.SetWinnerTeams(winners);
         public static void AddWinnerPlayer(string playerName) => GameStateManager?.AddWinnerPlayer(playerName);
         public static IEnumerator EndGame() => GameStateManager?.EndGame();

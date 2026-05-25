@@ -69,6 +69,15 @@ namespace GLMod.Services.Interfaces
         IEnumerator AddMyPlayer(System.Action<bool> onComplete = null);
 
         /// <summary>
+        /// Asks the server which player should benefit from a T1 shield for the current game.
+        /// Retries while the API returns 400 (not all players have sent their addMyPlayer yet).
+        /// </summary>
+        /// <param name="onComplete">Callback with the in-game player name (PseudoInGame)</param>
+        /// <param name="onError">Callback with the error message if the call ultimately fails</param>
+        /// <returns>Coroutine</returns>
+        IEnumerator GetShieldPlayer(System.Action<string> onComplete = null, System.Action<string> onError = null);
+
+        /// <summary>
         /// Sets the winning teams
         /// </summary>
         /// <param name="winners">List of winning team names</param>
