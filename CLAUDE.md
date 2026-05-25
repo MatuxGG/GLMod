@@ -525,7 +525,10 @@ For every change to the project:
    - New `ServiceType` enabled by default → §3.3 and §14.
 4. Update `README.md` if the user-facing surface changes.
 5. Update `docs/dev.MD` if the third-party integration surface changes.
-6. Update the version both in `GLMod.csproj` AND in the `GLMod.Version` constant ([GLMod/GLMod.cs](GLMod/GLMod.cs)) — **the two must remain in sync**.
+6. Update the version in **three places** that MUST stay in sync:
+   - `<Version>` in [GLMod/GLMod.csproj](GLMod/GLMod.csproj).
+   - `GLMod.Version` constant in [GLMod/GLMod.cs](GLMod/GLMod.cs).
+   - The version badge in [README.md](README.md) (`https://img.shields.io/badge/GLMod-vX.Y.Z-blue`).
 7. Make sure the change respects the **English-only rule** (§0) — code, comments, logs, docs.
 8. Commit + PR.
 
@@ -533,7 +536,7 @@ For every change to the project:
 
 ## 17. Known pitfalls / Points of attention
 
-- **`GLMod.Version` vs csproj `<Version>`**: must be identical. Any drift breaks display on the Good Loss side.
+- **`GLMod.Version` vs csproj `<Version>` vs README badge**: the three must be identical. Any drift breaks display on the Good Loss side or misleads users about the installed version. The README badge URL is `https://img.shields.io/badge/GLMod-vX.Y.Z-blue` — update the `X.Y.Z` segment on every version bump.
 - **csproj `<GameVersion>` vs README**: must point to the same Among Us version — a build against the wrong Among Us version will crash because of incompatible IL2CPP signatures.
 - **`PlayerControl.LocalPlayer` may be `null`** at startup (pre-menu). Always use `?.` (see the pattern in every `Log(...)`).
 - **IL2CPP**: any new `MonoBehaviour` must be registered with `ClassInjector.RegisterTypeInIl2Cpp<T>()` before instantiation.
