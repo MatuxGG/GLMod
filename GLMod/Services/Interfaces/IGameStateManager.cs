@@ -107,5 +107,31 @@ namespace GLMod.Services.Interfaces
         /// Resets the game state
         /// </summary>
         void ResetGame();
+        bool IsGameActive();
+
+        /// <summary>
+        /// Sets the map name for the current game (creates game if needed)
+        /// </summary>
+        /// <param name="mapName">Map name</param>
+        void SetMap(string mapName);
+
+        /// <summary>
+        /// Sets the ranked status for the current game (creates game if needed)
+        /// </summary>
+        /// <param name="isRanked">Ranked status</param>
+        void SetRanked(bool isRanked);
+
+        /// <summary>
+        /// Sets the ranked status for the current game using string value (creates game if needed)
+        /// </summary>
+        /// <param name="rankedValue">Ranked status as string ("0" or "1")</param>
+        void SetRankedString(string rankedValue);
+
+        /// <summary>
+        /// Ensures CurrentGame is initialized with default values
+        /// </summary>
+        void EnsureGameInitialized();
     }
 }
+
+

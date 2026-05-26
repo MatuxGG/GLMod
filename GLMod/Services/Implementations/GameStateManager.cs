@@ -403,6 +403,52 @@ namespace GLMod.Services.Implementations
             Log("[GetShieldPlayer] max attempts reached, players still not all registered");
             onError?.Invoke("max attempts reached");
         }
+        public bool IsGameActive()
+        {
+            return CurrentGame != null;
+        }
+
+        public void EnsureGameInitialized()
+        {
+            if (CurrentGame == null)
+            {
+                string defaultCode = GameCode ?? GameConstants.DEFAULT_GAME_CODE;
+                string defaultMap = GameMap ?? GameConstants.DEFAULT_MAP_NAME;
+                CurrentGame = new GLGame(defaultCode, defaultMap, false, _configService.ModName);
+                Log("[EnsureGameInitialized] Game auto-initialized with default values");
+            }
+        }
+
+        public void SetMap(string mapName)
+        {
+            if (string.IsNullOrEmpty(mapName))
+            {
+                Log("[SetMap] Map name is null or empty");
+                return;
+            }
+
+            EnsureGameInitialized();
+            CurrentGame.map = mapName;
+            GameMap = mapName;
+        }
+
+        public void SetRanked(bool isRanked)
+        {
+            EnsureGameInitialized();
+            CurrentGame.ranked = isRanked ? "1" : "0";
+        }
+
+        public void SetRankedString(string rankedValue)
+        {
+            if (string.IsNullOrEmpty(rankedValue))
+            {
+                Log("[SetRankedString] Ranked value is null or empty");
+                return;
+            }
+
+            EnsureGameInitialized();
+            CurrentGame.ranked = rankedValue;
+        }
 
         public void SetWinnerTeams(List<string> winners)
         {
