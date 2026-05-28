@@ -228,7 +228,7 @@ Reactor, Coms, Lights, O2
 | Constant                      | Value                                        |
 |-------------------------------|----------------------------------------------|
 | `API_ENDPOINT`                | `https://goodloss.fr/api`                    |
-| `SUPPORT_ID_CHARS`            | `A-Za-z1-9` (no `0`, no `O`)                 |
+| `SUPPORT_ID_CHARS`            | `A-Za-z1-9` (no `0`)                         |
 | `SUPPORT_ID_LENGTH`           | `10`                                         |
 | `RPC_SYNC_TIMEOUT`            | `5.0f` seconds                               |
 | `BACKGROUND_POLLING_INTERVAL` | `0.5f` seconds                               |
@@ -327,13 +327,19 @@ Base: `https://goodloss.fr/api`
 - **Recommended IDE**: Visual Studio 2022.
 - **SDK**: .NET 6.0.
 - `dotnet build --configuration Debug` at the repo root.
+- `dotnet test GLMod.Tests/GLMod.Tests.csproj --configuration Debug` to run the unit-test suite.
 - An `AfterTargets="Build"` step copies `GLMod.dll` to `Among Us/BepInEx/plugins/` (Debug only) — see [GLMod/GLMod.csproj](GLMod/GLMod.csproj).
 
 ### 11.2 CI
 - **GitHub Actions**: [.github/workflows/main.yml](.github/workflows/main.yml).
 - Trigger: push & PR on `main`.
 - Single job: `dotnet restore` + `dotnet build --configuration Debug`.
-- No automated tests at this point.
+- Unit tests (xUnit, in [GLMod.Tests/](GLMod.Tests/)) are runnable locally; the CI workflow does not invoke `dotnet test` yet.
+
+### 11.4 Testing
+- Test framework: xUnit ([GLMod.Tests/GLMod.Tests.csproj](GLMod.Tests/GLMod.Tests.csproj)).
+- Scope: pure logic — entities (`GLGame`, `GLPlayer`, `GLPosition`), enums (`SabotageType`, `GameMapType`), `ServiceManager`, and `GameConstants` invariants. Anything that touches IL2CPP / Among Us types stays untestable until further decoupling.
+- Add new tests for any new pure-logic surface. Refactor toward injectable abstractions before adding tests that would otherwise require IL2CPP mocking.
 
 ### 11.3 Release
 - Build driven by [build.cake](build.cake) (Cake).
@@ -358,6 +364,12 @@ GLMod/                                # Repo root
 │   └── dev.MD                        # Integration guide for third-party modders.
 ├── Among Us/                         # (gitignored) Local install used for debugging.
 │   └── BepInEx/                      # Core + interop DLLs (referenced by csproj).
+├── GLMod.Tests/                      # xUnit test project for pure-logic types.
+│   ├── GLMod.Tests.csproj
+│   ├── EntityTests.cs
+│   ├── EnumTests.cs
+│   ├── GameConstantsTests.cs
+│   └── ServiceManagerTests.cs
 └── GLMod/                            # C# project.
     ├── GLMod.csproj                  # Project definition, mod version, targeted Among Us version.
     ├── GLMod.cs                      # Plugin entry point + static facade.
