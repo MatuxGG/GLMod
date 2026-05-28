@@ -5,6 +5,9 @@ namespace GLMod.GLEntities
 {
     public static class GLJson
     {
+        // Truncate payload snippets in logs so we never spam BepInEx with multi-MB strings.
+        private const int LogSnippetMaxLength = 200;
+
         public static T Deserialize<T>(string jsonString)
         {
             try
@@ -14,7 +17,7 @@ namespace GLMod.GLEntities
             }
             catch (Exception ex)
             {
-                GLMod.log("Deserialize Error: " + ex.Message);
+                GLMod.log($"[GLJson.Deserialize<{typeof(T).Name}>] {ex.GetType().Name}: {ex.Message} | payload: {Snippet(jsonString)}");
                 return default(T);
             }
         }
@@ -28,9 +31,18 @@ namespace GLMod.GLEntities
             }
             catch (Exception ex)
             {
-                GLMod.log("Serialize Error: " + ex.Message);
+                GLMod.log($"[GLJson.Serialize<{typeof(T).Name}>] {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
+        }
+
+        private static string Snippet(string payload)
+        {
+            if (payload == null) return "<null>";
+            if (payload.Length == 0) return "<empty>";
+            return payload.Length <= LogSnippetMaxLength
+                ? payload
+                : payload.Substring(0, LogSnippetMaxLength) + "…(+" + (payload.Length - LogSnippetMaxLength) + " chars)";
         }
     }
 }

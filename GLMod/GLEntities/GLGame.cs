@@ -60,7 +60,12 @@ namespace GLMod.GLEntities
 
         public int GetId()
         {
-            return int.Parse(this.id);
+            if (!int.TryParse(this.id, out int parsed))
+            {
+                throw new InvalidOperationException(
+                    $"GLGame.GetId(): id is not a valid integer (value='{this.id ?? "<null>"}')");
+            }
+            return parsed;
         }
 
         public void SetWinner(string winner)

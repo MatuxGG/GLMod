@@ -54,11 +54,12 @@ namespace GLMod.Services.Implementations
                 { "mod", modName }
             };
 
+            const string endpoint = "/player/rank";
             string responseString = null;
             string error = null;
 
             // Call the ApiService coroutine
-            yield return ApiService.PostFormAsync(_apiEndpoint + "/player/rank", form,
+            yield return ApiService.PostFormAsync(_apiEndpoint + endpoint, form,
                 result => {
                     responseString = result;
                 },
@@ -70,6 +71,7 @@ namespace GLMod.Services.Implementations
             // Result handling
             if (error != null)
             {
+                Log($"[GetRank] HTTP error from {endpoint} (mod={modName}): {error}");
                 errorRank.error = "Login fail";
                 onComplete?.Invoke(errorRank);
                 yield break;
@@ -83,7 +85,7 @@ namespace GLMod.Services.Implementations
             }
             catch (Exception ex)
             {
-                Log("Error while deserializing rank: " + ex.Message);
+                Log($"[GetRank] Error while deserializing rank for mod={modName}: {ex.Message}");
                 errorRank.error = "Parse error";
                 onComplete?.Invoke(errorRank);
             }

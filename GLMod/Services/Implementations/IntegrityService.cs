@@ -30,6 +30,7 @@ namespace GLMod.Services.Implementations
 
         public IEnumerator GetApiData(string id, System.Action<string> onComplete, System.Action<string> onError = null)
         {
+            const string endpoint = "/data";
             var form = new Dictionary<string, string>
             {
                 { "id", id }
@@ -38,7 +39,7 @@ namespace GLMod.Services.Implementations
             string responseString = null;
             string error = null;
 
-            yield return ApiService.PostFormAsync(_apiEndpoint + "/data", form,
+            yield return ApiService.PostFormAsync(_apiEndpoint + endpoint, form,
                 result => {
                     responseString = result;
                 },
@@ -49,6 +50,7 @@ namespace GLMod.Services.Implementations
 
             if (error != null)
             {
+                Log($"[GetApiData] HTTP error from {endpoint} (id={id}): {error}");
                 onError?.Invoke(error);
                 onComplete?.Invoke("");
                 yield break;

@@ -48,8 +48,10 @@ namespace GLMod.Services.Implementations
             string responseString = null;
             string error = null;
 
+            const string endpoint = "/player/challengerItems";
+
             // Call the ApiService coroutine
-            yield return ApiService.PostFormAsync(_apiEndpoint + "/player/challengerItems", form,
+            yield return ApiService.PostFormAsync(_apiEndpoint + endpoint, form,
                 result => {
                     responseString = result;
                 },
@@ -61,7 +63,7 @@ namespace GLMod.Services.Implementations
             // Check for error
             if (error != null)
             {
-                Log("HTTP error: " + error);
+                Log($"[ReloadItems] HTTP error from {endpoint} (player={_authService.GetAccountName()}): {error}");
                 yield break;
             }
 
@@ -74,7 +76,7 @@ namespace GLMod.Services.Implementations
             }
             catch (Exception ex)
             {
-                Log("Error while loading items: " + ex.Message);
+                Log($"[ReloadItems] Error while loading items from {endpoint}: {ex.Message}");
             }
         }
 
@@ -93,8 +95,10 @@ namespace GLMod.Services.Implementations
             string responseString = null;
             string error = null;
 
+            const string endpoint = "/user/steamownerships";
+
             // Call the ApiService coroutine
-            yield return ApiService.PostFormAsync(_apiEndpoint + "/user/steamownerships", form,
+            yield return ApiService.PostFormAsync(_apiEndpoint + endpoint, form,
                 result => {
                     responseString = result;
                 },
@@ -106,7 +110,7 @@ namespace GLMod.Services.Implementations
             // Check for error
             if (error != null)
             {
-                Log("HTTP error: " + error);
+                Log($"[ReloadDlcOwnerships] HTTP error from {endpoint}: {error}");
                 yield break;
             }
 
@@ -119,7 +123,7 @@ namespace GLMod.Services.Implementations
             }
             catch (Exception ex)
             {
-                Log("Error while loading DLC ownerships: " + ex.Message);
+                Log($"[ReloadDlcOwnerships] Error while loading DLC ownerships from {endpoint}: {ex.Message}");
             }
         }
 
