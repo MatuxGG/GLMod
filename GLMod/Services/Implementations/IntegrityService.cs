@@ -26,15 +26,7 @@ namespace GLMod.Services.Implementations
             _apiEndpoint = apiEndpoint ?? throw new ArgumentNullException(nameof(apiEndpoint));
         }
 
-        private void Log(string message)
-        {
-            if (!string.IsNullOrEmpty(message))
-            {
-                string playerName = PlayerControl.LocalPlayer?.Data?.PlayerName;
-                string prefix = playerName != null ? "[GLMod] " + playerName + ": " : "[GLMod] ";
-                _logger.LogInfo(prefix + message);
-            }
-        }
+        private void Log(string message) => ServiceLogger.Log(_logger, nameof(IntegrityService), message);
 
         public IEnumerator GetApiData(string id, System.Action<string> onComplete, System.Action<string> onError = null)
         {
@@ -69,7 +61,7 @@ namespace GLMod.Services.Implementations
         {
             string result = null;
             string error = null;
-            Log("getChecksum:" + checksumId);
+            Log("[GetChecksum] " + checksumId);
 
             yield return GetApiData("checksum_" + checksumId,
                 data => {
@@ -82,7 +74,7 @@ namespace GLMod.Services.Implementations
 
             if (error != null)
             {
-                Log($"getChecksum failed for {checksumId}, error: {error}");
+                Log($"[GetChecksum] failed for {checksumId}, error: {error}");
                 onError?.Invoke(error);
             }
             else
@@ -180,7 +172,7 @@ namespace GLMod.Services.Implementations
         /// </summary>
         public async Task<string> GetChecksumAsync(string checksumId)
         {
-            Log("getChecksumAsync:" + checksumId);
+            Log("[GetChecksumAsync] " + checksumId);
 
             try
             {
@@ -189,7 +181,7 @@ namespace GLMod.Services.Implementations
             }
             catch (Exception ex)
             {
-                Log($"getChecksumAsync failed for {checksumId}, error: {ex.Message}");
+                Log($"[GetChecksumAsync] failed for {checksumId}, error: {ex.Message}");
                 throw;
             }
         }

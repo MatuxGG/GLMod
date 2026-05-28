@@ -36,15 +36,7 @@ namespace GLMod.Services.Implementations
             _steamOwnerships = new List<int>();
         }
 
-        private void Log(string message)
-        {
-            if (!string.IsNullOrEmpty(message))
-            {
-                string playerName = PlayerControl.LocalPlayer?.Data?.PlayerName;
-                string prefix = playerName != null ? "[GLMod] " + playerName + ": " : "[GLMod] ";
-                _logger.LogInfo(prefix + message);
-            }
-        }
+        private void Log(string message) => ServiceLogger.Log(_logger, nameof(ItemService), message);
 
         public IEnumerator ReloadItems()
         {

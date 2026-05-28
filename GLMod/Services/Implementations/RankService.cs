@@ -30,15 +30,7 @@ namespace GLMod.Services.Implementations
             _apiEndpoint = apiEndpoint ?? throw new ArgumentNullException(nameof(apiEndpoint));
         }
 
-        private void Log(string message)
-        {
-            if (!string.IsNullOrEmpty(message))
-            {
-                string playerName = PlayerControl.LocalPlayer?.Data?.PlayerName;
-                string prefix = playerName != null ? "[GLMod] " + playerName + ": " : "[GLMod] ";
-                _logger.LogInfo(prefix + message);
-            }
-        }
+        private void Log(string message) => ServiceLogger.Log(_logger, nameof(RankService), message);
 
         public IEnumerator GetRank(string modName, System.Action<GLRank> onComplete)
         {

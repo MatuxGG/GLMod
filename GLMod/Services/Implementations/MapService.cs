@@ -1,4 +1,5 @@
 using AmongUs.GameOptions;
+using GLMod.Class;
 using GLMod.Services.Interfaces;
 using BepInEx.Logging;
 using GLMod.Enums;
@@ -18,15 +19,7 @@ namespace GLMod.Services.Implementations
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
-        private void Log(string message)
-        {
-            if (!string.IsNullOrEmpty(message))
-            {
-                string playerName = PlayerControl.LocalPlayer?.Data?.PlayerName;
-                string prefix = playerName != null ? "[GLMod] " + playerName + ": " : "[GLMod] ";
-                _logger.LogInfo(prefix + message);
-            }
-        }
+        private void Log(string message) => ServiceLogger.Log(_logger, nameof(MapService), message);
 
         public string GetMapName()
         {
@@ -43,7 +36,7 @@ namespace GLMod.Services.Implementations
             }
             catch (Exception e)
             {
-                Log("[getMapName] Catch exception " + e.Message);
+                Log("[GetMapName] Catch exception " + e.Message);
                 return "Unknown";
             }
         }

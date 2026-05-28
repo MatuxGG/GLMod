@@ -53,15 +53,7 @@ namespace GLMod.Services.Implementations
             GameMap = GameConstants.DEFAULT_MAP_NAME;
         }
 
-        private void Log(string message)
-        {
-            if (!string.IsNullOrEmpty(message))
-            {
-                string playerName = PlayerControl.LocalPlayer?.Data?.PlayerName;
-                string prefix = playerName != null ? "[GLMod] " + playerName + ": " : "[GLMod] ";
-                _logger.LogInfo(prefix + message);
-            }
-        }
+        private void Log(string message) => ServiceLogger.Log(_logger, nameof(GameStateManager), message);
 
         public void StartGame(string code, string map, bool ranked)
         {

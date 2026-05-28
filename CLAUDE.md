@@ -280,6 +280,7 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 | `ApiService.cs`        | `PostFormAsync`, `PostFormWithErrorHandlingAsync`, `ApiResponse` type.                     |
 | `CoroutineHelpers.cs`  | `RunAsync` / `RunAsync<T>` — async-task ↔ coroutine bridge. Use these instead of re-implementing the `Task.Run` + volatile `done` flag pattern. |
 | `CoroutineRunner.cs`   | `MonoBehaviour` IL2CPP singleton used to run coroutines from static classes.               |
+| `ServiceLogger.cs`     | `Log(logger, serviceName, message)` — shared log formatter producing `[GLMod][Service] PlayerName: message`. Every service must delegate to it. |
 | `BackgroundEvents.cs`  | Background loop: watches DCs, hidden sabotages, etc.                                       |
 | `VanillaEvents.cs`     | Default implementations (`startGameVanilla`, `endGameVanilla`…) used when the matching `ServiceType` is enabled. |
 
@@ -366,6 +367,7 @@ GLMod/                                # Repo root
     │   ├── CoroutineHelpers.cs       # Async-task ↔ coroutine bridge.
     │   ├── CoroutineRunner.cs
     │   ├── HttpHelper.cs
+    │   ├── ServiceLogger.cs          # Shared [GLMod][Service] log formatter.
     │   └── VanillaEvents.cs
     ├── Constants/
     │   └── GameConstants.cs          # Global constants (API, timeouts, defaults).
@@ -446,7 +448,7 @@ GLMod/                                # Repo root
 - **Braces**: Allman style (brace on its own line).
 - **`var`**: allowed for obvious types.
 - **XML doc comments** (`/// <summary>`): **mandatory on every public method and property of a service interface**.
-- **Logging**: always via `GLMod.log(...)` or `_logger.LogInfo(...)` with the prefix `[GLMod]` + local player name (see the pattern in every service).
+- **Logging**: inside a service, expose `private void Log(string message) => ServiceLogger.Log(_logger, nameof(<Service>), message);` and call `Log(...)` everywhere. The shared formatter ([GLMod/Class/ServiceLogger.cs](GLMod/Class/ServiceLogger.cs)) produces `[GLMod][ServiceName] PlayerName: message`. Outside of services, use `GLMod.log(...)`.
 - **Exception handling**: `try/catch` around every call into the game / network / parser, log the exception, **never** silently rethrow in a way that would crash the game.
 - **Language**: all identifiers, comments, and developer-facing strings MUST be in English (see §0).
 

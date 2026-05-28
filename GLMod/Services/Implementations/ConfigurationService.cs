@@ -1,4 +1,5 @@
 using BepInEx.Logging;
+using GLMod.Class;
 using GLMod.Services.Interfaces;
 using GLMod.Constants;
 using System;
@@ -24,15 +25,7 @@ namespace GLMod.Services.Implementations
             _modName = "Vanilla";
         }
 
-        private void Log(string message)
-        {
-            if (!string.IsNullOrEmpty(message))
-            {
-                string playerName = PlayerControl.LocalPlayer?.Data?.PlayerName;
-                string prefix = playerName != null ? "[GLMod] " + playerName + ": " : "[GLMod] ";
-                _logger.LogInfo(prefix + message);
-            }
-        }
+        private void Log(string message) => ServiceLogger.Log(_logger, nameof(ConfigurationService), message);
 
         public void FindModName()
         {
