@@ -11,11 +11,6 @@ namespace GLMod.Constants
         public const string API_ENDPOINT = "https://goodloss.fr/api";
 
         /// <summary>
-        /// Default language code
-        /// </summary>
-        public const string DEFAULT_LANGUAGE = "en";
-
-        /// <summary>
         /// Characters used for generating support IDs
         /// </summary>
         public const string SUPPORT_ID_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz123456789";

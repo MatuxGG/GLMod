@@ -28,7 +28,6 @@ namespace GLMod
 
         // Services
         public static IAuthenticationService AuthService { get; private set; }
-        public static ITranslationService TranslationService { get; private set; }
         public static IGameStateManager GameStateManager { get; private set; }
         public static IServiceManager ServiceManager { get; private set; }
         public static IItemService ItemService { get; private set; }
@@ -38,7 +37,6 @@ namespace GLMod
         public static IMapService MapService { get; private set; }
 
         public static ConfigEntry<string> connectionState { get; private set; }
-        public static ConfigEntry<string> translations { get; private set; }
         public static ConfigEntry<string> stepConf { get; private set; }
         public static ConfigEntry<string> stepRpc { get; private set; }
         public static ConfigEntry<string> enabled { get; private set; }
@@ -71,7 +69,6 @@ namespace GLMod
         {
             connectionState = Config.Bind("GoodLoss", "Connected", "");
             enabled = Config.Bind("GoodLoss", "Enabled", "Yes");
-            translations = Config.Bind("GoodLoss", "translations", "No");
             stepConf = Config.Bind("Validation", "steps", "");
             stepRpc = Config.Bind("Validation", "RPC", "");
 
@@ -86,7 +83,6 @@ namespace GLMod
             string configPathValue = Path.GetDirectoryName(Config.ConfigFilePath);
 
             AuthService = new AuthenticationService(connectionState);
-            TranslationService = new TranslationService();
             ConfigService = new ConfigurationService(Logger, configPathValue);
             ConfigService.FindModName();
             GameStateManager = new GameStateManager(Logger, AuthService, ConfigService, api, stepRpc);
@@ -129,18 +125,7 @@ namespace GLMod
                 log("[✗] AuthenticationService: Failed to initialize");
             }
 
-            // 3. TranslationService
-            if (TranslationService != null)
-            {
-                log("[✓] TranslationService: Initialized");
-                log($"    - Ready for translation loading");
-            }
-            else
-            {
-                log("[✗] TranslationService: Failed to initialize");
-            }
-
-            // 4. IntegrityService
+            // 3. IntegrityService
             if (IntegrityService != null)
             {
                 log("[✓] IntegrityService: Initialized");
@@ -151,7 +136,7 @@ namespace GLMod
                 log("[✗] IntegrityService: Failed to initialize");
             }
 
-            // 5. ServiceManager
+            // 4. ServiceManager
             if (ServiceManager != null)
             {
                 log("[✓] ServiceManager: Initialized");
@@ -162,7 +147,7 @@ namespace GLMod
                 log("[✗] ServiceManager: Failed to initialize");
             }
 
-            // 6. GameStateManager (cannot test game features)
+            // 5. GameStateManager (cannot test game features)
             if (GameStateManager != null)
             {
                 log("[✓] GameStateManager: Initialized (game features require active game)");
@@ -172,7 +157,7 @@ namespace GLMod
                 log("[✗] GameStateManager: Failed to initialize");
             }
 
-            // 7. ItemService (requires authentication)
+            // 6. ItemService (requires authentication)
             if (ItemService != null)
             {
                 log("[✓] ItemService: Initialized (requires authentication to use)");
@@ -182,7 +167,7 @@ namespace GLMod
                 log("[✗] ItemService: Failed to initialize");
             }
 
-            // 8. RankService (requires authentication)
+            // 7. RankService (requires authentication)
             if (RankService != null)
             {
                 log("[✓] RankService: Initialized (requires authentication to use)");
@@ -192,7 +177,7 @@ namespace GLMod
                 log("[✗] RankService: Failed to initialize");
             }
 
-            // 9. MapService (requires game)
+            // 8. MapService (requires game)
             if (MapService != null)
             {
                 log("[✓] MapService: Initialized (requires active game to use)");
@@ -223,12 +208,6 @@ namespace GLMod
 
             stepConf.Value = "YES";
             stepRpc.Value = "YES";
-
-            // Load translations if enabled
-            if (translations.Value.ToLower() == "yes")
-            {
-                CoroutineRunner.Run(TranslationService.LoadTranslations());
-            }
         }
 
         private void StartVerificationAndPatching()

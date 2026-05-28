@@ -43,20 +43,6 @@ yield return GLMod.AuthService.Login(success =>
 });
 ```
 
-### Translation Service (ITranslationService)
-Handles multi-language support with translations from Good Loss API.
-
-```csharp
-// Translate a key
-string translated = GLMod.TranslationService.Translate("key");
-
-// Set language
-GLMod.TranslationService.SetLanguage("fr");
-
-// Load translations
-yield return GLMod.TranslationService.LoadTranslations();
-```
-
 ### Configuration Service (IConfigurationService)
 Manages mod configuration and custom mod names.
 
@@ -142,7 +128,6 @@ GLMod follows a clean architecture pattern with dependency injection and interfa
 
 ```csharp
 GLMod.AuthService      // IAuthenticationService
-GLMod.TranslationService  // ITranslationService
 GLMod.ConfigService    // IConfigurationService
 GLMod.IntegrityService // IIntegrityService
 GLMod.ItemService      // IItemService
