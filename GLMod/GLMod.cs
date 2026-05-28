@@ -260,6 +260,7 @@ namespace GLMod
 
         // Legacy wrapper methods - prefer using services directly
         public static void StartGame(string code, string map, Boolean ranked) => GameStateManager?.StartGame(code, map, ranked);
+        public static void SetRanked(bool ranked) => GameStateManager?.SetRanked(ranked);
         public static void AddPlayer(string playerName, string role, string team, string color) => GameStateManager?.AddPlayer(playerName, role, team, color);
         public static IEnumerator SendGame(System.Action<bool> onComplete = null) => GameStateManager?.SendGame(onComplete);
         public static IEnumerator SyncGameId(System.Action<bool> onComplete = null) => GameStateManager?.SyncGameId(onComplete);

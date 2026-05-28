@@ -39,6 +39,13 @@ namespace GLMod.Services.Interfaces
         void StartGame(string code, string map, bool ranked);
 
         /// <summary>
+        /// Updates the ranked flag of the current game.
+        /// Internally stored as "0"/"1" to match the Good Loss API contract.
+        /// </summary>
+        /// <param name="ranked">true for a ranked game, false otherwise</param>
+        void SetRanked(bool ranked);
+
+        /// <summary>
         /// Adds a player to the current game
         /// </summary>
         /// <param name="playerName">Player name</param>

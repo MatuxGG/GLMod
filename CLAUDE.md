@@ -152,6 +152,7 @@ Every service is exposed statically via the main `GLMod` class and has a dedicat
 - **Properties**: `CurrentGame` (GLGame), `Step` (GameStep), `GameCode`, `GameMap`.
 - **Key methods**:
   - `StartGame(code, map, ranked)` — initializes a `GLGame`.
+  - `SetRanked(ranked)` — updates the ranked flag on the current game (`bool` setter; stored as `"0"`/`"1"`).
   - `AddPlayer(name, role, team, color)` — adds a player to the current match.
   - `SendGame(onComplete)` — uploads the match to the API (coroutine).
   - `SyncGameId(onComplete)` — broadcasts the match ID to non-hosts via RPC.

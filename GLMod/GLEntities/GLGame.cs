@@ -53,6 +53,11 @@ namespace GLMod.GLEntities
             this.id = id.ToString();
         }
 
+        public void setRanked(bool ranked)
+        {
+            this.ranked = ranked ? "1" : "0";
+        }
+
         public int getId()
         {
             return int.Parse(this.id);

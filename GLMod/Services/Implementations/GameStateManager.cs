@@ -96,6 +96,24 @@ namespace GLMod.Services.Implementations
             }
         }
 
+        public void SetRanked(bool ranked)
+        {
+            if (CurrentGame == null)
+            {
+                Log("[SetRanked] Current Game null");
+                return;
+            }
+
+            try
+            {
+                CurrentGame.setRanked(ranked);
+            }
+            catch (Exception e)
+            {
+                Log("[SetRanked] Catch exception " + e.Message);
+            }
+        }
+
         public void AddPlayer(string playerName, string role, string team, string color)
         {
             if (Step != GameStep.PlayersAdded)
