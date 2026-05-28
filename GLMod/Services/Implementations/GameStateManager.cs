@@ -174,51 +174,22 @@ namespace GLMod.Services.Implementations
         {
             Log("Sending game...");
 
-            if (!AmongUsClient.Instance.AmHost)
+            if (!CanSendGame(onComplete))
             {
-                Step = GameStep.GameIdSynced;
-                onComplete?.Invoke(false);
                 yield break;
             }
 
-            if (Step != GameStep.GameSent)
-            {
-                Log("[SendGame] Duplicate call");
-                onComplete?.Invoke(false);
-                yield break;
-            }
-
-            if (CurrentGame.modName == null)
-            {
-                Log("[SendGame] Modname null");
-            }
-
-            var form = new Dictionary<string, string>
-            {
-                { "code", CurrentGame.code },
-                { "map", CurrentGame.map },
-                { "ranked", CurrentGame.ranked },
-                { "modName", CurrentGame.modName },
-                { "players", GLJson.Serialize<List<GLPlayer>>(CurrentGame.players) }
-            };
-
-            // DEBUG
-            Log("startGame: " + GLJson.Serialize<List<GLPlayer>>(CurrentGame.players));
+            var form = BuildSendGameForm();
+            Log("startGame: " + form["players"]);
 
             string responseString = null;
             string error = null;
 
-            // Call the ApiService coroutine
             yield return ApiService.PostFormAsync(_apiEndpoint + "/game/start", form,
-                result => {
-                    responseString = result;
-                },
-                err => {
-                    error = err;
-                }
+                result => responseString = result,
+                err => error = err
             );
 
-            // Result handling
             if (error != null)
             {
                 Log("[SendGame] fail, error: " + error);
@@ -226,7 +197,48 @@ namespace GLMod.Services.Implementations
                 yield break;
             }
 
-            CurrentGame.id = responseString;
+            HandleSendGameResult(responseString, onComplete);
+        }
+
+        private bool CanSendGame(System.Action<bool> onComplete)
+        {
+            if (!AmongUsClient.Instance.AmHost)
+            {
+                Step = GameStep.GameIdSynced;
+                onComplete?.Invoke(false);
+                return false;
+            }
+
+            if (Step != GameStep.GameSent)
+            {
+                Log("[SendGame] Duplicate call");
+                onComplete?.Invoke(false);
+                return false;
+            }
+
+            if (CurrentGame.modName == null)
+            {
+                Log("[SendGame] Modname null");
+            }
+
+            return true;
+        }
+
+        private Dictionary<string, string> BuildSendGameForm()
+        {
+            return new Dictionary<string, string>
+            {
+                { "code", CurrentGame.code },
+                { "map", CurrentGame.map },
+                { "ranked", CurrentGame.ranked },
+                { "modName", CurrentGame.modName },
+                { "players", GLJson.Serialize<List<GLPlayer>>(CurrentGame.players) }
+            };
+        }
+
+        private void HandleSendGameResult(string gameId, System.Action<bool> onComplete)
+        {
+            CurrentGame.id = gameId;
             Step = GameStep.GameIdSynced;
             CoroutineRunner.Run(SyncGameId(result =>
             {
