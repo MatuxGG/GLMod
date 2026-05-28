@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -43,52 +43,53 @@ namespace GLMod.GLEntities
             this.actions = actions;
         }
 
-        public void addPlayer(string login, string playerName, string role, string team, string color)
+        public void AddPlayer(string login, string playerName, string role, string team, string color)
         {
             this.players.Add(new GLPlayer(login, playerName, role, team, color));
         }
 
-        public void setId(int id)
+        public void SetId(int id)
         {
             this.id = id.ToString();
         }
 
-        public void setRanked(bool ranked)
+        public void SetRanked(bool ranked)
         {
             this.ranked = ranked ? "1" : "0";
         }
 
-        public int getId()
+        public int GetId()
         {
             return int.Parse(this.id);
         }
 
-        public void setWinner(string winner)
+        public void SetWinner(string winner)
         {
             this.winner = winner;
-            this.players.FindAll(p => p.team == winner).ForEach(p => p.setWin());
+            this.players.FindAll(p => p.team == winner).ForEach(p => p.SetWin());
         }
 
-        public void setWinners(List<string> winners)
+        public void SetWinners(List<string> winners)
         {
             this.winner = winners[0];
-            this.players.FindAll(p => winners.Contains(p.team)).ForEach(p => p.setWin());
+            this.players.FindAll(p => winners.Contains(p.team)).ForEach(p => p.SetWin());
         }
 
-        public void addTurn()
+        public void AddTurn()
         {
             int turn = int.Parse(this.turns);
             this.turns = turn < 1000 ? (turn + 1000).ToString() : (turn - 999).ToString();
         }
-        public void addAction(string source, string target, string action)
+
+        public void AddAction(string source, string target, string action)
         {
             long timestampSeconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             this.actions.Add(new GLAction(this.turns, source, target, action, timestampSeconds.ToString()));
         }
 
-        public void addPosition(string playerName, float x, float y, string timestampStr)
+        public void AddPosition(string playerName, float x, float y, string timestampStr)
         {
-            this.players.Find(p => p.playerName == playerName).addPosition(x, y, timestampStr);
+            this.players.Find(p => p.playerName == playerName).AddPosition(x, y, timestampStr);
         }
     }
 }

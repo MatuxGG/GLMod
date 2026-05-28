@@ -40,10 +40,10 @@ namespace GLMod
                     }
                     if (target)
                     {
-                        GLMod.GameStateManager.CurrentGame.addAction(voterPlayer.PlayerName, target.Data.PlayerName, "voted");
+                        GLMod.GameStateManager.CurrentGame.AddAction(voterPlayer.PlayerName, target.Data.PlayerName, "voted");
                     } else
                     {
-                        GLMod.GameStateManager.CurrentGame.addAction(voterPlayer.PlayerName, "", "voted");
+                        GLMod.GameStateManager.CurrentGame.AddAction(voterPlayer.PlayerName, "", "voted");
                     }
                     
                 } catch (Exception e)
@@ -66,7 +66,7 @@ namespace GLMod
                 if (player.Data.IsDead) continue;
                 float x = player.MyPhysics.body.transform.position.x;
                 float y = player.MyPhysics.body.transform.position.y;
-                GLMod.GameStateManager.CurrentGame.addPosition(player.Data.PlayerName, x, y, timestampSeconds.ToString());
+                GLMod.GameStateManager.CurrentGame.AddPosition(player.Data.PlayerName, x, y, timestampSeconds.ToString());
             }
         }
     }

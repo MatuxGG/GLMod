@@ -66,7 +66,7 @@ namespace GLMod
 
                     try
                     {
-                        GLMod.GameStateManager.CurrentGame.setId(int.Parse(values[0]));
+                        GLMod.GameStateManager.CurrentGame.SetId(int.Parse(values[0]));
                         GLMod.GameStateManager.Step = GameStep.PlayersRecorded;
                     }
                     catch (Exception ex)

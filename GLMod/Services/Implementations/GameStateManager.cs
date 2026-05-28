@@ -106,7 +106,7 @@ namespace GLMod.Services.Implementations
 
             try
             {
-                CurrentGame.setRanked(ranked);
+                CurrentGame.SetRanked(ranked);
             }
             catch (Exception e)
             {
@@ -148,7 +148,7 @@ namespace GLMod.Services.Implementations
 
             try
             {
-                CurrentGame.addPlayer(null, playerName, role, team, color);
+                CurrentGame.AddPlayer(null, playerName, role, team, color);
             }
             catch (Exception e)
             {
@@ -267,7 +267,7 @@ namespace GLMod.Services.Implementations
             {
                 try
                 {
-                    List<string> values = new() { CurrentGame.getId().ToString() };
+                    List<string> values = new() { CurrentGame.GetId().ToString() };
                     GLRPCProcedure.makeRpcCall(1, values);
                 }
                 catch (Exception ex)
@@ -450,7 +450,7 @@ namespace GLMod.Services.Implementations
 
             try
             {
-                CurrentGame.setWinners(winners);
+                CurrentGame.SetWinners(winners);
                 Step = GameStep.WinnerSet;
             }
             catch (Exception e)
@@ -487,7 +487,7 @@ namespace GLMod.Services.Implementations
 
             try
             {
-                CurrentGame.players.FindAll(p => p.playerName == playerName).ForEach(p => p.setWin());
+                CurrentGame.players.FindAll(p => p.playerName == playerName).ForEach(p => p.SetWin());
                 Step = GameStep.WinnerSet;
             }
             catch (Exception e)
@@ -566,7 +566,7 @@ namespace GLMod.Services.Implementations
         {
             try
             {
-                CurrentGame?.addAction(source, target, action);
+                CurrentGame?.AddAction(source, target, action);
             }
             catch (Exception e)
             {

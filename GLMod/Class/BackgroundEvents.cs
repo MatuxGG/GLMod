@@ -101,7 +101,7 @@ namespace GLMod.Class
 
                 float x = player.MyPhysics.body.transform.position.x;
                 float y = player.MyPhysics.body.transform.position.y;
-                GLMod.GameStateManager.CurrentGame.addPosition(player.Data.PlayerName, x, y, timestamp.ToString());
+                GLMod.GameStateManager.CurrentGame.AddPosition(player.Data.PlayerName, x, y, timestamp.ToString());
             }
         }
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -60,33 +60,34 @@ namespace GLMod.GLEntities
             this.color = color;
         }
 
-        public void addTasks()
+        public void AddTasks()
         {
             this.tasks = (int.Parse(this.tasks) + 1).ToString();
         }
-        public void addTasksDead()
+
+        public void AddTasksDead()
         {
             this.tasksDead = (int.Parse(this.tasksDead) + 1).ToString();
         }
 
-        public void setTasksMax(int tasksMax)
+        public void SetTasksMax(int tasksMax)
         {
             this.tasksMax = tasksMax.ToString();
         }
 
-        public void setWin()
+        public void SetWin()
         {
             this.win = "1";
         }
 
-        public void addPosition(float x, float y, string timestampStr)
+        public void AddPosition(float x, float y, string timestampStr)
         {
             x = (float)Math.Round(x, 2);
             y = (float)Math.Round(y, 2);
             this.positions.Add(new GLPosition(x, y, timestampStr));
         }
 
-        public void setColor(string color)
+        public void SetColor(string color)
         {
             this.color = color;
         }
