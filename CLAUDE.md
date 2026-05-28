@@ -98,7 +98,7 @@ GLMod follows a **service-oriented architecture** with:
 
 ### 2.3 Service dependency graph
 ```
-AuthenticationService     ← ConfigEntry<string> connectionState
+AuthenticationService     ← ManualLogSource, ConfigEntry<string> connectionState
 ConfigurationService      ← ManualLogSource, configPath
 GameStateManager          ← Logger, AuthService, ConfigService, apiEndpoint, stepRpc
 ServiceManager            ← (none)

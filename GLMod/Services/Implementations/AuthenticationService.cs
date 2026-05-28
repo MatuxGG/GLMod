@@ -1,4 +1,5 @@
 using BepInEx.Configuration;
+using BepInEx.Logging;
 using GLMod.Class;
 using GLMod.Constants;
 using GLMod.Services.Interfaces;
@@ -19,20 +20,24 @@ namespace GLMod.Services.Implementations
         private bool _isBanned;
         private string _banReason;
         private readonly ConfigEntry<string> _connectionState;
+        private readonly ManualLogSource _logger;
 
         public string Token => _token;
         public bool IsLoggedIn => _isLoggedIn;
         public bool IsBanned => _isBanned;
         public string BanReason => _banReason;
 
-        public AuthenticationService(ConfigEntry<string> connectionState)
+        public AuthenticationService(ManualLogSource logger, ConfigEntry<string> connectionState)
         {
-            _connectionState = connectionState;
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _connectionState = connectionState ?? throw new ArgumentNullException(nameof(connectionState));
             _token = null;
             _isLoggedIn = false;
             _isBanned = false;
             _banReason = "";
         }
+
+        private void Log(string message) => ServiceLogger.Log(_logger, nameof(AuthenticationService), message);
 
         public IEnumerator Login(System.Action<bool> onComplete = null)
         {
@@ -51,7 +56,7 @@ namespace GLMod.Services.Implementations
             // Check if response is null
             if (response == null)
             {
-                GLMod.log("Login failed, no response");
+                Log("[Login] failed, no response");
                 SetLoginState(false, "", false, "");
                 onComplete?.Invoke(false);
                 yield break;
@@ -60,7 +65,7 @@ namespace GLMod.Services.Implementations
             // Interpret response
             if (response.IsSuccess)
             {
-                GLMod.log("Login success");
+                Log("[Login] success");
                 SetLoginState(true, response.Content, false, "");
                 onComplete?.Invoke(true);
             }
@@ -70,19 +75,19 @@ namespace GLMod.Services.Implementations
                 if (!string.IsNullOrEmpty(trimmed) && trimmed.StartsWith("Banned: ", StringComparison.OrdinalIgnoreCase))
                 {
                     string reason = trimmed.Substring("Banned: ".Length);
-                    GLMod.log("User banned, reason: " + reason);
+                    Log("[Login] User banned, reason: " + reason);
                     SetLoginState(false, "", true, reason);
                 }
                 else
                 {
-                    GLMod.log($"Login failed 403: {trimmed}");
+                    Log($"[Login] failed 403: {trimmed}");
                     SetLoginState(false, "", false, "");
                 }
                 onComplete?.Invoke(false);
             }
             else
             {
-                GLMod.log($"Login failed - Status code: {response.StatusCode}");
+                Log($"[Login] failed - Status code: {response.StatusCode}");
                 SetLoginState(false, "", false, "");
                 onComplete?.Invoke(false);
             }
@@ -99,7 +104,7 @@ namespace GLMod.Services.Implementations
             }
             catch (Exception e)
             {
-                GLMod.log("[Logout] Catch exception " + e.Message);
+                Log("[Logout] Catch exception " + e.Message);
             }
         }
 
@@ -122,7 +127,7 @@ namespace GLMod.Services.Implementations
             }
             catch (Exception e)
             {
-                GLMod.log("[GetAccountName] Catch exception " + e.Message);
+                Log("[GetAccountName] Catch exception " + e.Message);
                 return "";
             }
         }

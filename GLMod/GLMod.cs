@@ -82,7 +82,7 @@ namespace GLMod
         {
             string configPathValue = Path.GetDirectoryName(Config.ConfigFilePath);
 
-            AuthService = new AuthenticationService(connectionState);
+            AuthService = new AuthenticationService(Logger, connectionState);
             ConfigService = new ConfigurationService(Logger, configPathValue);
             ConfigService.FindModName();
             GameStateManager = new GameStateManager(Logger, AuthService, ConfigService, api, stepRpc);

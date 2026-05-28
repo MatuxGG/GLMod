@@ -80,11 +80,11 @@ namespace GLMod.GLEntities
             this.win = "1";
         }
 
-        public void AddPosition(float x, float y, string timestampStr)
+        public void AddPosition(float x, float y, string timestampStr, string turn)
         {
             x = (float)Math.Round(x, 2);
             y = (float)Math.Round(y, 2);
-            this.positions.Add(new GLPosition(x, y, timestampStr));
+            this.positions.Add(new GLPosition(x, y, timestampStr, turn));
         }
 
         public void SetColor(string color)
