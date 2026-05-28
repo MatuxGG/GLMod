@@ -235,6 +235,12 @@ Reactor, Coms, Lights, O2
 | `RPC_POLLING_INTERVAL`        | `0.1f` seconds                               |
 | `DEFAULT_GAME_CODE`           | `XXXXXX`                                     |
 | `DEFAULT_MAP_NAME`            | `Unknown`                                    |
+| `ACTION_PREFIX_DC_PROCESS`    | `DC_PROCESS_` (background-detected DC)       |
+| `ACTION_PREFIX_DC_INTERNAL`   | `DC_INTERNAL_` (RPC `DisconnectInternal`)    |
+| `ACTION_PREFIX_DC_HANDLE`     | `DC_HANDLE_` (RPC `HandleDisconnect`)        |
+| `ACTION_PREFIX_DC_ON`         | `DC_ON_` (RPC `OnDisconnect`)                |
+| `ACTION_PREFIX_SAB_START`     | `SAB_START_` (suffixed by sabotage type)     |
+| `ACTION_PREFIX_SAB_END`       | `SAB_END_` (suffixed by sabotage type)       |
 
 ---
 

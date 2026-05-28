@@ -78,19 +78,19 @@ namespace GLMod
                     break;
 
                 case 2: // DisconnectInternal
-                    string reason = "DC_INTERNAL_" + (values[0] ?? "unknown");
+                    string reason = GameConstants.ACTION_PREFIX_DC_INTERNAL + (values[0] ?? "unknown");
                     string playerName = values[1] ?? "";
                     BackgroundEvents.handleDc(reason, playerName);
                     break;
 
                 case 3: // HandleDisconnect
-                    string reason2 = "DC_HANDLE_" + (values[0] ?? "unknown");
+                    string reason2 = GameConstants.ACTION_PREFIX_DC_HANDLE + (values[0] ?? "unknown");
                     string playerName2 = values[1] ?? "";
                     BackgroundEvents.handleDc(reason2, playerName2);
                     break;
 
                 case 4: // OnDisconnect
-                    string reason3 = "DC_ON_" + (values[0] ?? "unknown");
+                    string reason3 = GameConstants.ACTION_PREFIX_DC_ON + (values[0] ?? "unknown");
                     string playerName3 = values[1] ?? "";
                     BackgroundEvents.handleDc(reason3, playerName3);
                     break;

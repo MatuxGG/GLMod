@@ -122,7 +122,7 @@ namespace GLMod.Class
             {
                 if (!playersDc.Contains(gamePlayer.playerName) && !activePlayers.Contains(gamePlayer.playerName))
                 {
-                    handleDc("DC_PROCESS_", gamePlayer.playerName);
+                    handleDc(GameConstants.ACTION_PREFIX_DC_PROCESS, gamePlayer.playerName);
                     playersDc.Add(gamePlayer.playerName);
                 }
             }
@@ -142,20 +142,20 @@ namespace GLMod.Class
             if (!cachedSabotage.HasValue && currentSabotage.HasValue)
             {
                 // New sabotage started
-                GLMod.addAction("", "", "SAB_START_" + currentSabotage.Value.ToActionString());
+                GLMod.addAction("", "", GameConstants.ACTION_PREFIX_SAB_START + currentSabotage.Value.ToActionString());
                 cachedSabotage = currentSabotage;
             }
             else if (cachedSabotage.HasValue && !currentSabotage.HasValue)
             {
                 // Sabotage ended
-                GLMod.addAction("", "", "SAB_END_" + cachedSabotage.Value.ToActionString());
+                GLMod.addAction("", "", GameConstants.ACTION_PREFIX_SAB_END + cachedSabotage.Value.ToActionString());
                 cachedSabotage = null;
             }
             else if (cachedSabotage.HasValue && currentSabotage.HasValue && cachedSabotage != currentSabotage)
             {
                 // Sabotage changed
-                GLMod.addAction("", "", "SAB_END_" + cachedSabotage.Value.ToActionString());
-                GLMod.addAction("", "", "SAB_START_" + currentSabotage.Value.ToActionString());
+                GLMod.addAction("", "", GameConstants.ACTION_PREFIX_SAB_END + cachedSabotage.Value.ToActionString());
+                GLMod.addAction("", "", GameConstants.ACTION_PREFIX_SAB_START + currentSabotage.Value.ToActionString());
                 cachedSabotage = currentSabotage;
             }
         }

@@ -44,5 +44,35 @@ namespace GLMod.Constants
         /// Default map name when unknown
         /// </summary>
         public const string DEFAULT_MAP_NAME = "Unknown";
+
+        /// <summary>
+        /// Action code prefix for disconnections detected by the background process.
+        /// </summary>
+        public const string ACTION_PREFIX_DC_PROCESS = "DC_PROCESS_";
+
+        /// <summary>
+        /// Action code prefix for RPC "DisconnectInternal" disconnections.
+        /// </summary>
+        public const string ACTION_PREFIX_DC_INTERNAL = "DC_INTERNAL_";
+
+        /// <summary>
+        /// Action code prefix for RPC "HandleDisconnect" disconnections.
+        /// </summary>
+        public const string ACTION_PREFIX_DC_HANDLE = "DC_HANDLE_";
+
+        /// <summary>
+        /// Action code prefix for RPC "OnDisconnect" disconnections.
+        /// </summary>
+        public const string ACTION_PREFIX_DC_ON = "DC_ON_";
+
+        /// <summary>
+        /// Action code prefix recorded when a sabotage starts (suffixed by the sabotage type).
+        /// </summary>
+        public const string ACTION_PREFIX_SAB_START = "SAB_START_";
+
+        /// <summary>
+        /// Action code prefix recorded when a sabotage ends (suffixed by the sabotage type).
+        /// </summary>
+        public const string ACTION_PREFIX_SAB_END = "SAB_END_";
     }
 }
