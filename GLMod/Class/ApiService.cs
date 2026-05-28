@@ -1,10 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections;
-using System.Linq;
 using System.Net.Http;
-using System.Text;
-using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 
 namespace GLMod.Class
 {
@@ -12,93 +10,46 @@ namespace GLMod.Class
     {
         public static IEnumerator PostFormAsync(string url, Dictionary<string, string> formValues, System.Action<string> onComplete, System.Action<string> onError = null)
         {
-            // Variables shared across threads
-            bool done = false;
-            string error = null;
-            string result = null;
-
-            // Keep a reference to the task for proper handling
-            var task = System.Threading.Tasks.Task.Run(async () =>
-            {
-                try
+            return CoroutineHelpers.RunAsync(
+                async () =>
                 {
                     var content = new FormUrlEncodedContent(formValues);
                     var response = await HttpHelper.Client.PostAsync(url, content).ConfigureAwait(false);
                     response.EnsureSuccessStatusCode();
                     var responseString = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                    result = System.Text.RegularExpressions.Regex.Unescape(responseString);
-                }
-                catch (System.Exception ex)
-                {
-                    error = ex.Message;
-                }
-                finally
-                {
-                    // Set done last to guarantee visibility of the other variables
-                    System.Threading.Volatile.Write(ref done, true);
-                }
-            });
-
-            // Wait for completion with a volatile read
-            while (!System.Threading.Volatile.Read(ref done))
-                yield return null;
-
-            // Result handling
-            if (error != null)
-            {
-                onError?.Invoke(error);
-            }
-            else
-            {
-                onComplete?.Invoke(result);
-            }
+                    return Regex.Unescape(responseString);
+                },
+                onCompleted: onComplete,
+                onError: ex => onError?.Invoke(ex.Message)
+            );
         }
 
         public static IEnumerator PostFormWithErrorHandlingAsync(string url, Dictionary<string, string> formValues, System.Action<ApiResponse> onComplete)
         {
-            // Variables shared across threads
-            ApiResponse apiResponse = null;
-            bool done = false;
-
-            // Keep a reference to the task for proper handling
-            var task = System.Threading.Tasks.Task.Run(async () =>
-            {
-                try
+            return CoroutineHelpers.RunAsync<ApiResponse>(
+                async () =>
                 {
                     var content = new FormUrlEncodedContent(formValues);
                     var response = await HttpHelper.Client.PostAsync(url, content).ConfigureAwait(false);
                     var responseString = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
-                    apiResponse = new ApiResponse
+                    return new ApiResponse
                     {
                         IsSuccess = response.IsSuccessStatusCode,
                         StatusCode = (int)response.StatusCode,
-                        Content = System.Text.RegularExpressions.Regex.Unescape(responseString)
+                        Content = Regex.Unescape(responseString)
                     };
-                }
-                catch (System.Exception ex)
+                },
+                onCompleted: onComplete,
+                // Map network exceptions to a failure-shaped ApiResponse so callers
+                // can keep a single uniform code path.
+                onError: ex => onComplete?.Invoke(new ApiResponse
                 {
-                    // On network exception, build an error response
-                    apiResponse = new ApiResponse
-                    {
-                        IsSuccess = false,
-                        StatusCode = 0,
-                        Content = ex.Message
-                    };
-                }
-                finally
-                {
-                    // Set done last to guarantee visibility of the other variables
-                    System.Threading.Volatile.Write(ref done, true);
-                }
-            });
-
-            // Wait for completion with a volatile read
-            while (!System.Threading.Volatile.Read(ref done))
-                yield return null;
-
-            // Return the result via callback
-            onComplete?.Invoke(apiResponse);
+                    IsSuccess = false,
+                    StatusCode = 0,
+                    Content = ex.Message
+                })
+            );
         }
     }
 

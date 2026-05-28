@@ -110,8 +110,8 @@ MapService                ← Logger
 
 ### 2.4 Coroutines & async
 - API calls use Unity **coroutines** (`IEnumerator`) to remain compatible with the Unity main thread.
-- Recurring pattern: a background `Task.Run` + a `done` flag using `Volatile.Read/Write` + `yield return null` until completion.
-- See [GLMod/Class/ApiService.cs](GLMod/Class/ApiService.cs) (`PostFormAsync`, `PostFormWithErrorHandlingAsync`).
+- The bridge between `Task`-based async work and coroutines is centralized in [GLMod/Class/CoroutineHelpers.cs](GLMod/Class/CoroutineHelpers.cs) (`RunAsync<T>` / `RunAsync`). It encapsulates the `Task.Run` + volatile `done` flag + `yield return null` pattern. **Do not re-implement this pattern** elsewhere.
+- See [GLMod/Class/ApiService.cs](GLMod/Class/ApiService.cs) (`PostFormAsync`, `PostFormWithErrorHandlingAsync`) for typical usage.
 - `IIntegrityService` additionally exposes **async/await** variants (`*Async`) for consumers running outside a Unity context.
 - `CoroutineRunner` ([GLMod/Class/CoroutineRunner.cs](GLMod/Class/CoroutineRunner.cs)) is a `MonoBehaviour` singleton registered in IL2CPP via `ClassInjector.RegisterTypeInIl2Cpp`.
 
@@ -278,6 +278,7 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 |------------------------|--------------------------------------------------------------------------------------------|
 | `HttpHelper.cs`        | Shared static `HttpClient`, proxy disabled.                                                |
 | `ApiService.cs`        | `PostFormAsync`, `PostFormWithErrorHandlingAsync`, `ApiResponse` type.                     |
+| `CoroutineHelpers.cs`  | `RunAsync` / `RunAsync<T>` — async-task ↔ coroutine bridge. Use these instead of re-implementing the `Task.Run` + volatile `done` flag pattern. |
 | `CoroutineRunner.cs`   | `MonoBehaviour` IL2CPP singleton used to run coroutines from static classes.               |
 | `BackgroundEvents.cs`  | Background loop: watches DCs, hidden sabotages, etc.                                       |
 | `VanillaEvents.cs`     | Default implementations (`startGameVanilla`, `endGameVanilla`…) used when the matching `ServiceType` is enabled. |
@@ -362,6 +363,7 @@ GLMod/                                # Repo root
     ├── Class/                        # Cross-cutting helpers (non-services).
     │   ├── ApiService.cs
     │   ├── BackgroundEvents.cs
+    │   ├── CoroutineHelpers.cs       # Async-task ↔ coroutine bridge.
     │   ├── CoroutineRunner.cs
     │   ├── HttpHelper.cs
     │   └── VanillaEvents.cs

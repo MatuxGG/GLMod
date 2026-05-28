@@ -261,28 +261,14 @@ namespace GLMod.Services.Implementations
             _stepRpcConfig.Value = "NO";
             yield return new WaitForSeconds(GameConstants.RPC_SYNC_TIMEOUT);
 
-            bool done = false;
-
-            var task = Task.Run(() =>
-            {
-                try
+            yield return CoroutineHelpers.RunAsync(
+                () => Task.Run(() =>
                 {
                     List<string> values = new() { CurrentGame.GetId().ToString() };
                     GLRPCProcedure.makeRpcCall(1, values);
-                }
-                catch (Exception ex)
-                {
-                    Log("[SyncGameId] RPC fail : " + ex.Message);
-                }
-                finally
-                {
-                    System.Threading.Volatile.Write(ref done, true);
-                }
-            });
-
-            // Wait without blocking the main thread, using a volatile read
-            while (!System.Threading.Volatile.Read(ref done))
-                yield return null;
+                }),
+                onError: ex => Log("[SyncGameId] RPC fail : " + ex.Message)
+            );
 
             Step = GameStep.PlayersRecorded;
             onComplete?.Invoke(true);
@@ -520,46 +506,22 @@ namespace GLMod.Services.Implementations
 
             BackgroundEvents.endBackgroundProcess();
 
-            string error = null;
-            bool done = false;
-
-            var task = Task.Run(async () =>
-            {
-                try
+            yield return CoroutineHelpers.RunAsync(
+                async () =>
                 {
                     string json = GLJson.Serialize<GLGame>(CurrentGame);
-
                     var content = new StringContent(json, Encoding.UTF8, "application/json");
                     var response = await HttpHelper.Client.PostAsync(_apiEndpoint + "/game/end", content).ConfigureAwait(false);
                     response.EnsureSuccessStatusCode();
-
-                    // Read the response if needed
-                    var result = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                }
-                catch (Exception e)
+                    await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                },
+                onCompleted: () =>
                 {
-                    error = e.Message;
-                }
-                finally
-                {
-                    System.Threading.Volatile.Write(ref done, true);
-                }
-            });
-
-            // Wait for the task to complete with a volatile read
-            while (!System.Threading.Volatile.Read(ref done))
-                yield return null;
-
-            // Result handling
-            if (error != null)
-            {
-                Log("[EndGame] End Game fail, error: " + error);
-            }
-            else
-            {
-                Step = GameStep.Initial;
-                Log("Game ended.");
-            }
+                    Step = GameStep.Initial;
+                    Log("Game ended.");
+                },
+                onError: ex => Log("[EndGame] End Game fail, error: " + ex.Message)
+            );
         }
 
         public void AddAction(string source, string target, string action)
