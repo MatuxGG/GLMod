@@ -41,7 +41,7 @@ Any code review MUST reject contributions that introduce non-English identifiers
 
 ### 1.1 Identity
 - **Name**: GLMod (Good Loss Mod)
-- **Current version**: `5.4.0` (see [GLMod/GLMod.csproj](GLMod/GLMod.csproj) and [GLMod/GLMod.cs](GLMod/GLMod.cs))
+- **Current version**: `5.4.1` (see [GLMod/GLMod.csproj](GLMod/GLMod.csproj) and [GLMod/GLMod.cs](GLMod/GLMod.cs))
 - **BepInEx plugin Id**: `glmod`
 - **Author**: Matux
 - **License**: GNU GPLv3
@@ -595,5 +595,5 @@ For every change to the project:
 
 ---
 
-*Last updated: 2026-10-14 — GLMod version 5.4.0.*
+*Last updated: 2026-10-14 — GLMod version 5.4.1.*
 *Every change to the project must be accompanied by an update of this file.*
