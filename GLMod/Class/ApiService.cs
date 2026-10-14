@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections;
 using System.Net.Http;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace GLMod.Class
 {
@@ -13,8 +14,7 @@ namespace GLMod.Class
             return CoroutineHelpers.RunAsync(
                 async () =>
                 {
-                    var content = new FormUrlEncodedContent(formValues);
-                    var response = await HttpHelper.Client.PostAsync(url, content).ConfigureAwait(false);
+                    var response = await PostAndSyncClockAsync(url, formValues).ConfigureAwait(false);
                     response.EnsureSuccessStatusCode();
                     var responseString = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                     return Regex.Unescape(responseString);
@@ -29,8 +29,7 @@ namespace GLMod.Class
             return CoroutineHelpers.RunAsync<ApiResponse>(
                 async () =>
                 {
-                    var content = new FormUrlEncodedContent(formValues);
-                    var response = await HttpHelper.Client.PostAsync(url, content).ConfigureAwait(false);
+                    var response = await PostAndSyncClockAsync(url, formValues).ConfigureAwait(false);
                     var responseString = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
                     return new ApiResponse
@@ -50,6 +49,18 @@ namespace GLMod.Class
                     Content = ex.Message
                 })
             );
+        }
+
+        /// <summary>
+        /// Posts the form and refreshes ServerClock from the response Date header.
+        /// </summary>
+        private static async Task<HttpResponseMessage> PostAndSyncClockAsync(string url, Dictionary<string, string> formValues)
+        {
+            var content = new FormUrlEncodedContent(formValues);
+            DateTimeOffset sentAt = DateTimeOffset.UtcNow;
+            var response = await HttpHelper.Client.PostAsync(url, content).ConfigureAwait(false);
+            ServerClock.Update(response.Headers.Date, sentAt, DateTimeOffset.UtcNow);
+            return response;
         }
     }
 

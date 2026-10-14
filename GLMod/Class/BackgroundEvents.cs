@@ -93,7 +93,7 @@ namespace GLMod.Class
         /// </summary>
         private static void TrackPlayerPositions()
         {
-            long timestamp = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            long timestamp = ServerClock.NowMs();
 
             foreach (PlayerControl player in PlayerControl.AllPlayerControls)
             {

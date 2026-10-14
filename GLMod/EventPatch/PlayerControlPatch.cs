@@ -36,7 +36,7 @@ namespace GLMod
         {
             try
             {
-                long timestampSeconds = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                long timestampSeconds = ServerClock.NowMs();
                 // Set positions before kill
                 float x = __instance.MyPhysics.body.transform.position.x;
                 float y = __instance.MyPhysics.body.transform.position.y;
@@ -204,7 +204,7 @@ namespace GLMod
         {
             try
             {
-                long timestampSeconds = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                long timestampSeconds = ServerClock.NowMs();
                 if (target == null)
                 {
                     if (GLMod.existService("Emergencies") || GLMod.debug)

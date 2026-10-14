@@ -1,3 +1,4 @@
+using GLMod.Class;
 using GLMod.Constants;
 using Xunit;
 
@@ -29,6 +30,29 @@ namespace GLMod.Tests
             Assert.EndsWith("_", GameConstants.ACTION_PREFIX_DC_ON);
             Assert.EndsWith("_", GameConstants.ACTION_PREFIX_SAB_START);
             Assert.EndsWith("_", GameConstants.ACTION_PREFIX_SAB_END);
+        }
+    }
+
+    public class ApiEndpointResolverTests
+    {
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("   ")]
+        [InlineData("not a url")]
+        [InlineData("ftp://preprod.goodloss.fr/api")]
+        public void Resolve_FallsBackToProduction(string overrideValue)
+        {
+            Assert.Equal(GameConstants.API_ENDPOINT, ApiEndpointResolver.Resolve(overrideValue));
+        }
+
+        [Theory]
+        [InlineData("https://preprod.goodloss.fr/api", "https://preprod.goodloss.fr/api")]
+        [InlineData(" https://preprod.goodloss.fr/api/ ", "https://preprod.goodloss.fr/api")]
+        [InlineData("http://localhost:8080/api", "http://localhost:8080/api")]
+        public void Resolve_UsesValidOverride(string overrideValue, string expected)
+        {
+            Assert.Equal(expected, ApiEndpointResolver.Resolve(overrideValue));
         }
     }
 }

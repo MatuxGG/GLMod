@@ -1,4 +1,5 @@
 using System;
+using GLMod.Class;
 using System.Collections.Generic;
 using System.Text;
 
@@ -88,7 +89,7 @@ namespace GLMod.GLEntities
 
         public void AddAction(string source, string target, string action)
         {
-            long timestampSeconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            long timestampSeconds = ServerClock.NowMs();
             this.actions.Add(new GLAction(this.turns, source, target, action, timestampSeconds.ToString()));
         }
 

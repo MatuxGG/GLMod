@@ -1,6 +1,7 @@
 ﻿using HarmonyLib;
 using InnerNet;
 using System;
+using GLMod.Class;
 using UnityEngine;
 
 namespace GLMod
@@ -60,7 +61,7 @@ namespace GLMod
     {
         public static void Postfix(MeetingHud __instance)
         {
-            long timestampSeconds = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            long timestampSeconds = ServerClock.NowMs();
             foreach (PlayerControl player in PlayerControl.AllPlayerControls)
             {
                 if (player.Data.IsDead) continue;

@@ -11,6 +11,16 @@ namespace GLMod.Constants
         public const string API_ENDPOINT = "https://goodloss.fr/api";
 
         /// <summary>
+        /// Environment variable overriding API_ENDPOINT (e.g. https://preprod.goodloss.fr/api for tests)
+        /// </summary>
+        public const string API_ENDPOINT_ENV_VAR = "GLMOD_API_ENDPOINT";
+
+        /// <summary>
+        /// Clock difference with the API server ignored by ServerClock (HTTP Date has a 1s resolution)
+        /// </summary>
+        public const long CLOCK_SKEW_TOLERANCE_MS = 2000;
+
+        /// <summary>
         /// Characters used for generating support IDs
         /// </summary>
         public const string SUPPORT_ID_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz123456789";

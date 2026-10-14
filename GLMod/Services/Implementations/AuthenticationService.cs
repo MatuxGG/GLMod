@@ -21,16 +21,18 @@ namespace GLMod.Services.Implementations
         private string _banReason;
         private readonly ConfigEntry<string> _connectionState;
         private readonly ManualLogSource _logger;
+        private readonly string _apiEndpoint;
 
         public string Token => _token;
         public bool IsLoggedIn => _isLoggedIn;
         public bool IsBanned => _isBanned;
         public string BanReason => _banReason;
 
-        public AuthenticationService(ManualLogSource logger, ConfigEntry<string> connectionState)
+        public AuthenticationService(ManualLogSource logger, ConfigEntry<string> connectionState, string apiEndpoint)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _connectionState = connectionState ?? throw new ArgumentNullException(nameof(connectionState));
+            _apiEndpoint = apiEndpoint ?? throw new ArgumentNullException(nameof(apiEndpoint));
             _token = null;
             _isLoggedIn = false;
             _isBanned = false;
@@ -48,7 +50,7 @@ namespace GLMod.Services.Implementations
 
             // Call API service
             yield return ApiService.PostFormWithErrorHandlingAsync(
-                GameConstants.API_ENDPOINT + "/user/login",
+                _apiEndpoint + "/user/login",
                 form,
                 apiResponse => { response = apiResponse; }
             );
@@ -66,6 +68,10 @@ namespace GLMod.Services.Implementations
             if (response.IsSuccess)
             {
                 Log("[Login] success");
+                if (ServerClock.OffsetMs != 0)
+                {
+                    Log($"[Login] local clock differs from the server by {ServerClock.OffsetMs} ms; timestamps are corrected");
+                }
                 SetLoginState(true, response.Content, false, "");
                 onComplete?.Invoke(true);
             }

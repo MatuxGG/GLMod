@@ -265,14 +265,17 @@ namespace GLMod.Services.Implementations
             _stepRpcConfig.Value = "NO";
             yield return new WaitForSeconds(GameConstants.RPC_SYNC_TIMEOUT);
 
-            yield return CoroutineHelpers.RunAsync(
-                () => Task.Run(() =>
-                {
-                    List<string> values = new() { CurrentGame.GetId().ToString() };
-                    GLRPCProcedure.makeRpcCall(1, values);
-                }),
-                onError: ex => Log("[SyncGameId] RPC fail : " + ex.Message)
-            );
+            // The RPC goes through IL2CPP (AmongUsClient, PlayerControl): it must run on the Unity
+            // main thread, which this coroutine already is. Sending it from Task.Run crashed the game.
+            try
+            {
+                List<string> values = new() { CurrentGame.GetId().ToString() };
+                GLRPCProcedure.makeRpcCall(1, values);
+            }
+            catch (Exception ex)
+            {
+                Log("[SyncGameId] RPC fail : " + ex.Message);
+            }
 
             Step = GameStep.PlayersRecorded;
             onComplete?.Invoke(true);

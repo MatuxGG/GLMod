@@ -42,7 +42,8 @@ namespace GLMod
         public static ConfigEntry<string> enabled { get; private set; }
         public static ConfigEntry<string> supportId { get; private set; }
 
-        public const string api = GameConstants.API_ENDPOINT;
+        // Production by default; overridable through GLMOD_API_ENDPOINT (see ApiEndpointResolver)
+        public static string api { get; private set; } = GameConstants.API_ENDPOINT;
 
         public static bool debug = false;
         public static bool withUnityExplorer = false;
@@ -52,6 +53,12 @@ namespace GLMod
         {
             Logger = Log;
             log("Loading mod...");
+
+            api = ApiEndpointResolver.ResolveFromEnvironment();
+            if (api != GameConstants.API_ENDPOINT)
+            {
+                log("[!] API endpoint overridden by " + GameConstants.API_ENDPOINT_ENV_VAR + ": " + api);
+            }
 
             InitializeConfiguration();
             InitializeServices();
@@ -82,7 +89,7 @@ namespace GLMod
         {
             string configPathValue = Path.GetDirectoryName(Config.ConfigFilePath);
 
-            AuthService = new AuthenticationService(Logger, connectionState);
+            AuthService = new AuthenticationService(Logger, connectionState, api);
             ConfigService = new ConfigurationService(Logger, configPathValue);
             ConfigService.FindModName();
             GameStateManager = new GameStateManager(Logger, AuthService, ConfigService, api, stepRpc);
