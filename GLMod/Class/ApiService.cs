@@ -52,6 +52,37 @@ namespace GLMod.Class
         }
 
         /// <summary>
+        /// GET request; network errors and non-2xx statuses come back as a failed ApiResponse
+        /// (Content holds the body, e.g. {"error":"..."}, or the exception message).
+        /// </summary>
+        public static IEnumerator GetWithErrorHandlingAsync(string url, System.Action<ApiResponse> onComplete)
+        {
+            return CoroutineHelpers.RunAsync<ApiResponse>(
+                async () =>
+                {
+                    DateTimeOffset sentAt = DateTimeOffset.UtcNow;
+                    var response = await HttpHelper.Client.GetAsync(url).ConfigureAwait(false);
+                    ServerClock.Update(response.Headers.Date, sentAt, DateTimeOffset.UtcNow);
+                    var responseString = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+                    return new ApiResponse
+                    {
+                        IsSuccess = response.IsSuccessStatusCode,
+                        StatusCode = (int)response.StatusCode,
+                        Content = responseString
+                    };
+                },
+                onCompleted: onComplete,
+                onError: ex => onComplete?.Invoke(new ApiResponse
+                {
+                    IsSuccess = false,
+                    StatusCode = 0,
+                    Content = ex.Message
+                })
+            );
+        }
+
+        /// <summary>
         /// Posts the form and refreshes ServerClock from the response Date header.
         /// </summary>
         private static async Task<HttpResponseMessage> PostAndSyncClockAsync(string url, Dictionary<string, string> formValues)

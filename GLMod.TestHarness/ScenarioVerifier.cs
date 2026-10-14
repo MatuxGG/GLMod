@@ -93,7 +93,7 @@ namespace GLMod.TestHarness
         }
 
         /// <summary>
-        /// The end screen must have recorded the game in the local history (Games tab of the menu),
+        /// The end screen must have recorded the game in the local history (end-of-game signal of the menu),
         /// with the recap link of the API's site and the right outcome for the local player.
         /// </summary>
         public static List<string> VerifyHistoryEntry(GLGameHistoryEntry entry, GLGame game, int gameNumber, bool localIsImpostor, string apiEndpoint)

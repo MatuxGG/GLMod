@@ -59,6 +59,15 @@ namespace GLMod.Services.Implementations
         {
             Log("Creating game...");
 
+            // Free play games are never recorded nor sent to Good Loss (also when a third-party mod starts the game)
+            if (PlayModeHelper.IsFreePlay())
+            {
+                Log("[CreateGame] Free play: game not recorded");
+                CurrentGame = null;
+                Step = GameStep.Initial;
+                return;
+            }
+
             if (Step != GameStep.Initial)
             {
                 Log("[CreateGame] Duplicate call");
@@ -194,6 +203,13 @@ namespace GLMod.Services.Implementations
 
         private bool CanSendGame(System.Action<bool> onComplete)
         {
+            if (PlayModeHelper.IsFreePlay())
+            {
+                Log("[SendGame] Free play: not sent");
+                onComplete?.Invoke(false);
+                return false;
+            }
+
             if (!AmongUsClient.Instance.AmHost)
             {
                 Step = GameStep.GameIdSynced;
@@ -283,7 +299,7 @@ namespace GLMod.Services.Implementations
 
         public IEnumerator AddMyPlayer(System.Action<bool> onComplete = null)
         {
-            if (!_authService.IsLoggedIn)
+            if (!_authService.IsLoggedIn || PlayModeHelper.IsFreePlay())
             {
                 onComplete?.Invoke(false);
                 yield break;
@@ -492,6 +508,13 @@ namespace GLMod.Services.Implementations
         public IEnumerator EndGame()
         {
             Log("Ending game...");
+
+            if (PlayModeHelper.IsFreePlay())
+            {
+                Log("[EndGame] Free play: not sent");
+                Step = GameStep.Initial;
+                yield break;
+            }
 
             if (!AmongUsClient.Instance.AmHost)
             {

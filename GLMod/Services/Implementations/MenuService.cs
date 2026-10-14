@@ -12,33 +12,70 @@ namespace GLMod.Services.Implementations
     {
         private readonly List<IMenuTab> _tabs = new List<IMenuTab>();
         private int _selectedIndex;
+        private bool _isOpen;
+        private bool _enabled = true;
 
-        public bool IsOpen { get; private set; }
+        public bool IsOpen => _isOpen && IsVisible;
         public IReadOnlyList<IMenuTab> Tabs => _tabs;
         public int SelectedIndex => _tabs.Count == 0 ? -1 : _selectedIndex;
         public IMenuTab SelectedTab => _tabs.Count == 0 ? null : _tabs[_selectedIndex];
 
-        public bool RegisterTab(IMenuTab tab)
+        public bool Enabled
         {
-            if (tab == null || _tabs.Contains(tab))
+            get => _enabled;
+            set
+            {
+                _enabled = value;
+                if (!value)
+                {
+                    _isOpen = false;
+                }
+            }
+        }
+
+        public bool IsVisible => _enabled && _tabs.Count > 0;
+
+        public bool RegisterTab(IMenuTab tab) => InsertTab(_tabs.Count, tab);
+
+        public IMenuTab RegisterTab(string id, string title, Action draw, Action onShown = null)
+        {
+            var tab = new MenuTab(id, title, draw, onShown);
+            return RegisterTab(tab) ? tab : null;
+        }
+
+        public bool InsertTab(int index, IMenuTab tab)
+        {
+            if (tab == null || string.IsNullOrWhiteSpace(tab.Id) || _tabs.Contains(tab) || FindTab(tab.Id) != null)
             {
                 return false;
             }
 
-            _tabs.Add(tab);
+            index = Math.Max(0, Math.Min(index, _tabs.Count));
+            _tabs.Insert(index, tab);
+
+            // Keep the same tab selected when a tab is inserted before it
+            if (_tabs.Count > 1 && index <= _selectedIndex)
+            {
+                _selectedIndex++;
+            }
             return true;
         }
 
-        public IMenuTab RegisterTab(string title, Action draw, Action onShown = null)
+        public IMenuTab FindTab(string id)
         {
-            var tab = new MenuTab(title, draw, onShown);
-            RegisterTab(tab);
-            return tab;
+            if (string.IsNullOrEmpty(id))
+            {
+                return null;
+            }
+
+            return _tabs.Find(tab => tab.Id == id);
         }
+
+        public bool UnregisterTab(string id) => UnregisterTab(FindTab(id));
 
         public bool UnregisterTab(IMenuTab tab)
         {
-            int index = _tabs.IndexOf(tab);
+            int index = tab == null ? -1 : _tabs.IndexOf(tab);
             if (index < 0)
             {
                 return false;
@@ -55,12 +92,16 @@ namespace GLMod.Services.Implementations
             {
                 _selectedIndex = Math.Max(0, _tabs.Count - 1);
             }
+            if (_tabs.Count == 0)
+            {
+                _isOpen = false;
+            }
             return true;
         }
 
         public bool Select(IMenuTab tab)
         {
-            int index = _tabs.IndexOf(tab);
+            int index = tab == null ? -1 : _tabs.IndexOf(tab);
             if (index < 0)
             {
                 return false;
@@ -69,6 +110,8 @@ namespace GLMod.Services.Implementations
             _selectedIndex = index;
             return true;
         }
+
+        public bool Select(string id) => Select(FindTab(id));
 
         public void SelectNext()
         {
@@ -90,10 +133,26 @@ namespace GLMod.Services.Implementations
             _selectedIndex = (_selectedIndex - 1 + _tabs.Count) % _tabs.Count;
         }
 
-        public void Open() => IsOpen = true;
+        public void Open()
+        {
+            if (IsVisible)
+            {
+                _isOpen = true;
+            }
+        }
 
-        public void Close() => IsOpen = false;
+        public void Close() => _isOpen = false;
 
-        public void Toggle() => IsOpen = !IsOpen;
+        public void Toggle()
+        {
+            if (IsOpen)
+            {
+                Close();
+            }
+            else
+            {
+                Open();
+            }
+        }
     }
 }

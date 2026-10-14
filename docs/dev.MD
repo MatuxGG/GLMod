@@ -123,19 +123,51 @@ bool exists = GLMod.ServiceManager.ExistsService(ServiceType.Kills);
 ```
 
 ### Menu Service (IMenuService)
-State of the Good Loss menu (F2 or a click on the "Good Loss" label in the bottom-left corner). Your mod can add its own tab, placed after GLMod's tabs (Account, Games, Rank, DLC) and reachable with the left / right arrows.
+State of the Good Loss menu (F2 or a click on the "GOOD LOSS" tab in the bottom-left corner). From your plugin's `Load()` (GLMod is loaded first thanks to `[BepInDependency("glmod")]`) or later, your mod can:
+- **hide the menu completely**,
+- **remove** GLMod's built-in tabs,
+- **add** its own tabs, at the end or at a given position.
 
-Register it in your plugin's `Load()` (GLMod is loaded first thanks to `[BepInDependency("glmod")]`). Draw the content with the `GLMod.Menu.MenuUI` widgets: they follow the menu style and are laid out from top to bottom, and a tab that is too long scrolls automatically.
+Every tab has a unique, stable **id**. Built-in tabs, in this order:
+
+| Tab | Id (`GLMod.Constants.GameConstants`) |
+|-----|--------------------------------------|
+| Account | `MENU_TAB_ACCOUNT` = `"glmod.account"` |
+| Last game | `MENU_TAB_LAST_GAME` = `"glmod.lastgame"` |
+| Sessions | `MENU_TAB_SESSIONS` = `"glmod.sessions"` |
+
+#### Hide the menu
+
+```csharp
+GLMod.MenuService.Enabled = false; // no "GOOD LOSS" tab, no panel; F2, arrows and clicks are left to the game
+GLMod.MenuService.Enabled = true;  // back (closed)
+```
+
+The menu also hides itself when no tab is left. `IsVisible` tells whether it is shown (enabled and at least one tab), `IsOpen` whether the panel is open; `Open()` has no effect while it is not visible.
+
+#### Remove built-in tabs
+
+```csharp
+using GLMod.Constants;
+
+GLMod.MenuService.UnregisterTab(GameConstants.MENU_TAB_SESSIONS);
+GLMod.MenuService.UnregisterTab(GameConstants.MENU_TAB_LAST_GAME);
+```
+
+#### Add tabs
+
+Draw the content with the `GLMod.Menu.MenuUI` widgets: they follow the menu style and are laid out from top to bottom, and a tab that is too long scrolls automatically. Prefix your ids with your mod name to avoid collisions: a second tab with an existing id is refused.
 
 ```csharp
 using GLMod.Menu;
 
-IMenuTab myTab = GLMod.MenuService.RegisterTab("My mod",
+// At the end of the tab bar
+IMenuTab rules = GLMod.MenuService.RegisterTab("mymod.rules", "Rules",
     draw: () =>
     {
         MenuUI.Heading("Season 3");
-        MenuUI.Field("Players", "42");
-        MenuUI.Muted("Rules are on our Discord.");
+        MenuUI.Tags(("Ranked", MenuUI.Accent), ("10 players", MenuUI.Success));
+        MenuUI.StatGrid(3, ("Kill cooldown", "25 s"), ("Tasks", "4"), ("Meetings", "1"));
         if (MenuUI.Button("Open the rules"))
         {
             UnityEngine.Application.OpenURL("https://example.org/rules");
@@ -143,23 +175,43 @@ IMenuTab myTab = GLMod.MenuService.RegisterTab("My mod",
     },
     onShown: () => { /* refresh your data here (called when the tab becomes visible) */ });
 
+// At a given position (0 = first tab): here, right after Account
+GLMod.MenuService.InsertTab(1, new MenuTab("mymod.news", "News", () => MenuUI.Label("Patch 2.3 is out!")));
+
 // Later
-GLMod.MenuService.Select(myTab);         // show it on the next opening
+GLMod.MenuService.Select("mymod.rules");   // shown on the next opening
 GLMod.MenuService.Open();
-GLMod.MenuService.UnregisterTab(myTab);
+GLMod.MenuService.UnregisterTab("mymod.news");
+IMenuTab found = GLMod.MenuService.FindTab("mymod.rules");
 ```
 
-Widgets: `Heading`, `Highlight`, `Label` (optionally colored), `Muted`, `Field(name, value)`, `Button` (returns true when clicked), `Row(text, buttonText, color)`, `Space`, `Separator`, and the colors `MenuUI.Accent`, `Text`, `MutedText`, `Success`, `Danger`.
+For more control, implement `IMenuTab` (`Id`, `Title`, `OnShown()`, `Draw()`) and register it with `RegisterTab(tab)` or `InsertTab(index, tab)`.
 
-For more control, implement `IMenuTab` (`Title`, `OnShown()`, `Draw()`) and call `GLMod.MenuService.RegisterTab(tab)`.
+Widgets: `Heading` (section title), `Highlight` (large display text), `Label` (optionally colored), `Muted`, `Field(name, value)`, `Button` (gradient call to action, returns true when clicked), `Row(text, buttonText, color)` (card with a colored edge and an optional small button), `ProgressBar(label, fraction, valueText)`, `Tiles(("Label", "value"), ...)` (row of stat tiles), `StatGrid(columns, ("Label", value), ...)` (compact grid of stat tiles, null values skipped), `Tags(("Text", color), ...)` (colored pills that wrap), `Space`, `Separator`, and the colors `MenuUI.Accent`, `AccentStrong`, `Text`, `MutedText`, `Success`, `Danger`. Sizes passed to the widgets (e.g. `Space(10f)`) are 1080p reference units; `MenuUI.Width` is in screen pixels.
 
 Rules:
 - Everything runs on the Unity main thread. `Draw()` is called several times per frame (IMGUI): keep it cheap and never start requests from it, start them from `OnShown()` (e.g. with a coroutine) and draw the cached result.
 - An exception in your tab is logged once and replaced by an error message, it does not break the menu.
 - `GUI.DrawTexture` is stripped from the Among Us build: drawing it from a tab throws. Use the `MenuUI` widgets (or `GUI.Label` / `GUI.Button` / `GUI.Box`).
 
+### Translation Service (ITranslationService)
+The menu follows the language selected in the game (`Language`: "en", "fr", "pt-BR"...), with English when a text is not translated. Translate your own tabs the same way: add your texts per language, then read them with `Get` (also in `Title`, so the tab bar follows language changes).
+
+```csharp
+GLMod.TranslationService.AddTranslations("en", new Dictionary<string, string> { { "mymod.rules", "Rules" }, { "mymod.players", "{0} players" } });
+GLMod.TranslationService.AddTranslations("fr", new Dictionary<string, string> { { "mymod.rules", "Règles" }, { "mymod.players", "{0} joueurs" } });
+
+GLMod.MenuService.RegisterTab(new MyRulesTab()); // Title => GLMod.TranslationService.Get("mymod.rules")
+string players = GLMod.TranslationService.Get("mymod.players", 10);
+```
+
+Missing texts fall back to the base language ("pt-BR" -> "pt"), then English, then the key itself. `AddTranslations` can also add a new language to GLMod's own keys (see `GLMod/Resources/Translations/en.json`).
+
+### Free play
+Free play games are never recorded nor sent to Good Loss: in free play, `GLMod.StartGame` creates no game and `SendGame` / `AddMyPlayer` / `EndGame` send nothing, even when your mod calls them.
+
 ### Game History Service (IGameHistoryService)
-Local history of the games played with GLMod (shown in the Games tab), most recent first.
+Local history of the games played with GLMod, most recent first (stored on the player's computer only).
 
 ```csharp
 GLGameHistoryEntry last = GLMod.GameHistoryService.Latest; // null when empty
@@ -182,6 +234,8 @@ GLMod.ServiceManager   // IServiceManager
 GLMod.GameStateManager // IGameStateManager
 GLMod.GameHistoryService // IGameHistoryService
 GLMod.MenuService      // IMenuService
+GLMod.PlayerService    // IPlayerService (GET /player/sessions, /player/last-game)
+GLMod.TranslationService // ITranslationService (menu texts in the game language)
 ```
 
 ### Service Initialization

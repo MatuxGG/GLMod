@@ -279,6 +279,14 @@ namespace GLMod
 
                 if (gameStarted) return;
 
+                // Free play games are never recorded nor sent to Good Loss
+                if (PlayModeHelper.IsFreePlay())
+                {
+                    gameStarted = true;
+                    GLMod.log("Free play: game not recorded");
+                    return;
+                }
+
                 int nbImp = GameOptionsManager.Instance.CurrentGameOptions.NumImpostors;
                 if (PlayerControl.AllPlayerControls.Count < 6) nbImp = 1;
                 int realImp = 0;

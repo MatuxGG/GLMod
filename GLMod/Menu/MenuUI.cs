@@ -1,54 +1,105 @@
+using GLMod.Constants;
 using System;
+using System.IO;
 using UnityEngine;
 
 namespace GLMod.Menu
 {
     /// <summary>
     /// Widgets to draw the content of a menu tab, laid out from top to bottom in the tab area
-    /// (IMGUI, 1080p reference units). Only valid inside IMenuTab.Draw.
+    /// (IMGUI). Sizes are given in 1080p reference units and scaled to the screen.
+    /// Only valid inside IMenuTab.Draw.
     /// </summary>
     public static class MenuUI
     {
-        // Good Loss site palette
+        // Good Loss site palette, with deeper accents for the esport look
         public static readonly Color Accent = Rgb(0xA78BFA);
+        public static readonly Color AccentStrong = Rgb(0x7C3AED);
         public static readonly Color Text = Rgb(0xEEF2F7);
         public static readonly Color MutedText = Rgb(0x8B95A5);
         public static readonly Color Success = Rgb(0x22C55E);
         public static readonly Color Danger = Rgb(0xEF4444);
 
-        internal static readonly Color PanelBackground = Rgb(0x11161E, 0.96f);
-        internal static readonly Color Raised = Rgb(0x1A212C);
-        internal static readonly Color RaisedHover = Rgb(0x252E3B);
-        internal static readonly Color AccentHover = Rgb(0x8B5CF6);
-        internal static readonly Color OnAccent = Rgb(0x0A0D12);
+        internal static readonly Color AccentLight = Rgb(0xC4B5FD);
+        internal static readonly Color DimText = Rgb(0x5B6577);
+        internal static readonly Color PanelTop = Rgb(0x171C29);
+        internal static readonly Color PanelBottom = Rgb(0x0A0D13);
+        internal static readonly Color Surface = Rgb(0x161C28);
+        internal static readonly Color SurfaceHover = Rgb(0x1F2738);
+        internal static readonly Color Border = Rgb(0x283143);
+        internal static readonly Color White = Rgb(0xFFFFFF);
 
-        private const float Spacing = 6f;
-        private const float ButtonHeight = 30f;
-        private const float RowButtonWidth = 72f;
-        private const float RowHeight = 28f;
-        internal const float CornerRadius = 6f;
-        internal const float LargeRadius = 10f;
+        internal enum Corner
+        {
+            None,
+            Small,
+            Medium,
+            Large,
+        }
 
+        private const int SmallRadius = 4;
+        private const int MediumRadius = 7;
+        private const int LargeRadius = 12;
+        private const int GlowSpread = 18;
+        private const int SmallGlowRadius = 1;
+        private const int SmallGlowSpread = 8;
+        private const float Spacing = 9f;
+
+        // Windows fonts first (Bahnschrift is the condensed DIN-like face of Windows 10+), Arial elsewhere
+        private static readonly string[] DisplayFontNames = { "Bahnschrift SemiBold", "Bahnschrift", "Segoe UI Semibold", "Arial" };
+        private static readonly string[] BodyFontNames = { "Segoe UI", "Arial" };
+
+        internal static float Scale { get; private set; } = 1f;
+
+        // Display styles (titles, tabs, buttons)
         internal static GUIStyle BrandStyle;
-        internal static GUIStyle HintStyle;
+        internal static GUIStyle LogoStyle;
         internal static GUIStyle TabStyle;
-        private static GUIStyle _heading;
-        private static GUIStyle _highlight;
-        private static GUIStyle _text;
-        private static GUIStyle _muted;
-        private static GUIStyle _fieldName;
-        private static GUIStyle _primaryButton;
-        private static GUIStyle _secondaryButton;
+        internal static GUIStyle KeycapStyle;
+        internal static GUIStyle ChipStyle;
+        internal static GUIStyle SectionStyle;
+        internal static GUIStyle HighlightStyle;
+        internal static GUIStyle ResultStyle;
+        internal static GUIStyle TileValueStyle;
+        internal static GUIStyle ButtonStyle;
+        internal static GUIStyle SmallButtonStyle;
+        internal static GUIStyle PillStyle;
+        internal static GUIStyle AvatarStyle;
+        internal static GUIStyle NameStyle;
+        internal static GUIStyle InvisibleStyle;
+        internal static GUIStyle CloseStyle;
+
+        // Body styles
+        internal static GUIStyle TextStyle;
+        internal static GUIStyle MutedStyle;
+        internal static GUIStyle CaptionStyle;
+        internal static GUIStyle FieldNameStyle;
+        internal static GUIStyle FieldValueStyle;
+        internal static GUIStyle RowStyle;
+
+        private static Font _displayFont;
+        private static Font _bodyFont;
+        private static bool _fontsLoaded;
+        private static float _stylesScale = -1f;
+
         private static GUIStyle _fillSquare;
-        private static GUIStyle _fillRounded;
+        private static GUIStyle _fillSmall;
+        private static GUIStyle _fillMedium;
         private static GUIStyle _fillLarge;
+        private static GUIStyle _glow;
+        private static GUIStyle _smallGlow;
+        private static GUIStyle _circle;
+        private static GUIStyle _accentGradient;
+        private static GUIStyle _accentGradientSquare;
+        private static GUIStyle _panelGradient;
         private static GUIContent _empty;
+        private static GUIStyle _logo;
 
         private static Rect _area;
         private static float _y;
 
         /// <summary>
-        /// Width available for the content of the tab
+        /// Width available for the content of the tab, in screen pixels
         /// </summary>
         public static float Width => _area.width;
 
@@ -57,107 +108,227 @@ namespace GLMod.Menu
         /// </summary>
         internal static float ContentHeight => _y - _area.y;
 
-        /// <summary>
-        /// Section title
-        /// </summary>
-        public static void Heading(string text) => DrawText(text, _heading, Text);
+        // ------------------------------------------------------------------ public widgets
 
         /// <summary>
-        /// Large accent text (e.g. a rank name)
+        /// Section title: small accent capitals followed by a thin line
         /// </summary>
-        public static void Highlight(string text) => DrawText(text, _highlight, Accent);
+        public static void Heading(string text)
+        {
+            string title = (text ?? "").ToUpperInvariant();
+            Rect rect = Reserve(20f);
+            float textWidth = SectionStyle.CalcSize(new GUIContent(title)).x;
+            DrawText(new Rect(rect.x, rect.y, textWidth, rect.height), title, SectionStyle, Accent);
+            float lineX = rect.x + textWidth + U(10f);
+            DrawRect(new Rect(lineX, rect.y + rect.height / 2f, rect.xMax - lineX, Px(1f)), Border, Corner.None);
+            _y += U(2f);
+        }
+
+        /// <summary>
+        /// Large display text (e.g. a rank name)
+        /// </summary>
+        public static void Highlight(string text) => DrawFlowText(text, HighlightStyle, AccentLight);
 
         /// <summary>
         /// Body text, wrapped
         /// </summary>
-        public static void Label(string text) => DrawText(text, _text, Text);
+        public static void Label(string text) => DrawFlowText(text, TextStyle, Text);
 
         /// <summary>
         /// Body text in a given color, wrapped
         /// </summary>
-        public static void Label(string text, Color color) => DrawText(text, _text, color);
+        public static void Label(string text, Color color) => DrawFlowText(text, TextStyle, color);
 
         /// <summary>
         /// Secondary text (hints, explanations), wrapped
         /// </summary>
-        public static void Muted(string text) => DrawText(text, _muted, MutedText);
+        public static void Muted(string text) => DrawFlowText(text, MutedStyle, MutedText);
 
         /// <summary>
-        /// "name  value" line
+        /// "name ........ value" line with a divider
         /// </summary>
         public static void Field(string name, string value) => Field(name, value, Text);
 
         /// <summary>
-        /// "name  value" line with a colored value
+        /// "name ........ value" line with a divider and a colored value
         /// </summary>
         public static void Field(string name, string value, Color valueColor)
         {
-            float nameWidth = Mathf.Round(_area.width * 0.34f);
-            float valueWidth = _area.width - nameWidth;
             var nameContent = new GUIContent(name ?? "");
             var valueContent = new GUIContent(string.IsNullOrEmpty(value) ? "-" : value);
+            float nameWidth = Mathf.Round(_area.width * 0.4f);
+            float valueWidth = _area.width - nameWidth;
+            float height = Math.Max(U(30f), FieldValueStyle.CalcHeight(valueContent, valueWidth) + U(8f));
 
-            _text.normal.textColor = valueColor;
-            float height = Math.Max(_fieldName.CalcHeight(nameContent, nameWidth), _text.CalcHeight(valueContent, valueWidth));
-            GUI.Label(new Rect(_area.x, _y, nameWidth, height), nameContent, _fieldName);
-            GUI.Label(new Rect(_area.x + nameWidth, _y, valueWidth, height), valueContent, _text);
-            _y += height + Spacing;
+            var rect = new Rect(_area.x, _y, _area.width, height);
+            DrawText(new Rect(rect.x, rect.y, nameWidth, height), nameContent.text, FieldNameStyle, MutedText);
+            DrawText(new Rect(rect.x + nameWidth, rect.y, valueWidth, height), valueContent.text, FieldValueStyle, valueColor);
+            DrawRect(new Rect(rect.x, rect.yMax - Px(1f), rect.width, Px(1f)), Border, Corner.None);
+            _y += height + U(4f);
         }
 
         /// <summary>
-        /// Accent button sized to its text
+        /// Gradient call-to-action button, glowing on hover
         /// </summary>
         /// <returns>True when clicked</returns>
         public static bool Button(string text)
         {
-            float width = Math.Min(_area.width, _primaryButton.CalcSize(new GUIContent(text ?? "")).x + 32f);
-            var rect = new Rect(_area.x, _y, width, ButtonHeight);
-            _y += ButtonHeight + Spacing;
-            return DrawButton(rect, text, true);
+            string label = (text ?? "").ToUpperInvariant();
+            float width = Math.Min(_area.width, Math.Max(U(180f), ButtonStyle.CalcSize(new GUIContent(label)).x + U(56f)));
+            Rect rect = ReserveWidth(width, 40f);
+            return DrawPrimaryButton(rect, label);
         }
 
         /// <summary>
-        /// One-line row: text on the left, optional small button on the right
+        /// One-line card: colored edge, text, optional small button on the right
         /// </summary>
         /// <param name="text">Row text (cut when too long)</param>
         /// <param name="buttonText">Button text, or null for no button</param>
-        /// <param name="textColor">Color of the row text</param>
+        /// <param name="color">Edge and text color</param>
         /// <returns>True when the button is clicked</returns>
-        public static bool Row(string text, string buttonText, Color textColor)
+        public static bool Row(string text, string buttonText, Color color)
         {
-            var rowRect = new Rect(_area.x, _y, _area.width, RowHeight);
-            DrawRect(rowRect, Raised, CornerRadius);
+            Rect rect = Reserve(42f, 6f);
+            bool hover = IsHover(rect);
+            DrawRect(rect, hover ? SurfaceHover : Surface, Corner.Medium);
+            DrawRect(new Rect(rect.x, rect.y + U(8f), Px(3f), rect.height - U(16f)), color, Corner.None);
 
-            float textWidth = _area.width - 20f - (buttonText != null ? RowButtonWidth + 4f : 0f);
-            _text.normal.textColor = textColor;
-            _text.wordWrap = false;
-            GUI.Label(new Rect(rowRect.x + 10f, rowRect.y, textWidth, RowHeight), text ?? "", _text);
-            _text.wordWrap = true;
+            float buttonWidth = buttonText != null ? U(84f) : 0f;
+            var textRect = new Rect(rect.x + U(16f), rect.y, rect.width - U(28f) - buttonWidth, rect.height);
+            DrawText(textRect, text ?? "", RowStyle, color);
 
-            bool clicked = false;
-            if (buttonText != null)
+            if (buttonText == null)
             {
-                var buttonRect = new Rect(rowRect.xMax - RowButtonWidth - 3f, rowRect.y + 3f, RowButtonWidth, RowHeight - 6f);
-                clicked = DrawButton(buttonRect, buttonText, false);
+                return false;
             }
-
-            _y += RowHeight + 4f;
-            return clicked;
+            var buttonRect = new Rect(rect.xMax - buttonWidth - U(7f), rect.y + U(7f), buttonWidth, rect.height - U(14f));
+            return DrawSecondaryButton(buttonRect, buttonText.ToUpperInvariant());
         }
 
         /// <summary>
-        /// Vertical gap
+        /// Labelled progress bar (fraction from 0 to 1)
         /// </summary>
-        public static void Space(float height = 10f) => _y += height;
+        public static void ProgressBar(string label, float fraction, string valueText)
+        {
+            Rect header = Reserve(20f, 4f);
+            DrawText(header, (label ?? "").ToUpperInvariant(), CaptionStyle, MutedText);
+            DrawText(header, valueText ?? "", CaptionStyle, Text, TextAnchor.MiddleRight);
+
+            Rect track = Reserve(8f);
+            DrawProgress(track, fraction);
+        }
+
+        /// <summary>
+        /// Row of stat tiles (label in small capitals, value below)
+        /// </summary>
+        public static void Tiles(params (string label, string value)[] tiles)
+        {
+            if (tiles == null || tiles.Length == 0)
+            {
+                return;
+            }
+
+            Rect row = Reserve(64f);
+            float gap = U(8f);
+            float width = (row.width - gap * (tiles.Length - 1)) / tiles.Length;
+            for (int i = 0; i < tiles.Length; i++)
+            {
+                var tile = new Rect(row.x + i * (width + gap), row.y, width, row.height);
+                DrawRect(tile, Surface, Corner.Medium);
+                DrawText(new Rect(tile.x + U(12f), tile.y + U(9f), tile.width - U(24f), U(16f)),
+                    (tiles[i].label ?? "").ToUpperInvariant(), CaptionStyle, MutedText);
+                DrawText(new Rect(tile.x + U(12f), tile.y + U(27f), tile.width - U(24f), U(28f)),
+                    string.IsNullOrEmpty(tiles[i].value) ? "-" : tiles[i].value, TileValueStyle, Text);
+            }
+        }
+
+        /// <summary>
+        /// Compact grid of stat tiles (small label, value), skipping null values; wraps every columns tiles
+        /// </summary>
+        public static void StatGrid(int columns, params (string label, string value)[] stats)
+        {
+            if (stats == null || columns <= 0)
+            {
+                return;
+            }
+
+            var visible = new System.Collections.Generic.List<(string label, string value)>();
+            foreach (var stat in stats)
+            {
+                if (stat.value != null)
+                {
+                    visible.Add(stat);
+                }
+            }
+
+            float gap = U(6f);
+            for (int start = 0; start < visible.Count; start += columns)
+            {
+                Rect row = Reserve(48f, 6f);
+                float width = (row.width - gap * (columns - 1)) / columns;
+                for (int i = start; i < Math.Min(start + columns, visible.Count); i++)
+                {
+                    var tile = new Rect(row.x + (i - start) * (width + gap), row.y, width, row.height);
+                    DrawRect(tile, Surface, Corner.Small);
+                    DrawText(new Rect(tile.x + U(10f), tile.y + U(6f), tile.width - U(16f), U(14f)),
+                        (visible[i].label ?? "").ToUpperInvariant(), CaptionStyle, MutedText);
+                    DrawText(new Rect(tile.x + U(10f), tile.y + U(21f), tile.width - U(16f), U(22f)),
+                        visible[i].value, TileValueStyle, Text);
+                }
+            }
+            _y += U(3f);
+        }
+
+        /// <summary>
+        /// Row of colored tags (pills), wrapping to the next line when full
+        /// </summary>
+        public static void Tags(params (string text, Color color)[] tags)
+        {
+            if (tags == null || tags.Length == 0)
+            {
+                return;
+            }
+
+            float gap = U(6f);
+            float lineHeight = U(22f);
+            float x = _area.x;
+            float y = _y;
+            foreach (var tag in tags)
+            {
+                string text = (tag.text ?? "").ToUpperInvariant();
+                float width = PillStyle.CalcSize(new GUIContent(text)).x + U(18f);
+                if (x > _area.x && x + width > _area.xMax)
+                {
+                    x = _area.x;
+                    y += lineHeight + gap;
+                }
+                DrawRect(new Rect(x, y, width, lineHeight), WithAlpha(tag.color, 0.18f), Corner.Small);
+                DrawText(new Rect(x, y, width, lineHeight), text, PillStyle, tag.color);
+                x += width + gap;
+            }
+            _y = y + lineHeight + U(Spacing);
+        }
+
+        /// <summary>
+        /// Vertical gap (reference units)
+        /// </summary>
+        public static void Space(float height = 10f) => _y += U(height);
 
         /// <summary>
         /// Thin horizontal line
         /// </summary>
         public static void Separator()
         {
-            DrawRect(new Rect(_area.x, _y + 4f, _area.width, 1f), Raised, 0f);
-            _y += 9f;
+            Rect rect = Reserve(9f);
+            DrawRect(new Rect(rect.x, rect.y + rect.height / 2f, rect.width, Px(1f)), Border, Corner.None);
         }
+
+        // ------------------------------------------------------------------ layout (internal)
+
+        internal static float U(float units) => Mathf.Round(units * Scale);
+
+        // At least one physical pixel for hairlines
+        internal static float Px(float units) => Mathf.Max(1f, Mathf.Round(units * Scale));
 
         internal static void BeginContent(Rect area)
         {
@@ -165,33 +336,351 @@ namespace GLMod.Menu
             _y = area.y;
         }
 
-        internal static void EnsureStyles()
+        /// <summary>
+        /// Full-width block of the given height (reference units) at the cursor; the cursor moves below it
+        /// </summary>
+        internal static Rect Reserve(float height, float spacingAfter = Spacing)
         {
-            if (_text != null)
+            var rect = new Rect(_area.x, _y, _area.width, U(height));
+            _y += rect.height + U(spacingAfter);
+            return rect;
+        }
+
+        private static Rect ReserveWidth(float width, float height)
+        {
+            var rect = new Rect(_area.x, _y, width, U(height));
+            _y += rect.height + U(Spacing);
+            return rect;
+        }
+
+        internal static bool IsHover(Rect rect) => rect.Contains(Event.current.mousePosition);
+
+        // ------------------------------------------------------------------ drawing (internal)
+
+        /// <summary>
+        /// Filled rectangle. GUI.DrawTexture is stripped from the game: a GUI.Box with a white
+        /// background tinted by GUI.backgroundColor is used instead.
+        /// </summary>
+        internal static void DrawRect(Rect rect, Color color, Corner corner)
+        {
+            GUIStyle style = corner == Corner.Large ? _fillLarge
+                : corner == Corner.Medium ? _fillMedium
+                : corner == Corner.Small ? _fillSmall
+                : _fillSquare;
+            DrawBox(rect, style, color);
+        }
+
+        internal static void DrawPanelBackground(Rect rect) => DrawBox(rect, _panelGradient, White);
+
+        internal static void DrawAccentGradient(Rect rect, bool rounded, float alpha = 1f) =>
+            DrawBox(rect, rounded ? _accentGradient : _accentGradientSquare, WithAlpha(White, alpha));
+
+        /// <summary>
+        /// Card with a centered title and explanation, for empty or offline states
+        /// </summary>
+        internal static void EmptyState(string title, string text)
+        {
+            var content = new GUIContent(text ?? "");
+            float textHeight = MutedStyle.CalcHeight(content, _area.width - U(40f));
+            Rect card = Reserve(0f, 0f);
+            card.height = U(52f) + textHeight;
+            _y = card.yMax + U(Spacing);
+
+            DrawRect(card, Surface, Corner.Medium);
+            DrawText(new Rect(card.x, card.y + U(14f), card.width, U(22f)), (title ?? "").ToUpperInvariant(), SectionStyle, Text, TextAnchor.MiddleCenter);
+            TextAnchor previous = MutedStyle.alignment;
+            MutedStyle.alignment = TextAnchor.UpperCenter;
+            DrawText(new Rect(card.x + U(20f), card.y + U(40f), card.width - U(40f), textHeight), content.text, MutedStyle, MutedText);
+            MutedStyle.alignment = previous;
+        }
+
+        internal static void DrawCircle(Rect rect, Color color) => DrawBox(rect, _circle, color);
+
+        /// <summary>
+        /// Width / height ratio of the Good Loss logo
+        /// </summary>
+        internal static float LogoAspect { get; private set; } = 1f;
+
+        /// <summary>
+        /// Draws the Good Loss logo stretched to the rectangle; false when it could not be loaded
+        /// </summary>
+        internal static bool DrawLogo(Rect rect)
+        {
+            if (_logo == null)
+            {
+                return false;
+            }
+            DrawBox(rect, _logo, White);
+            return true;
+        }
+
+        /// <summary>
+        /// Soft glow around a rectangle
+        /// </summary>
+        internal static void DrawGlow(Rect rect, Color color)
+        {
+            // A 9-slice border larger than the drawn rectangle distorts the halo into a block:
+            // thin or small elements (bars, dots) use a tighter halo
+            bool small = Math.Min(rect.width, rect.height) < 2f * LargeRadius;
+            float spread = small ? SmallGlowSpread : GlowSpread;
+            DrawBox(new Rect(rect.x - spread, rect.y - spread, rect.width + 2f * spread, rect.height + 2f * spread),
+                small ? _smallGlow : _glow, color);
+        }
+
+        internal static void DrawOutline(Rect rect, Color border, Color fill, Corner corner)
+        {
+            DrawRect(rect, border, corner);
+            float px = Px(1f);
+            DrawRect(new Rect(rect.x + px, rect.y + px, rect.width - 2f * px, rect.height - 2f * px), fill, corner);
+        }
+
+        internal static void DrawProgress(Rect track, float fraction)
+        {
+            DrawRect(track, Border, Corner.Small);
+            float width = track.width * Mathf.Clamp01(fraction);
+            if (width < 1f)
             {
                 return;
             }
+            var fill = new Rect(track.x, track.y, Mathf.Max(width, track.height), track.height);
+            DrawGlow(fill, WithAlpha(Accent, 0.25f));
+            DrawAccentGradient(fill, true);
+        }
 
-            BrandStyle = NewStyle(19, FontStyle.Bold, Accent, false);
-            HintStyle = NewStyle(12, FontStyle.Normal, MutedText, false);
-            TabStyle = NewStyle(14, FontStyle.Bold, MutedText, false);
-            TabStyle.alignment = TextAnchor.MiddleCenter;
-            _heading = NewStyle(16, FontStyle.Bold, Text, true);
-            _highlight = NewStyle(26, FontStyle.Bold, Accent, true);
-            _text = NewStyle(15, FontStyle.Normal, Text, true);
-            _text.alignment = TextAnchor.MiddleLeft;
-            _muted = NewStyle(13, FontStyle.Normal, MutedText, true);
-            _fieldName = NewStyle(14, FontStyle.Normal, MutedText, true);
-            _fieldName.alignment = TextAnchor.MiddleLeft;
-            _primaryButton = NewStyle(14, FontStyle.Bold, OnAccent, false);
-            _primaryButton.alignment = TextAnchor.MiddleCenter;
-            _secondaryButton = NewStyle(13, FontStyle.Bold, Accent, false);
-            _secondaryButton.alignment = TextAnchor.MiddleCenter;
+        internal static void DrawText(Rect rect, string text, GUIStyle style, Color color, TextAnchor? alignment = null)
+        {
+            TextAnchor previous = style.alignment;
+            if (alignment.HasValue)
+            {
+                style.alignment = alignment.Value;
+            }
+            style.normal.textColor = color;
+            GUI.Label(rect, text ?? "", style);
+            style.alignment = previous;
+        }
 
+        internal static bool DrawPrimaryButton(Rect rect, string text)
+        {
+            bool hover = IsHover(rect);
+            if (hover)
+            {
+                DrawGlow(rect, WithAlpha(Accent, 0.45f));
+            }
+            DrawAccentGradient(rect, true);
+            if (hover)
+            {
+                DrawRect(rect, WithAlpha(White, 0.08f), Corner.Medium);
+            }
+            ButtonStyle.normal.textColor = White;
+            return GUI.Button(rect, text ?? "", ButtonStyle);
+        }
+
+        internal static bool DrawSecondaryButton(Rect rect, string text)
+        {
+            bool hover = IsHover(rect);
+            DrawOutline(rect, WithAlpha(Accent, hover ? 0.9f : 0.45f), hover ? WithAlpha(AccentStrong, 0.35f) : PanelBottom, Corner.Small);
+            SmallButtonStyle.normal.textColor = hover ? White : AccentLight;
+            return GUI.Button(rect, text ?? "", SmallButtonStyle);
+        }
+
+        /// <summary>
+        /// Small rounded label (map, role...) at a given position; returns its width
+        /// </summary>
+        internal static float DrawPill(float x, float y, string text, Color textColor, Color background)
+        {
+            var content = new GUIContent(text ?? "");
+            float width = PillStyle.CalcSize(content).x + U(18f);
+            var rect = new Rect(x, y, width, U(22f));
+            DrawRect(rect, background, Corner.Small);
+            DrawText(rect, content.text, PillStyle, textColor);
+            return width;
+        }
+
+        internal static Color WithAlpha(Color color, float alpha)
+        {
+            return new Color { r = color.r, g = color.g, b = color.b, a = color.a * alpha };
+        }
+
+        private static void DrawBox(Rect rect, GUIStyle style, Color tint)
+        {
+            Color previous = GUI.backgroundColor;
+            GUI.backgroundColor = tint;
+            GUI.Box(rect, _empty, style);
+            GUI.backgroundColor = previous;
+        }
+
+        private static void DrawFlowText(string text, GUIStyle style, Color color)
+        {
+            var content = new GUIContent(text ?? "");
+            float height = style.CalcHeight(content, _area.width);
+            DrawText(new Rect(_area.x, _y, _area.width, height), content.text, style, color);
+            _y += height + U(6f);
+        }
+
+        // ------------------------------------------------------------------ styles and textures
+
+        /// <summary>
+        /// Builds the textures once and the styles whenever the UI scale changes
+        /// </summary>
+        internal static void EnsureStyles(float scale)
+        {
+            if (_empty == null)
+            {
+                LoadFonts();
+                BuildTextures();
+            }
+
+            if (Math.Abs(scale - _stylesScale) < 0.01f)
+            {
+                return;
+            }
+            Scale = scale;
+            _stylesScale = scale;
+
+            BrandStyle = DisplayStyle(20, FontStyle.Bold, TextAnchor.MiddleLeft);
+            LogoStyle = DisplayStyle(15, FontStyle.Bold, TextAnchor.MiddleCenter);
+            TabStyle = DisplayStyle(14, FontStyle.Bold, TextAnchor.MiddleCenter);
+            KeycapStyle = DisplayStyle(11, FontStyle.Bold, TextAnchor.MiddleCenter);
+            ChipStyle = DisplayStyle(12, FontStyle.Bold, TextAnchor.MiddleLeft);
+            SectionStyle = DisplayStyle(12, FontStyle.Bold, TextAnchor.MiddleLeft);
+            HighlightStyle = DisplayStyle(32, FontStyle.Bold, TextAnchor.MiddleLeft);
+            HighlightStyle.wordWrap = true;
+            ResultStyle = DisplayStyle(28, FontStyle.Bold, TextAnchor.MiddleLeft);
+            TileValueStyle = DisplayStyle(17, FontStyle.Bold, TextAnchor.MiddleLeft);
+            ButtonStyle = DisplayStyle(15, FontStyle.Bold, TextAnchor.MiddleCenter);
+            SmallButtonStyle = DisplayStyle(12, FontStyle.Bold, TextAnchor.MiddleCenter);
+            PillStyle = DisplayStyle(12, FontStyle.Bold, TextAnchor.MiddleCenter);
+            AvatarStyle = DisplayStyle(24, FontStyle.Bold, TextAnchor.MiddleCenter);
+            NameStyle = DisplayStyle(21, FontStyle.Bold, TextAnchor.MiddleLeft);
+            CloseStyle = BodyStyle(20, FontStyle.Normal, TextAnchor.MiddleCenter, false);
+
+            TextStyle = BodyStyle(14, FontStyle.Normal, TextAnchor.UpperLeft, true);
+            MutedStyle = BodyStyle(13, FontStyle.Normal, TextAnchor.UpperLeft, true);
+            CaptionStyle = DisplayStyle(11, FontStyle.Bold, TextAnchor.MiddleLeft);
+            FieldNameStyle = BodyStyle(13, FontStyle.Normal, TextAnchor.MiddleLeft, false);
+            FieldValueStyle = BodyStyle(14, FontStyle.Bold, TextAnchor.MiddleRight, true);
+            RowStyle = BodyStyle(14, FontStyle.Normal, TextAnchor.MiddleLeft, false);
+        }
+
+        private static GUIStyle DisplayStyle(int size, FontStyle fontStyle, TextAnchor alignment)
+        {
+            return NewStyle(_displayFont, size, fontStyle, alignment, false);
+        }
+
+        private static GUIStyle BodyStyle(int size, FontStyle fontStyle, TextAnchor alignment, bool wordWrap)
+        {
+            return NewStyle(_bodyFont, size, fontStyle, alignment, wordWrap);
+        }
+
+        private static GUIStyle NewStyle(Font font, int size, FontStyle fontStyle, TextAnchor alignment, bool wordWrap)
+        {
+            var style = new GUIStyle();
+            if (font != null)
+            {
+                style.font = font;
+            }
+            style.fontSize = Math.Max(8, Mathf.RoundToInt(size * Scale));
+            style.fontStyle = fontStyle;
+            style.alignment = alignment;
+            style.wordWrap = wordWrap;
+            style.clipping = TextClipping.Clip;
+            style.richText = false;
+            style.normal.textColor = Text;
+            return style;
+        }
+
+        private static void LoadFonts()
+        {
+            if (_fontsLoaded)
+            {
+                return;
+            }
+            _fontsLoaded = true;
+            _displayFont = LoadOsFont(DisplayFontNames);
+            _bodyFont = LoadOsFont(BodyFontNames);
+        }
+
+        private static Font LoadOsFont(string[] names)
+        {
+            try
+            {
+                Font font = Font.CreateDynamicFontFromOSFont(names, 16);
+                if (font != null)
+                {
+                    font.hideFlags = HideFlags.HideAndDontSave;
+                }
+                return font;
+            }
+            catch (Exception e)
+            {
+                GLMod.log("[Menu] System font unavailable (" + names[0] + "), using the default font: " + e.Message);
+                return null;
+            }
+        }
+
+        private static void BuildTextures()
+        {
             _empty = new GUIContent("");
+            _logo = LoadLogo();
+            InvisibleStyle = new GUIStyle();
             _fillSquare = FillStyle(Texture2D.whiteTexture, 0);
-            _fillRounded = RoundedFillStyle((int)CornerRadius);
-            _fillLarge = RoundedFillStyle((int)LargeRadius);
+            _fillSmall = SafeStyle(() => FillStyle(RoundedTexture(SmallRadius, White, White, false, 0), SmallRadius));
+            _fillMedium = SafeStyle(() => FillStyle(RoundedTexture(MediumRadius, White, White, false, 0), MediumRadius));
+            _fillLarge = SafeStyle(() => FillStyle(RoundedTexture(LargeRadius, White, White, false, 0), LargeRadius));
+            _panelGradient = SafeStyle(() => FillStyle(RoundedTexture(LargeRadius, PanelTop, PanelBottom, false, 64), LargeRadius));
+            _accentGradient = SafeStyle(() => FillStyle(RoundedTexture(SmallRadius, AccentStrong, Accent, true, 64), SmallRadius));
+            _accentGradientSquare = SafeStyle(() => FillStyle(RoundedTexture(0, AccentStrong, Accent, true, 64), 0));
+            _circle = SafeStyle(() => FillStyle(CircleTexture(64), 0));
+            _glow = SafeStyle(() => FillStyle(GlowTexture(LargeRadius, GlowSpread), LargeRadius + GlowSpread));
+            _smallGlow = SafeStyle(() => FillStyle(GlowTexture(SmallGlowRadius, SmallGlowSpread), SmallGlowRadius + SmallGlowSpread));
+        }
+
+        /// <summary>
+        /// Good Loss logo embedded in the DLL (PNG decoded by ImageConversion, as Among Us mods do for sprites)
+        /// </summary>
+        private static GUIStyle LoadLogo()
+        {
+            try
+            {
+                using Stream stream = typeof(MenuUI).Assembly.GetManifestResourceStream(GameConstants.LOGO_RESOURCE_NAME);
+                if (stream == null)
+                {
+                    GLMod.log("[Menu] Logo resource missing: " + GameConstants.LOGO_RESOURCE_NAME);
+                    return null;
+                }
+
+                using var buffer = new MemoryStream();
+                stream.CopyTo(buffer);
+                var texture = new Texture2D(2, 2, TextureFormat.ARGB32, true);
+                texture.hideFlags = HideFlags.HideAndDontSave;
+                texture.wrapMode = TextureWrapMode.Clamp;
+                if (!ImageConversion.LoadImage(texture, buffer.ToArray(), false))
+                {
+                    GLMod.log("[Menu] Logo could not be decoded");
+                    return null;
+                }
+                texture.filterMode = FilterMode.Trilinear;
+                LogoAspect = texture.width / (float)texture.height;
+                return FillStyle(texture, 0);
+            }
+            catch (Exception e)
+            {
+                GLMod.log("[Menu] Logo unavailable, using the GL badge: " + e.Message);
+                return null;
+            }
+        }
+
+        private static GUIStyle SafeStyle(Func<GUIStyle> build)
+        {
+            try
+            {
+                return build();
+            }
+            catch (Exception e)
+            {
+                GLMod.log("[Menu] Texture generation failed, using flat shapes: " + e.Message);
+                return _fillSquare;
+            }
         }
 
         private static GUIStyle FillStyle(Texture2D texture, int border)
@@ -200,6 +689,7 @@ namespace GLMod.Menu
             style.normal.background = texture;
             if (border > 0)
             {
+                // The 4-argument RectOffset constructor is stripped from the game
                 var offset = new RectOffset();
                 offset.left = border;
                 offset.right = border;
@@ -210,84 +700,104 @@ namespace GLMod.Menu
             return style;
         }
 
-        private static GUIStyle RoundedFillStyle(int radius)
+        private static Texture2D NewTexture(int width, int height)
         {
-            try
+            var texture = new Texture2D(width, height, TextureFormat.ARGB32, false);
+            texture.hideFlags = HideFlags.HideAndDontSave;
+            texture.wrapMode = TextureWrapMode.Clamp;
+            texture.filterMode = FilterMode.Bilinear;
+            return texture;
+        }
+
+        /// <summary>
+        /// Rounded rectangle (anti-aliased corners) filled with a gradient from start to end,
+        /// horizontal or vertical, with a stretchable middle of the given length (9-slice)
+        /// </summary>
+        private static Texture2D RoundedTexture(int radius, Color start, Color end, bool horizontal, int middle)
+        {
+            int width = 2 * radius + (horizontal ? Math.Max(2, middle) : 2);
+            int height = 2 * radius + (horizontal ? 2 : Math.Max(2, middle));
+            Texture2D texture = NewTexture(width, height);
+            for (int y = 0; y < height; y++)
             {
-                // White texture with anti-aliased rounded corners, stretched as a 9-slice
-                int size = radius * 2 + 2;
-                var texture = new Texture2D(size, size, TextureFormat.ARGB32, false);
-                texture.hideFlags = HideFlags.HideAndDontSave;
-                texture.wrapMode = TextureWrapMode.Clamp;
-                texture.filterMode = FilterMode.Bilinear;
-                for (int y = 0; y < size; y++)
+                for (int x = 0; x < width; x++)
                 {
-                    for (int x = 0; x < size; x++)
-                    {
-                        float px = x + 0.5f;
-                        float py = y + 0.5f;
-                        float cx = Mathf.Clamp(px, radius, size - radius);
-                        float cy = Mathf.Clamp(py, radius, size - radius);
-                        float distance = Mathf.Sqrt((px - cx) * (px - cx) + (py - cy) * (py - cy));
-                        float alpha = Mathf.Clamp01(radius - distance + 0.5f);
-                        texture.SetPixel(x, y, new Color { r = 1f, g = 1f, b = 1f, a = alpha });
-                    }
+                    float t = horizontal ? x / (float)(width - 1) : 1f - y / (float)(height - 1);
+                    Color color = Lerp(start, end, t);
+                    color.a *= CornerCoverage(x, y, width, height, radius);
+                    texture.SetPixel(x, y, color);
                 }
-                texture.Apply();
-                return FillStyle(texture, radius);
             }
-            catch (Exception e)
+            texture.Apply();
+            return texture;
+        }
+
+        private static Texture2D CircleTexture(int size)
+        {
+            Texture2D texture = NewTexture(size, size);
+            float center = size / 2f;
+            for (int y = 0; y < size; y++)
             {
-                GLMod.log("[Menu] Rounded corners unavailable, using square corners: " + e.Message);
-                return _fillSquare;
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = x + 0.5f - center;
+                    float dy = y + 0.5f - center;
+                    float alpha = Mathf.Clamp01(center - Mathf.Sqrt(dx * dx + dy * dy) + 0.5f);
+                    texture.SetPixel(x, y, new Color { r = 1f, g = 1f, b = 1f, a = alpha });
+                }
             }
+            texture.Apply();
+            return texture;
         }
 
         /// <summary>
-        /// Filled rectangle, with rounded corners when radius > 0.
-        /// GUI.DrawTexture is stripped from the game: a GUI.Box with a white background tinted by
-        /// GUI.backgroundColor is used instead.
+        /// Soft halo: opaque inside a rounded rectangle, fading over spread pixels around it
         /// </summary>
-        internal static void DrawRect(Rect rect, Color color, float radius)
+        private static Texture2D GlowTexture(int radius, int spread)
         {
-            GUIStyle style = radius >= LargeRadius ? _fillLarge : radius > 0f ? _fillRounded : _fillSquare;
-            Color previous = GUI.backgroundColor;
-            GUI.backgroundColor = color;
-            GUI.Box(rect, _empty, style);
-            GUI.backgroundColor = previous;
+            int size = 2 * (radius + spread) + 2;
+            Texture2D texture = NewTexture(size, size);
+            float inner = radius + spread;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float px = x + 0.5f;
+                    float py = y + 0.5f;
+                    float cx = Mathf.Clamp(px, inner, size - inner);
+                    float cy = Mathf.Clamp(py, inner, size - inner);
+                    float distance = Mathf.Sqrt((px - cx) * (px - cx) + (py - cy) * (py - cy)) - radius;
+                    float falloff = 1f - Mathf.Clamp01(distance / spread);
+                    texture.SetPixel(x, y, new Color { r = 1f, g = 1f, b = 1f, a = falloff * falloff * falloff });
+                }
+            }
+            texture.Apply();
+            return texture;
         }
 
-        /// <summary>
-        /// Button with a hover background: accent (primary) or raised (secondary)
-        /// </summary>
-        internal static bool DrawButton(Rect rect, string text, bool primary)
+        private static float CornerCoverage(int x, int y, int width, int height, int radius)
         {
-            bool hover = rect.Contains(Event.current.mousePosition);
-            Color background = primary
-                ? (hover ? AccentHover : Accent)
-                : (hover ? RaisedHover : PanelBackground);
-            DrawRect(rect, background, CornerRadius);
-            return GUI.Button(rect, text ?? "", primary ? _primaryButton : _secondaryButton);
+            if (radius <= 0)
+            {
+                return 1f;
+            }
+            float px = x + 0.5f;
+            float py = y + 0.5f;
+            float cx = Mathf.Clamp(px, radius, width - radius);
+            float cy = Mathf.Clamp(py, radius, height - radius);
+            float distance = Mathf.Sqrt((px - cx) * (px - cx) + (py - cy) * (py - cy));
+            return Mathf.Clamp01(radius - distance + 0.5f);
         }
 
-        private static void DrawText(string text, GUIStyle style, Color color)
+        private static Color Lerp(Color a, Color b, float t)
         {
-            var content = new GUIContent(text ?? "");
-            style.normal.textColor = color;
-            float height = style.CalcHeight(content, _area.width);
-            GUI.Label(new Rect(_area.x, _y, _area.width, height), content, style);
-            _y += height + Spacing;
-        }
-
-        private static GUIStyle NewStyle(int fontSize, FontStyle fontStyle, Color color, bool wordWrap)
-        {
-            var style = new GUIStyle();
-            style.fontSize = fontSize;
-            style.fontStyle = fontStyle;
-            style.wordWrap = wordWrap;
-            style.richText = false;
-            style.normal.textColor = color;
-            return style;
+            return new Color
+            {
+                r = a.r + (b.r - a.r) * t,
+                g = a.g + (b.g - a.g) * t,
+                b = a.b + (b.b - a.b) * t,
+                a = a.a + (b.a - a.a) * t,
+            };
         }
 
         private static Color Rgb(int rgb, float alpha = 1f)

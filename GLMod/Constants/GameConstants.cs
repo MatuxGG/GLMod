@@ -106,13 +106,53 @@ namespace GLMod.Constants
         public const int GAME_HISTORY_MAX_ENTRIES = 20;
 
         /// <summary>
+        /// Embedded resource holding the Good Loss logo shown in the menu header (GLMod/Resources/goodloss-logo.png).
+        /// </summary>
+        public const string LOGO_RESOURCE_NAME = "GLMod.Resources.goodloss-logo.png";
+
+        /// <summary>
+        /// Prefix of the embedded translation files (GLMod/Resources/Translations/&lt;language&gt;.json).
+        /// </summary>
+        public const string TRANSLATION_RESOURCE_PREFIX = "GLMod.Resources.Translations.";
+
+        /// <summary>
+        /// Id of the built-in Account tab of the menu (IMenuService.FindTab / UnregisterTab / Select).
+        /// </summary>
+        public const string MENU_TAB_ACCOUNT = "glmod.account";
+
+        /// <summary>
+        /// Id of the built-in Last game tab of the menu.
+        /// </summary>
+        public const string MENU_TAB_LAST_GAME = "glmod.lastgame";
+
+        /// <summary>
+        /// Id of the built-in Sessions tab of the menu.
+        /// </summary>
+        public const string MENU_TAB_SESSIONS = "glmod.sessions";
+
+        /// <summary>
+        /// Seconds after which a menu tab reloads its API data when shown.
+        /// </summary>
+        public const double MENU_REFRESH_SECONDS = 60;
+
+        /// <summary>
+        /// Seconds after which a menu tab retries a failed API load when shown.
+        /// </summary>
+        public const double MENU_RETRY_SECONDS = 10;
+
+        /// <summary>
+        /// After a game ends, how long the Last game tab keeps polling Good Loss for that game.
+        /// </summary>
+        public const double LAST_GAME_WAIT_SECONDS = 120;
+
+        /// <summary>
+        /// Polling interval of the Last game tab while it waits for the game that just ended.
+        /// </summary>
+        public const float LAST_GAME_POLL_SECONDS = 5f;
+
+        /// <summary>
         /// Name of the UnityEngine.KeyCode that opens / closes the Good Loss menu.
         /// </summary>
         public const string MENU_TOGGLE_KEY = "F2";
-
-        /// <summary>
-        /// Seconds after which the menu reloads data fetched from the API (rank) when its tab is shown.
-        /// </summary>
-        public const double MENU_REFRESH_SECONDS = 60;
     }
 }

@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://github.com/MatuxGG/GLMod">
-    <img src="https://img.shields.io/badge/GLMod-v5.4.1-blue" alt="GLMod Version">
+    <img src="https://img.shields.io/badge/GLMod-v5.5.0-blue" alt="GLMod Version">
   </a>
   <a href="https://goodloss.fr/discord">
     <img src="https://img.shields.io/badge/Good%20Loss%20Discord%20Server-Join-7289DA?logo=discord&logoColor=white" alt="Good Loss Discord Server">
@@ -32,17 +32,17 @@ GLMod provides a comprehensive set of services for tracking game data and enhanc
 
 ### Good Loss menu
 
-At rest, GLMod only shows a faint "Good Loss" label in the bottom-left corner of the screen. Press **F2** (or click the label) to slide the menu in, and F2 or **×** to close it.
+At rest, GLMod only shows a small "GOOD LOSS" tab at the bottom edge of the screen, near the left corner. Press **F2** (or click the tab) to slide the menu in, and F2 or **×** to close it.
 - **Left / right arrows** switch tabs, **up / down arrows** (or the mouse wheel) scroll the current tab.
 - **Account**: Good Loss connection status (connected account, not connected, banned with the reason) and the detected mod.
-- **Games**: your last game with a button to open its recap on Good Loss, then your previous games. This history is stored on your computer only (`BepInEx/config/glmod-history.json`, last 20 games).
-- **Rank**: your rank for the detected mod.
-- **DLC**: the Steam DLC owned by your account, as checked by Good Loss.
-- Other mods can add their own tabs (see [docs/dev.MD](docs/dev.MD)).
+- **Last game**: your last finished game on Good Loss (victory or defeat, map, role) with a button to open its recap, and every stat Good Loss computed for you in it (kills, tasks, votes, reports, survival...). After a game, it updates by itself once Good Loss has processed the game.
+- **Sessions**: your last 10 sessions (date, number of games, duration, live session) with a link to each session page.
+- Mods built on GLMod can hide the menu, remove its tabs or add their own (see [docs/dev.MD](docs/dev.MD)).
+- The menu follows the language selected in the game (English and French for now; English when the language is not translated).
 
 ### Data Collection
 
-GLMod automatically collects and synchronizes:
+GLMod automatically collects and synchronizes (free play games are never collected nor sent):
 - Match history with detailed player statistics
 - Role assignments and team compositions
 - In-game actions (kills, reports, votes, sabotages, etc.)
@@ -54,7 +54,7 @@ GLMod automatically collects and synchronizes:
 
 | Among Us - Version | Link |
 |--------------------|-----------------|
-| 2025.3.31          | [Release](https://github.com/MatuxGG/GLMod/releases/latest)
+| 2026.3.31          | [Release](https://github.com/MatuxGG/GLMod/releases/latest)
 
 # Installation
 

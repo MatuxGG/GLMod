@@ -188,7 +188,7 @@ namespace GLMod.TestHarness
                 if (_finished) yield break;
             }
 
-            // The end screen records the game in GLMod's local history (menu, Games tab)
+            // The end screen records the game in GLMod's local history (menu end-of-game signal)
             SetPhase(prefix + ":history");
             yield return WaitForQuiet(IsGameInHistory, HarnessConstants.END_SCREEN_TIMEOUT);
             if (_finished) yield break;

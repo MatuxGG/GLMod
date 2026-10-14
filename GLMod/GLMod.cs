@@ -23,7 +23,7 @@ namespace GLMod
     public class GLMod : BasePlugin
     {
         public const string Id = "glmod";
-        public const string Version = "5.4.1";
+        public const string Version = "5.5.0";
 
         public Harmony Harmony { get; } = new Harmony(Id);
 
@@ -38,6 +38,8 @@ namespace GLMod
         public static IMapService MapService { get; private set; }
         public static IGameHistoryService GameHistoryService { get; private set; }
         public static IMenuService MenuService { get; private set; }
+        public static IPlayerService PlayerService { get; private set; }
+        public static ITranslationService TranslationService { get; private set; }
 
         public static ConfigEntry<string> connectionState { get; private set; }
         public static ConfigEntry<string> stepConf { get; private set; }
@@ -106,15 +108,16 @@ namespace GLMod
                 Path.Combine(configPathValue, GameConstants.GAME_HISTORY_FILE_NAME), GameConstants.GAME_HISTORY_MAX_ENTRIES);
             GameHistoryService.Load();
             MenuService = new MenuService();
+            PlayerService = new PlayerService(Logger, api);
+            TranslationService = new TranslationService(Logger, GameLanguage.CurrentCode);
         }
 
         private void InitializeMenu()
         {
             // Built-in tabs first; third-party mods add theirs from their own Load() (see docs/dev.MD)
-            MenuService.RegisterTab(new AccountMenuTab(AuthService, ConfigService, api));
-            MenuService.RegisterTab(new GamesMenuTab(GameHistoryService, MenuService));
-            MenuService.RegisterTab(new RankMenuTab(RankService, AuthService, ConfigService));
-            MenuService.RegisterTab(new DlcMenuTab(ItemService, AuthService));
+            MenuService.RegisterTab(new AccountMenuTab(AuthService, ConfigService, api, TranslationService));
+            MenuService.RegisterTab(new LastGameMenuTab(PlayerService, AuthService, GameHistoryService, MenuService, TranslationService));
+            MenuService.RegisterTab(new SessionsMenuTab(PlayerService, AuthService, GameHistoryService, TranslationService));
             MenuBehaviour.Init(this);
         }
 
