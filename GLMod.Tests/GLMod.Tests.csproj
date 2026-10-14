@@ -17,6 +17,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\GLMod\GLMod.csproj" />
+        <ProjectReference Include="..\GLMod.TestHarness\GLMod.TestHarness.csproj" />
     </ItemGroup>
 
 </Project>

@@ -98,7 +98,7 @@ GLMod follows a **service-oriented architecture** with:
 
 ### 2.3 Service dependency graph
 ```
-AuthenticationService     ← ManualLogSource, ConfigEntry<string> connectionState
+AuthenticationService     ← ManualLogSource, ConfigEntry<string> connectionState, apiEndpoint
 ConfigurationService      ← ManualLogSource, configPath
 GameStateManager          ← Logger, AuthService, ConfigService, apiEndpoint, stepRpc
 ServiceManager            ← (none)
@@ -228,6 +228,8 @@ Reactor, Coms, Lights, O2
 | Constant                      | Value                                        |
 |-------------------------------|----------------------------------------------|
 | `API_ENDPOINT`                | `https://goodloss.fr/api`                    |
+| `API_ENDPOINT_ENV_VAR`        | `GLMOD_API_ENDPOINT` (overrides `API_ENDPOINT`, see §10) |
+| `CLOCK_SKEW_TOLERANCE_MS`     | `2000` — clock difference with the API ignored by `ServerClock` |
 | `SUPPORT_ID_CHARS`            | `A-Za-z1-9` (no `0`)                         |
 | `SUPPORT_ID_LENGTH`           | `10`                                         |
 | `RPC_SYNC_TIMEOUT`            | `5.0f` seconds                               |
@@ -278,6 +280,8 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 |------------------------|--------------------------------------------------------------------------------------------|
 | `HttpHelper.cs`        | Shared static `HttpClient`, proxy disabled.                                                |
 | `ApiService.cs`        | `PostFormAsync`, `PostFormWithErrorHandlingAsync`, `ApiResponse` type.                     |
+| `ApiEndpointResolver.cs` | Resolves the API base URL: `API_ENDPOINT`, or the `GLMOD_API_ENDPOINT` environment variable when it is a valid http(s) URL. |
+| `ServerClock.cs`       | `NowMs()` — Unix ms aligned on the API server clock. The offset is refreshed from the `Date` header of every `ApiService` response. **Every timestamp sent to the API (actions, positions) must use `ServerClock.NowMs()`**, never `DateTimeOffset.UtcNow`. |
 | `CoroutineHelpers.cs`  | `RunAsync` / `RunAsync<T>` — async-task ↔ coroutine bridge. Use these instead of re-implementing the `Task.Run` + volatile `done` flag pattern. |
 | `CoroutineRunner.cs`   | `MonoBehaviour` IL2CPP singleton used to run coroutines from static classes.               |
 | `ServiceLogger.cs`     | `Log(logger, serviceName, message)` — shared log formatter producing `[GLMod][Service] PlayerName: message`. Every service must delegate to it. |
@@ -302,7 +306,7 @@ A file `BepInEx/config/<MODNAME>.glmod` (empty) at the root of the config folder
 
 ## 10. Good Loss API — Endpoints used
 
-Base: `https://goodloss.fr/api`
+Base: `https://goodloss.fr/api` (production). It can be overridden at startup with the `GLMOD_API_ENDPOINT` environment variable (e.g. `https://preprod.goodloss.fr/api`, used by the end-to-end test). The resolved value is exposed as `GLMod.api` (a static property, no longer a `const`) and injected into every service.
 
 | Endpoint                       | Method | Service           | Usage                                  |
 |--------------------------------|--------|-------------------|----------------------------------------|
@@ -338,8 +342,31 @@ Base: `https://goodloss.fr/api`
 
 ### 11.4 Testing
 - Test framework: xUnit ([GLMod.Tests/GLMod.Tests.csproj](GLMod.Tests/GLMod.Tests.csproj)).
-- Scope: pure logic — entities (`GLGame`, `GLPlayer`, `GLPosition`), enums (`SabotageType`, `GameMapType`), `ServiceManager`, and `GameConstants` invariants. Anything that touches IL2CPP / Among Us types stays untestable until further decoupling.
+- Scope: pure logic — entities (`GLGame`, `GLPlayer`, `GLPosition`), enums (`SabotageType`, `GameMapType`), `ServiceManager`, `GameConstants` invariants, `ApiEndpointResolver`, `ServerClock`, and the E2E harness `ScenarioPlan` / `ScenarioVerifier`. Anything that touches IL2CPP / Among Us types stays untestable until further decoupling.
 - Add new tests for any new pure-logic surface. Refactor toward injectable abstractions before adding tests that would otherwise require IL2CPP mocking.
+
+### 11.5 End-to-end test (4 Among Us instances, online lobby, 2 games)
+- Project: [GLMod.TestHarness/](GLMod.TestHarness/) — a separate BepInEx plugin (`glmod.testharness`, depends on `glmod`). **Inert** unless the `GLMOD_TEST_INSTANCE` environment variable is set; it has no AfterBuild copy and is only installed in `Among Us/BepInEx/plugins/` for the duration of a run.
+- Entry point: `powershell -ExecutionPolicy Bypass -File GLMod.TestHarness/run-e2e.ps1` (options: `-ApiEndpoint` (default `https://preprod.goodloss.fr/api`), `-ModName`, `-Map`, `-NoTile`, `-NoBuild`, `-KeepPlugin`, `-KeepOtherPlugins`, `-TimeoutSeconds`). Refuses to start if Among Us is already running.
+- Plugin isolation: other mods change GLMod's mod name (e.g. ChallengerLevel sets "Challenger Maps", which the site records without a season). Unless `-KeepOtherPlugins`, the script moves every plugin except `GLMod.dll`, `GLMod.TestHarness.dll` and `Mini.RegionInstall.dll` (custom server region) to `BepInEx/plugins-disabled-by-e2e/` for the run and moves them back at the end, so the session runs as **Vanilla**.
+- Mod and map: `-ModName` (default `Among Us Ranked`, applied by the harness through `GLMod.ConfigService.SetModName`, like a third-party mod; empty keeps GLMod's own name) and `-Map` (default `Polus`; `Keep` leaves the lobby setting). The host switches the lobby map (`IGameOptions.SetByte(MapId)` + `LogicOptions.SyncOptions`) and restores its saved map setting at the end. The site only draws the map visualization for maps it has an image for (`/images/maps/polusmap.png`, Challenger maps, Submerged…): **not for The Skeld**.
+- Windows: the script tiles the 4 game windows in a 2×2 grid on the primary screen (`-NoTile` to disable) and restores Unity's `Screenmanager*` registry values (window size/position) afterwards.
+- Recap check: preprod recaps can be read at `https://preprod.goodloss.fr/game/<id>` (SSO account provided by the maintainer). Expected on Polus: every action line timed, map visualization with all positions inside the game window, `completedTask` actions on the map. Known site-side gaps (data sent by GLMod but not shown): `SAB_START_*` / `SAB_END_*`, and ghost tasks (`tasksDead`) in the `x/y` task count.
+- API: the script sets `GLMOD_API_ENDPOINT` for the 4 instances, so every match goes to the **preprod** API. All 4 instances share the local Steam / Good Loss account.
+- Network: **online games** (RPCs behave differently from LAN). Instance 0 creates a game on the currently selected region (`AmongUsClient.CoCreateOnlineGame`) and publishes its code in `lobby-1.json`; instances 1–3 join it (`CoJoinOnlineGameFromCode`). The harness **refuses official Innersloth servers** (region name / ping server containing `among.us` or `innersloth`): use a custom region (e.g. Impranked).
+- Session ([ScenarioPlan.cs](GLMod.TestHarness/ScenarioPlan.cs)); per game, crewmates sorted by player id → A, B, C:
+  - **Game 1 — crewmates win by tasks**: B (tasker) plays one task; the impostor sabotages the lights (`RpcUpdateSystem(Sabotage, Electrical)`) and C fixes them at the panel (one `RpcUpdateSystem(Electrical, i)` per wrong switch, like the minigame); C presses the emergency button (`EmergencyMinigame.CallMeeting`); votes impostor + A → B, B + C → skip: **tie, nobody exiled**; the impostor kills A; every crewmate, including A **as a ghost**, plays all its remaining tasks.
+  - **Return to the lobby**: everyone presses "Play Again" (`EndGameNavigation.NextGame`), the host first (it publishes `lobby-2.json` once back).
+  - **Game 2 — impostor wins by vote**: the impostor kills A; B walks to the body and reports it (`ReportClosest`); votes impostor + B → C, C → impostor; C is exiled → 1 vs 1.
+- Task play: for each step the player finds the step's console (`PlayerTask.FindConsoles`), moves there (`NetTransform.RpcSnapTo`), opens the minigame (`Console.Use`) and finishes it with `NormalPlayerTask.NextStep()` + `Minigame.Close()` (the last step sends `RpcCompleteTask` itself). The host makes the impostor kill (`RpcMurderPlayer`). Meetings wait for their "Proceed" button after the results, which the harness presses (`MeetingHud.HandleProceed`).
+- Coordination: files in the run output folder (`lobby-N.json`, `plan-N.json`), no extra RPC.
+- Verification ([ScenarioVerifier.cs](GLMod.TestHarness/ScenarioVerifier.cs), unit-tested), on the `GLGame` snapshot taken right after GLMod's `OnGameEnd`:
+  - game 1: `completedTask`, `SAB_START_Lights` / `SAB_END_Lights`, `called an emergency` (turn 1); 4 `voted` incl. 2 skips (target `""`, turn 1001); no `exiled`; `killed` in turn 2; `turns` = `2`; per crewmate `tasks + tasksDead = tasksMax` and as many `completedTask` actions, the ghost only in `tasksDead`; winner `Crewmate`;
+  - game 2: `killed`, `reported` (by a crewmate), 3 `voted`, `exiled` (a crewmate), winner `Impostor`, impostor `win=1`;
+  - both: game id set, teams, `/game/end` succeeded on the host (step back to `Initial`), clients received the game id (RPC 1), game 2 has a **new** GLMod game id.
+- Multi-instance workarounds: 4 Unity instances on one machine stall for seconds on heavy frames (map load, meeting open) and vanilla Hazel timeouts then drop the client (`ReliablePacketWithoutResponse`): the harness raises `DisconnectTimeoutMs` / `MissingPingsUntilDisconnect` on the client connection. Clients must load the map within a hard-coded 10s (`AmongUsClient.MAX_CLIENT_WAIT_SECONDS` is a native constant: **writing it crashes the game**), so each instance caps its frame rate (20 fps) and sets `Application.backgroundLoadingPriority = High`. It also skips `CosmeticsCache.ClearUnusedCosmetics`, which intermittently throws inside `AmongUsClient.CoStartGame` in multi-instance runs (the client then never becomes ready and is kicked).
+- Output: `GLMod.TestHarness/output/<date>-<runId>/` (gitignored) — `lobby-N.json`, `plan-N.json`, `result-N.json` (per-game results), `instance-N.log`, `player-N.log` (Unity log of each instance, via `-logFile`), copied BepInEx logs.
+- Not covered: disconnections (relaunching clients is too slow), roles, impostor wins by kill / sabotage, shield T1.
 
 ### 11.3 Release
 - Build driven by [build.cake](build.cake) (Cake).
@@ -357,7 +384,7 @@ GLMod/                                # Repo root
 ├── .gitignore                        # The "Among Us/" folder is ignored.
 ├── build.cake                        # Multi-platform release build script.
 ├── CLAUDE.md                         # ← THIS FILE. Living project spec.
-├── GLMod.sln                         # Visual Studio solution.
+├── GLMod.sln                         # Visual Studio solution (GLMod, GLMod.Tests, GLMod.TestHarness).
 ├── LICENSE                           # GPLv3.
 ├── README.md                         # End-user documentation.
 ├── docs/
@@ -369,16 +396,32 @@ GLMod/                                # Repo root
 │   ├── EntityTests.cs
 │   ├── EnumTests.cs
 │   ├── GameConstantsTests.cs
+│   ├── ScenarioTests.cs              # ScenarioPlan / ScenarioVerifier (E2E harness logic).
+│   ├── ServerClockTests.cs
 │   └── ServiceManagerTests.cs
+├── GLMod.TestHarness/                # E2E test plugin, see §11.5. Never shipped.
+│   ├── GLMod.TestHarness.csproj
+│   ├── run-e2e.ps1                   # Launches 4 instances and prints the summary.
+│   ├── TestHarnessPlugin.cs          # BepInEx entry point (inert without GLMOD_TEST_INSTANCE).
+│   ├── HarnessConstants.cs
+│   ├── HarnessContext.cs
+│   ├── HarnessLog.cs
+│   ├── HarnessPatches.cs             # MainMenuManager.Start / AmongUsClient.OnGameEnd hooks.
+│   ├── HarnessResult.cs
+│   ├── ScenarioPlan.cs               # Pure logic.
+│   ├── ScenarioRunner.cs             # In-game coroutine driving the scenario.
+│   └── ScenarioVerifier.cs           # Pure logic.
 └── GLMod/                            # C# project.
     ├── GLMod.csproj                  # Project definition, mod version, targeted Among Us version.
     ├── GLMod.cs                      # Plugin entry point + static facade.
     ├── Class/                        # Cross-cutting helpers (non-services).
-    │   ├── ApiService.cs
+    │   ├── ApiEndpointResolver.cs    # API base URL (prod or GLMOD_API_ENDPOINT override).
+    │   ├── ApiService.cs             # Also feeds ServerClock from response Date headers.
     │   ├── BackgroundEvents.cs
     │   ├── CoroutineHelpers.cs       # Async-task ↔ coroutine bridge.
     │   ├── CoroutineRunner.cs
     │   ├── HttpHelper.cs
+    │   ├── ServerClock.cs            # Timestamps aligned on the API server clock.
     │   ├── ServiceLogger.cs          # Shared [GLMod][Service] log formatter.
     │   └── VanillaEvents.cs
     ├── Constants/
@@ -546,9 +589,11 @@ For every change to the project:
 - **`CurrentGame` may be `null`** between `EndGame()` and the next `StartGame()`. Always check before access.
 - **Coroutines & threads**: **never** touch the Unity API from a `Task.Run` — only from the main thread (the `done` flag + `yield return null` pattern is there for that).
 - **The `Among Us/` folder is gitignored** — every developer installs their own copy. Never commit this folder.
+- **IL2CPP calls from worker threads crash the game** (access violation in `coreclr.dll`): `GameStateManager.SyncGameId` used to send RPC 1 from `Task.Run`, which intermittently killed the host right after `[makeRPC] 1`. RPCs and anything touching `AmongUsClient` / `PlayerControl` must be called from the coroutine itself (Unity main thread); `CoroutineHelpers.RunAsync` is for HTTP / pure .NET work only.
+- **Client clock skew**: the site places actions and positions on the game timeline by comparing their timestamps with the server's own start/end times. With a wrong system clock (seen: 2h behind), the recap had no action times and no map data. Always timestamp with `ServerClock.NowMs()` (offset measured from API responses), never `DateTimeOffset.UtcNow`.
 - **Auto-generated `Resources.Designer.cs`**: regenerated by Visual Studio in the developer's UI culture and is the only file allowed to contain non-English content. Do not hand-edit; regenerate from a machine with an English UI if needed.
 
 ---
 
-*Last updated: 2026-05-28 — GLMod version 5.4.0.*
+*Last updated: 2026-10-14 — GLMod version 5.4.0.*
 *Every change to the project must be accompanied by an update of this file.*

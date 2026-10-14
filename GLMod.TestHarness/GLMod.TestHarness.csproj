@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <Version>1.0.0</Version>
+
+        <Description>GLMod end-to-end test harness (4 local Among Us instances)</Description>
+        <Authors>Matux</Authors>
+        <Configurations>Debug</Configurations>
+        <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+        <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Reference Include="..\Among Us\BepInEx\core\*.dll" />
+        <Reference Include="..\Among Us\BepInEx\interop\*.dll" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\GLMod\GLMod.csproj" />
+    </ItemGroup>
+
+    <!--
+        Intentionally no AfterBuild copy into Among Us/BepInEx/plugins/:
+        the harness is only installed for the duration of a run by run-e2e.ps1.
+    -->
+</Project>
