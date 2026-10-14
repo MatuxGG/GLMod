@@ -12,21 +12,27 @@ namespace GLMod.Menu
     /// </summary>
     public static class MenuUI
     {
-        // Good Loss site palette, with deeper accents for the esport look
-        public static readonly Color Accent = Rgb(0xA78BFA);
-        public static readonly Color AccentStrong = Rgb(0x7C3AED);
-        public static readonly Color Text = Rgb(0xEEF2F7);
-        public static readonly Color MutedText = Rgb(0x8B95A5);
+        /// <summary>
+        /// Current theme (Good Loss, or Among Us Ranked); chosen by MenuBehaviour from the detected mod
+        /// </summary>
+        public static MenuTheme Theme { get; private set; } = MenuTheme.GoodLoss;
+
+        // Palette of the current theme
+        public static Color Accent => Theme.Accent;
+        public static Color AccentStrong => Theme.AccentStrong;
+        public static Color Text => Theme.Text;
+        public static Color MutedText => Theme.MutedText;
         public static readonly Color Success = Rgb(0x22C55E);
         public static readonly Color Danger = Rgb(0xEF4444);
 
-        internal static readonly Color AccentLight = Rgb(0xC4B5FD);
-        internal static readonly Color DimText = Rgb(0x5B6577);
-        internal static readonly Color PanelTop = Rgb(0x171C29);
-        internal static readonly Color PanelBottom = Rgb(0x0A0D13);
-        internal static readonly Color Surface = Rgb(0x161C28);
-        internal static readonly Color SurfaceHover = Rgb(0x1F2738);
-        internal static readonly Color Border = Rgb(0x283143);
+        internal static Color AccentLight => Theme.AccentLight;
+        internal static Color OnAccent => Theme.OnAccent;
+        internal static Color DimText => Theme.DimText;
+        internal static Color PanelTop => Theme.PanelTop;
+        internal static Color PanelBottom => Theme.PanelBottom;
+        internal static Color Surface => Theme.Surface;
+        internal static Color SurfaceHover => Theme.SurfaceHover;
+        internal static Color Border => Theme.Border;
         internal static readonly Color White = Rgb(0xFFFFFF);
 
         internal enum Corner
@@ -89,11 +95,20 @@ namespace GLMod.Menu
         private static GUIStyle _glow;
         private static GUIStyle _smallGlow;
         private static GUIStyle _circle;
-        private static GUIStyle _accentGradient;
-        private static GUIStyle _accentGradientSquare;
-        private static GUIStyle _panelGradient;
+        // Textures baked with theme colors (gradients, logo), built once per theme
+        private sealed class ThemeAssets
+        {
+            public GUIStyle Panel;
+            public GUIStyle Accent;
+            public GUIStyle AccentSquare;
+            public GUIStyle Logo;
+            public float LogoAspect = 1f;
+        }
+
+        private static readonly System.Collections.Generic.Dictionary<string, ThemeAssets> _themeAssets =
+            new System.Collections.Generic.Dictionary<string, ThemeAssets>();
+        private static ThemeAssets _assets;
         private static GUIContent _empty;
-        private static GUIStyle _logo;
 
         private static Rect _area;
         private static float _y;
@@ -370,10 +385,10 @@ namespace GLMod.Menu
             DrawBox(rect, style, color);
         }
 
-        internal static void DrawPanelBackground(Rect rect) => DrawBox(rect, _panelGradient, White);
+        internal static void DrawPanelBackground(Rect rect) => DrawBox(rect, _assets.Panel, White);
 
         internal static void DrawAccentGradient(Rect rect, bool rounded, float alpha = 1f) =>
-            DrawBox(rect, rounded ? _accentGradient : _accentGradientSquare, WithAlpha(White, alpha));
+            DrawBox(rect, rounded ? _assets.Accent : _assets.AccentSquare, WithAlpha(White, alpha));
 
         /// <summary>
         /// Card with a centered title and explanation, for empty or offline states
@@ -399,18 +414,18 @@ namespace GLMod.Menu
         /// <summary>
         /// Width / height ratio of the Good Loss logo
         /// </summary>
-        internal static float LogoAspect { get; private set; } = 1f;
+        internal static float LogoAspect => _assets?.LogoAspect ?? 1f;
 
         /// <summary>
         /// Draws the Good Loss logo stretched to the rectangle; false when it could not be loaded
         /// </summary>
         internal static bool DrawLogo(Rect rect)
         {
-            if (_logo == null)
+            if (_assets?.Logo == null)
             {
                 return false;
             }
-            DrawBox(rect, _logo, White);
+            DrawBox(rect, _assets.Logo, White);
             return true;
         }
 
@@ -471,7 +486,7 @@ namespace GLMod.Menu
             {
                 DrawRect(rect, WithAlpha(White, 0.08f), Corner.Medium);
             }
-            ButtonStyle.normal.textColor = White;
+            ButtonStyle.normal.textColor = OnAccent;
             return GUI.Button(rect, text ?? "", ButtonStyle);
         }
 
@@ -528,6 +543,7 @@ namespace GLMod.Menu
             {
                 LoadFonts();
                 BuildTextures();
+                _assets = GetAssets(Theme);
             }
 
             if (Math.Abs(scale - _stylesScale) < 0.01f)
@@ -621,31 +637,64 @@ namespace GLMod.Menu
         private static void BuildTextures()
         {
             _empty = new GUIContent("");
-            _logo = LoadLogo();
             InvisibleStyle = new GUIStyle();
             _fillSquare = FillStyle(Texture2D.whiteTexture, 0);
             _fillSmall = SafeStyle(() => FillStyle(RoundedTexture(SmallRadius, White, White, false, 0), SmallRadius));
             _fillMedium = SafeStyle(() => FillStyle(RoundedTexture(MediumRadius, White, White, false, 0), MediumRadius));
             _fillLarge = SafeStyle(() => FillStyle(RoundedTexture(LargeRadius, White, White, false, 0), LargeRadius));
-            _panelGradient = SafeStyle(() => FillStyle(RoundedTexture(LargeRadius, PanelTop, PanelBottom, false, 64), LargeRadius));
-            _accentGradient = SafeStyle(() => FillStyle(RoundedTexture(SmallRadius, AccentStrong, Accent, true, 64), SmallRadius));
-            _accentGradientSquare = SafeStyle(() => FillStyle(RoundedTexture(0, AccentStrong, Accent, true, 64), 0));
             _circle = SafeStyle(() => FillStyle(CircleTexture(64), 0));
             _glow = SafeStyle(() => FillStyle(GlowTexture(LargeRadius, GlowSpread), LargeRadius + GlowSpread));
             _smallGlow = SafeStyle(() => FillStyle(GlowTexture(SmallGlowRadius, SmallGlowSpread), SmallGlowRadius + SmallGlowSpread));
         }
 
         /// <summary>
-        /// Good Loss logo embedded in the DLL (PNG decoded by ImageConversion, as Among Us mods do for sprites)
+        /// Switches the theme; its textures are built on first use (EnsureStyles must have run once)
         /// </summary>
-        private static GUIStyle LoadLogo()
+        internal static void ApplyTheme(MenuTheme theme)
         {
+            theme ??= MenuTheme.GoodLoss;
+            if (theme == Theme && _assets != null)
+            {
+                return;
+            }
+
+            Theme = theme;
+            if (_empty != null)
+            {
+                _assets = GetAssets(theme);
+            }
+        }
+
+        private static ThemeAssets GetAssets(MenuTheme theme)
+        {
+            if (_themeAssets.TryGetValue(theme.Id, out ThemeAssets assets))
+            {
+                return assets;
+            }
+
+            assets = new ThemeAssets
+            {
+                Panel = SafeStyle(() => FillStyle(RoundedTexture(LargeRadius, theme.PanelTop, theme.PanelBottom, false, 64), LargeRadius)),
+                Accent = SafeStyle(() => FillStyle(RoundedTexture(SmallRadius, theme.AccentStrong, theme.Accent, true, 64), SmallRadius)),
+                AccentSquare = SafeStyle(() => FillStyle(RoundedTexture(0, theme.AccentStrong, theme.Accent, true, 64), 0)),
+            };
+            assets.Logo = LoadLogo(theme.LogoResource, out assets.LogoAspect);
+            _themeAssets[theme.Id] = assets;
+            return assets;
+        }
+
+        /// <summary>
+        /// Logo embedded in the DLL (PNG decoded by ImageConversion, as Among Us mods do for sprites)
+        /// </summary>
+        private static GUIStyle LoadLogo(string resource, out float aspect)
+        {
+            aspect = 1f;
             try
             {
-                using Stream stream = typeof(MenuUI).Assembly.GetManifestResourceStream(GameConstants.LOGO_RESOURCE_NAME);
+                using Stream stream = typeof(MenuUI).Assembly.GetManifestResourceStream(resource);
                 if (stream == null)
                 {
-                    GLMod.log("[Menu] Logo resource missing: " + GameConstants.LOGO_RESOURCE_NAME);
+                    GLMod.log("[Menu] Logo resource missing: " + resource);
                     return null;
                 }
 
@@ -656,16 +705,16 @@ namespace GLMod.Menu
                 texture.wrapMode = TextureWrapMode.Clamp;
                 if (!ImageConversion.LoadImage(texture, buffer.ToArray(), false))
                 {
-                    GLMod.log("[Menu] Logo could not be decoded");
+                    GLMod.log("[Menu] Logo could not be decoded: " + resource);
                     return null;
                 }
                 texture.filterMode = FilterMode.Trilinear;
-                LogoAspect = texture.width / (float)texture.height;
+                aspect = texture.width / (float)texture.height;
                 return FillStyle(texture, 0);
             }
             catch (Exception e)
             {
-                GLMod.log("[Menu] Logo unavailable, using the GL badge: " + e.Message);
+                GLMod.log("[Menu] Logo unavailable, using the initials badge: " + e.Message);
                 return null;
             }
         }

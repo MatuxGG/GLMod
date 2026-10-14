@@ -9,7 +9,7 @@ namespace GLMod.Menu
 {
     /// <summary>
     /// Draws the Good Loss menu (IMGUI) and handles its keys. At rest it only shows a small
-    /// "GOOD LOSS" chip in the bottom-left corner; F2 or a click on it slides the panel in.
+    /// brand chip ("GOOD LOSS", or "AMONG US RANKED" with the Among Us Ranked theme) at the bottom edge; F2 or a click on it slides the panel in.
     /// Left / right arrows switch tabs, up / down arrows and the mouse wheel scroll the tab.
     /// Layout values are 1080p reference units, converted to screen pixels with MenuUI.U.
     /// </summary>
@@ -163,6 +163,7 @@ namespace GLMod.Menu
             try
             {
                 MenuUI.EnsureStyles(Mathf.Max(MinScale, Screen.height / ReferenceHeight));
+                MenuUI.ApplyTheme(MenuTheme.ForMod(GLMod.ConfigService?.ModName));
                 DrawChip(menu);
                 if (_slide > 0f)
                 {
@@ -233,7 +234,7 @@ namespace GLMod.Menu
                 return;
             }
 
-            const string text = "GOOD LOSS";
+            string text = MenuUI.Theme.BrandName;
             string key = _toggleKey.ToString();
             float u = MenuUI.U(1f);
             float textWidth = MenuUI.ChipStyle.CalcSize(new GUIContent(text)).x;
@@ -328,11 +329,11 @@ namespace GLMod.Menu
                 logo = new Rect(panel.x + pad, panel.y + MenuUI.U(18f), logoSize, logoSize);
                 MenuUI.DrawGlow(logo, MenuUI.WithAlpha(MenuUI.Accent, 0.3f));
                 MenuUI.DrawAccentGradient(logo, true);
-                MenuUI.DrawText(logo, "GL", MenuUI.LogoStyle, MenuUI.White);
+                MenuUI.DrawText(logo, MenuUI.Theme.BrandInitials, MenuUI.LogoStyle, MenuUI.OnAccent);
             }
 
             float textX = logo.xMax + MenuUI.U(12f);
-            MenuUI.DrawText(new Rect(textX, logo.y - MenuUI.U(2f), MenuUI.U(220f), MenuUI.U(24f)), "GOOD LOSS", MenuUI.BrandStyle, MenuUI.Text);
+            MenuUI.DrawText(new Rect(textX, logo.y - MenuUI.U(2f), MenuUI.U(220f), MenuUI.U(24f)), MenuUI.Theme.BrandName, MenuUI.BrandStyle, MenuUI.Text);
             MenuUI.DrawText(new Rect(textX, logo.y + MenuUI.U(20f), MenuUI.U(220f), MenuUI.U(18f)), "GLMOD  v" + GLMod.Version, MenuUI.CaptionStyle, MenuUI.DimText);
 
             float closeSize = MenuUI.U(30f);
@@ -492,7 +493,7 @@ namespace GLMod.Menu
             DrawHint(x + MenuUI.U(14f), keyY, keyHeight, new[] { _toggleKey.ToString() }, Text("menu.hint.close"));
 
             MenuUI.DrawText(new Rect(footer.x, footer.y, footer.width - MenuUI.U(Padding), footer.height),
-                "goodloss.fr", MenuUI.CaptionStyle, MenuUI.DimText, TextAnchor.MiddleRight);
+                MenuUI.Theme.SiteLabel, MenuUI.CaptionStyle, MenuUI.DimText, TextAnchor.MiddleRight);
         }
 
         private static float DrawHint(float x, float y, float height, string[] keys, string label)

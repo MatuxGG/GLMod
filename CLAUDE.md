@@ -42,7 +42,7 @@ Any code review MUST reject contributions that introduce non-English identifiers
 
 ### 1.1 Identity
 - **Name**: GLMod (Good Loss Mod)
-- **Current version**: `5.5.0` (see [GLMod/GLMod.csproj](GLMod/GLMod.csproj) and [GLMod/GLMod.cs](GLMod/GLMod.cs))
+- **Current version**: `5.5.1` (see [GLMod/GLMod.csproj](GLMod/GLMod.csproj) and [GLMod/GLMod.cs](GLMod/GLMod.cs))
 - **BepInEx plugin Id**: `glmod`
 - **Author**: Matux
 - **License**: GNU GPLv3
@@ -294,6 +294,8 @@ Reactor, Coms, Lights, O2
 | `GAME_HISTORY_MAX_ENTRIES`    | `20`                                         |
 | `TRANSLATION_RESOURCE_PREFIX` | `GLMod.Resources.Translations.` — embedded translation files (§3.12) |
 | `LOGO_RESOURCE_NAME`          | `GLMod.Resources.goodloss-logo.png` — embedded logo of the menu header |
+| `RANKED_LOGO_RESOURCE_NAME`   | `GLMod.Resources.ranked-logo.png` — logo of the Among Us Ranked menu theme |
+| `RANKED_MOD_NAME`             | `Among Us Ranked` — mod name prefix that selects the Among Us Ranked menu theme |
 | `MENU_TOGGLE_KEY`             | `F2` (`UnityEngine.KeyCode` name)            |
 | `MENU_TAB_ACCOUNT` / `MENU_TAB_LAST_GAME` / `MENU_TAB_SESSIONS` | `glmod.account` / `glmod.lastgame` / `glmod.sessions` — ids of the built-in menu tabs (public, for mods) |
 | `MENU_REFRESH_SECONDS`        | `60` — a tab reloads its API data when shown after this delay |
@@ -346,6 +348,7 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 | `TranslationTable.cs`  | Pure translation lookup: texts by language and key, fallbacks (base language, English, key), `{0}` formatting, JSON loading. |
 | `GameLanguage.cs`      | `SupportedLangs` name → language code (pure `ToCode`) and `CurrentCode()` (reads the game settings). |
 | `PlayModeHelper.cs`    | `IsFreePlay()` — free play games are never recorded nor sent (§3.3). |
+| `RankedMod.cs`         | `Matches(modName)` — "Among Us Ranked" and its variants ("Among Us Ranked Roles"…), case-insensitive. Pure. |
 | `StatFormat.cs`        | Pure formatting of menu stats: durations ("1 min 05 s", "2 h 05"), ratios, Yes/No, numbers, local dates, vanilla role names. |
 | `ServerClock.cs`       | `NowMs()` — Unix ms aligned on the API server clock. The offset is refreshed from the `Date` header of every `ApiService` response. **Every timestamp sent to the API (actions, positions) must use `ServerClock.NowMs()`**, never `DateTimeOffset.UtcNow`. |
 | `CoroutineHelpers.cs`  | `RunAsync` / `RunAsync<T>` — async-task ↔ coroutine bridge. Use these instead of re-implementing the `Task.Run` + volatile `done` flag pattern. |
@@ -358,6 +361,10 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 
 - **At rest**: a small dark "GOOD LOSS" chip (22 px high at 1080p, 12 px text, tight padding) **flush with the bottom edge of the screen** near the left corner (only its top corners are rounded), with a slowly breathing accent bar (55 % opacity), on every screen (menu, lobby, game, meetings, end screen). On hover it lights up, glows and widens to reveal the `F2` keycap. Hidden while the menu is not visible (`IMenuService.Enabled = false` or no tab).
 - **Open / close**: `F2` (`MENU_TOGGLE_KEY`) or a click on the chip; `F2` or the **×** button closes it. The panel slides in from the left with a slight overshoot (0.32 s, ease-out-back, fading in) and slides out in 0.2 s; it is anchored bottom-left.
+- **Themes** ([MenuTheme.cs](GLMod/Menu/MenuTheme.cs)): the brand and palette follow the detected mod, re-evaluated every frame (`MenuTheme.ForMod(ConfigService.ModName)` → `MenuUI.ApplyTheme`):
+  - **Good Loss** (default): "GOOD LOSS", Good Loss logo, `goodloss.fr`, navy + violet palette of goodloss.fr (`--accent #A78BFA`).
+  - **Among Us Ranked** when the mod is Among Us Ranked (`RankedMod.Matches`): "AMONG US RANKED", Among Us Ranked logo (`GLMod/Resources/ranked-logo.png`, the transparent `/images/ranked.webp` of amongusranked.orianagames.com converted to PNG: `ImageConversion` cannot decode WebP and the PWA PNGs have an opaque background), `orianagames.com` (the full `amongusranked.orianagames.com` does not fit the footer), stone + amber palette of the `[data-theme="ranked"]` block of amongusranked.orianagames.com (`--accent #F59E0B`, `--accent-hover #D97706`, `--accent-light #FCD34D`, `--bg-body #141210`, `--bg-card #211E1B`, `--border #322D2A`…), dark text on amber buttons (`--on-accent #1C1917`). The site font (Archivo) is not available in game: Bahnschrift is kept.
+  - `MenuUI` colors (`Accent`, `Text`, `MutedText`…) are properties of the current theme; textures baked with theme colors (panel and accent gradients, logo) are built once per theme.
 - **Look** (esport style): vertical gradient panel with a violet halo and an accent line on the top edge; header with the Good Loss logo (embedded `GLMod/Resources/goodloss-logo.png`, 110×128, decoded with `ImageConversion.LoadImage`; a gradient "GL" badge if it cannot be loaded), "GOOD LOSS" and the GLMod version; uppercase tabs with a glowing gradient indicator that glides to the selected tab; tab content fades and slides in from the side of the newly selected tab (0.22 s); keycap hints in the footer (`← →` tabs, `↑ ↓` scroll, `F2` close).
 - **Fonts**: OS fonts through `Font.CreateDynamicFontFromOSFont`: display text (titles, tabs, buttons, captions) in Bahnschrift SemiBold (condensed DIN-like face of Windows 10+), body text in Segoe UI; Arial / the IMGUI default font elsewhere (Linux / Proton).
 - **Navigation**: left / right arrows (or the ‹ › buttons, or a click on a tab) switch tabs; up / down arrows and the mouse wheel scroll the current tab. The game does not see these inputs while the menu uses them (§7 patches).
@@ -493,6 +500,7 @@ GLMod/                                # Repo root
 │   ├── GameHistoryTests.cs           # GameHistoryList.
 │   ├── MenuServiceTests.cs
 │   ├── PlayerApiTests.cs             # PlayerApiResponse (captured preprod responses), StatFormat.
+│   ├── RankedModTests.cs             # RankedMod (theme selection).
 │   ├── TranslationTests.cs           # TranslationTable, GameLanguage, embedded translation files.
 │   ├── ScenarioTests.cs              # ScenarioPlan / ScenarioVerifier (E2E harness logic).
 │   ├── ServerClockTests.cs
@@ -526,6 +534,7 @@ GLMod/                                # Repo root
     │   ├── TranslationTable.cs       # Pure translation lookup with fallbacks.
     │   ├── GameLanguage.cs           # Game language -> language code.
     │   ├── PlayModeHelper.cs         # Free play detection.
+    │   ├── RankedMod.cs              # Among Us Ranked detection (menu theme).
     │   ├── ServiceLogger.cs          # Shared [GLMod][Service] log formatter.
     │   └── VanillaEvents.cs
     ├── Constants/
@@ -565,6 +574,7 @@ GLMod/                                # Repo root
     ├── Menu/                         # Good Loss menu (§8.1).
     │   ├── IMenuTab.cs               # Tab contract (public, third-party tabs).
     │   ├── MenuTab.cs                # Delegate-based tab.
+    │   ├── MenuTheme.cs              # Good Loss / Among Us Ranked themes.
     │   ├── MenuUI.cs                 # Public IMGUI widgets + palette.
     │   ├── MenuBehaviour.cs          # IL2CPP MonoBehaviour: input, animation, drawing.
     │   ├── AccountMenuTab.cs
@@ -573,6 +583,7 @@ GLMod/                                # Repo root
     │   └── RemoteData.cs             # Cached API data of a tab.
     ├── Resources/
     │   ├── goodloss-logo.png         # Good Loss logo (EmbeddedResource, menu header).
+    │   ├── ranked-logo.png           # Among Us Ranked logo (Among Us Ranked theme).
     │   └── Translations/             # Menu texts per language (EmbeddedResource, §3.12).
     │       ├── en.json               # Reference: every key.
     │       └── fr.json
@@ -738,5 +749,5 @@ For every change to the project:
 
 ---
 
-*Last updated: 2026-10-14 — GLMod version 5.5.0.*
+*Last updated: 2026-10-14 — GLMod version 5.5.1.*
 *Every change to the project must be accompanied by an update of this file.*

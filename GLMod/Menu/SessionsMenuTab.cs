@@ -118,7 +118,7 @@ namespace GLMod.Menu
                     float pulse = 0.5f + 0.5f * Mathf.Sin(Time.realtimeSinceStartup * 4f);
                     MenuUI.DrawGlow(new Rect(pillX, row.y + MenuUI.U(7f), badgeWidth, MenuUI.U(20f)), MenuUI.WithAlpha(badge, 0.2f + 0.3f * pulse));
                 }
-                MenuUI.DrawPill(pillX, row.y + MenuUI.U(6f), badgeText, MenuUI.White, MenuUI.WithAlpha(badge, 0.85f));
+                MenuUI.DrawPill(pillX, row.y + MenuUI.U(6f), badgeText, session.live ? MenuUI.White : MenuUI.OnAccent, MenuUI.WithAlpha(badge, 0.85f));
             }
 
             if (buttonWidth > 0f)

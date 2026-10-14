@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://github.com/MatuxGG/GLMod">
-    <img src="https://img.shields.io/badge/GLMod-v5.5.0-blue" alt="GLMod Version">
+    <img src="https://img.shields.io/badge/GLMod-v5.5.1-blue" alt="GLMod Version">
   </a>
   <a href="https://goodloss.fr/discord">
     <img src="https://img.shields.io/badge/Good%20Loss%20Discord%20Server-Join-7289DA?logo=discord&logoColor=white" alt="Good Loss Discord Server">
@@ -32,7 +32,7 @@ GLMod provides a comprehensive set of services for tracking game data and enhanc
 
 ### Good Loss menu
 
-At rest, GLMod only shows a small "GOOD LOSS" tab at the bottom edge of the screen, near the left corner. Press **F2** (or click the tab) to slide the menu in, and F2 or **×** to close it.
+At rest, GLMod only shows a small "GOOD LOSS" tab at the bottom edge of the screen, near the left corner (with Among Us Ranked, the menu takes the Among Us Ranked look: "AMONG US RANKED", its logo and the amber palette of its site). Press **F2** (or click the tab) to slide the menu in, and F2 or **×** to close it.
 - **Left / right arrows** switch tabs, **up / down arrows** (or the mouse wheel) scroll the current tab.
 - **Account**: Good Loss connection status (connected account, not connected, banned with the reason) and the detected mod.
 - **Last game**: your last finished game on Good Loss (victory or defeat, map, role) with a button to open its recap, and every stat Good Loss computed for you in it (kills, tasks, votes, reports, survival...). After a game, it updates by itself once Good Loss has processed the game.

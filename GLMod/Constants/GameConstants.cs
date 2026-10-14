@@ -111,6 +111,16 @@ namespace GLMod.Constants
         public const string LOGO_RESOURCE_NAME = "GLMod.Resources.goodloss-logo.png";
 
         /// <summary>
+        /// Embedded Among Us Ranked logo, shown by the Among Us Ranked menu theme (GLMod/Resources/ranked-logo.png).
+        /// </summary>
+        public const string RANKED_LOGO_RESOURCE_NAME = "GLMod.Resources.ranked-logo.png";
+
+        /// <summary>
+        /// Mod name (prefix) that switches the menu to the Among Us Ranked theme.
+        /// </summary>
+        public const string RANKED_MOD_NAME = "Among Us Ranked";
+
+        /// <summary>
         /// Prefix of the embedded translation files (GLMod/Resources/Translations/&lt;language&gt;.json).
         /// </summary>
         public const string TRANSLATION_RESOURCE_PREFIX = "GLMod.Resources.Translations.";

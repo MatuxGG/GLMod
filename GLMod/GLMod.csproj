@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <TargetFramework>net6.0</TargetFramework>
-        <Version>5.5.0</Version>
+        <Version>5.5.1</Version>
         <GameVersion>2026.3.31</GameVersion>
 
         <Description>GLMod</Description>
@@ -27,6 +27,7 @@
 
     <ItemGroup>
       <EmbeddedResource Include="Resources\goodloss-logo.png" LogicalName="GLMod.Resources.goodloss-logo.png" />
+      <EmbeddedResource Include="Resources\ranked-logo.png" LogicalName="GLMod.Resources.ranked-logo.png" />
       <EmbeddedResource Include="Resources\Translations\*.json" LogicalName="GLMod.Resources.Translations.%(Filename)%(Extension)" />
     </ItemGroup>
 	
