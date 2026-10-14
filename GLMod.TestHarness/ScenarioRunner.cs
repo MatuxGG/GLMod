@@ -36,6 +36,7 @@ namespace GLMod.TestHarness
         // Current game, reset before each game starts
         private static bool _gameEnded;
         private static GLGame _endGame;
+        private static bool _localIsImpostor;
         private static string _endGameJson;
         private static string _endReason;
 
@@ -82,6 +83,7 @@ namespace GLMod.TestHarness
             _endReason = reason.ToString();
             _endGame = GLModPlugin.GameStateManager?.CurrentGame;
             _endGameJson = _endGame != null ? GLJson.Serialize(_endGame) : null;
+            _localIsImpostor = _plan != null && PlayerControl.LocalPlayer != null && _plan.Impostor?.Id == PlayerControl.LocalPlayer.PlayerId;
             HarnessLog.Info($"Game ended: {reason} (GLMod step {GLModPlugin.GameStateManager?.Step})");
         }
 
@@ -186,7 +188,19 @@ namespace GLMod.TestHarness
                 if (_finished) yield break;
             }
 
+            // The end screen records the game in GLMod's local history (menu, Games tab)
+            SetPhase(prefix + ":history");
+            yield return WaitForQuiet(IsGameInHistory, HarnessConstants.END_SCREEN_TIMEOUT);
+            if (_finished) yield break;
+
             RecordGameResult(gameNumber, previousGameId);
+        }
+
+        private static bool IsGameInHistory()
+        {
+            return _endGame == null
+                || string.IsNullOrEmpty(_endGame.id)
+                || GLModPlugin.GameHistoryService?.Latest?.gameId == _endGame.id;
         }
 
         // ---------------------------------------------------------------- game 1: crewmates win by tasks
@@ -791,6 +805,8 @@ namespace GLMod.TestHarness
                 checks = ScenarioVerifier.VerifyClientGame(_endGame);
             }
             checks.AddRange(ScenarioVerifier.VerifyDistinctGames(previousGameId, _endGame?.id));
+            checks.AddRange(ScenarioVerifier.VerifyHistoryEntry(
+                GLModPlugin.GameHistoryService?.Latest, _endGame, gameNumber, _localIsImpostor, GLModPlugin.api));
 
             var result = new GameResult
             {

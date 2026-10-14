@@ -1,3 +1,4 @@
+using GLMod.Class;
 using GLMod.Constants;
 using GLMod.Enums;
 using GLMod.GLEntities;
@@ -87,6 +88,50 @@ namespace GLMod.TestHarness
             if (!string.IsNullOrEmpty(firstGameId) && firstGameId == secondGameId)
             {
                 failures.Add($"Game 2 reused the id of game 1 ({firstGameId}): state was not reset after returning to the lobby");
+            }
+            return failures;
+        }
+
+        /// <summary>
+        /// The end screen must have recorded the game in the local history (Games tab of the menu),
+        /// with the recap link of the API's site and the right outcome for the local player.
+        /// </summary>
+        public static List<string> VerifyHistoryEntry(GLGameHistoryEntry entry, GLGame game, int gameNumber, bool localIsImpostor, string apiEndpoint)
+        {
+            var failures = new List<string>();
+            if (game == null || string.IsNullOrEmpty(game.id))
+            {
+                return failures;
+            }
+
+            if (entry == null || entry.gameId != game.id)
+            {
+                failures.Add($"Game {game.id} is not the latest game of the local history (latest: {entry?.gameId ?? "none"})");
+                return failures;
+            }
+
+            string expectedRecap = ApiEndpointResolver.GameRecapUrl(apiEndpoint, game.id);
+            if (entry.recapUrl != expectedRecap)
+            {
+                failures.Add($"History recap link is '{entry.recapUrl}', expected '{expectedRecap}'");
+            }
+
+            if (entry.map != game.map)
+            {
+                failures.Add($"History map is '{entry.map}', expected '{game.map}'");
+            }
+
+            bool impostorsWin = gameNumber == ScenarioPlan.GAME_IMPOSTOR_WINS_BY_VOTE;
+            bool expectedWon = localIsImpostor == impostorsWin;
+            if (entry.won != expectedWon)
+            {
+                failures.Add($"History says {(entry.won ? "victory" : "defeat")}, expected {(expectedWon ? "victory" : "defeat")}");
+            }
+
+            string expectedTeam = localIsImpostor ? TEAM_IMPOSTOR : TEAM_CREWMATE;
+            if (entry.team != expectedTeam)
+            {
+                failures.Add($"History team is '{entry.team}', expected '{expectedTeam}'");
             }
             return failures;
         }

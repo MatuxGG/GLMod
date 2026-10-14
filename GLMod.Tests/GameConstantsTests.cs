@@ -54,5 +54,31 @@ namespace GLMod.Tests
         {
             Assert.Equal(expected, ApiEndpointResolver.Resolve(overrideValue));
         }
+
+        [Theory]
+        [InlineData("https://goodloss.fr/api", "https://goodloss.fr")]
+        [InlineData("https://preprod.goodloss.fr/api/", "https://preprod.goodloss.fr")]
+        [InlineData("http://localhost:8080", "http://localhost:8080")]
+        [InlineData(null, "https://goodloss.fr")]
+        public void ToSiteUrl_RemovesApiSuffix(string apiEndpoint, string expected)
+        {
+            Assert.Equal(expected, ApiEndpointResolver.ToSiteUrl(apiEndpoint));
+        }
+
+        [Fact]
+        public void GameRecapUrl_PointsToTheSiteOfTheApi()
+        {
+            Assert.Equal("https://preprod.goodloss.fr/game/1234",
+                ApiEndpointResolver.GameRecapUrl("https://preprod.goodloss.fr/api", "1234"));
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("  ")]
+        public void GameRecapUrl_EmptyWithoutGameId(string gameId)
+        {
+            Assert.Equal("", ApiEndpointResolver.GameRecapUrl(GameConstants.API_ENDPOINT, gameId));
+        }
     }
 }

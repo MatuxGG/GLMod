@@ -122,6 +122,51 @@ GLMod.ServiceManager.DisableService(ServiceType.EndGame);
 bool exists = GLMod.ServiceManager.ExistsService(ServiceType.Kills);
 ```
 
+### Menu Service (IMenuService)
+State of the Good Loss menu (F2 or a click on the "Good Loss" label in the bottom-left corner). Your mod can add its own tab, placed after GLMod's tabs (Account, Games, Rank, DLC) and reachable with the left / right arrows.
+
+Register it in your plugin's `Load()` (GLMod is loaded first thanks to `[BepInDependency("glmod")]`). Draw the content with the `GLMod.Menu.MenuUI` widgets: they follow the menu style and are laid out from top to bottom, and a tab that is too long scrolls automatically.
+
+```csharp
+using GLMod.Menu;
+
+IMenuTab myTab = GLMod.MenuService.RegisterTab("My mod",
+    draw: () =>
+    {
+        MenuUI.Heading("Season 3");
+        MenuUI.Field("Players", "42");
+        MenuUI.Muted("Rules are on our Discord.");
+        if (MenuUI.Button("Open the rules"))
+        {
+            UnityEngine.Application.OpenURL("https://example.org/rules");
+        }
+    },
+    onShown: () => { /* refresh your data here (called when the tab becomes visible) */ });
+
+// Later
+GLMod.MenuService.Select(myTab);         // show it on the next opening
+GLMod.MenuService.Open();
+GLMod.MenuService.UnregisterTab(myTab);
+```
+
+Widgets: `Heading`, `Highlight`, `Label` (optionally colored), `Muted`, `Field(name, value)`, `Button` (returns true when clicked), `Row(text, buttonText, color)`, `Space`, `Separator`, and the colors `MenuUI.Accent`, `Text`, `MutedText`, `Success`, `Danger`.
+
+For more control, implement `IMenuTab` (`Title`, `OnShown()`, `Draw()`) and call `GLMod.MenuService.RegisterTab(tab)`.
+
+Rules:
+- Everything runs on the Unity main thread. `Draw()` is called several times per frame (IMGUI): keep it cheap and never start requests from it, start them from `OnShown()` (e.g. with a coroutine) and draw the cached result.
+- An exception in your tab is logged once and replaced by an error message, it does not break the menu.
+- `GUI.DrawTexture` is stripped from the Among Us build: drawing it from a tab throws. Use the `MenuUI` widgets (or `GUI.Label` / `GUI.Button` / `GUI.Box`).
+
+### Game History Service (IGameHistoryService)
+Local history of the games played with GLMod (shown in the Games tab), most recent first.
+
+```csharp
+GLGameHistoryEntry last = GLMod.GameHistoryService.Latest; // null when empty
+// last.gameId, last.recapUrl, last.map, last.modName, last.role, last.team, last.won, last.endedAtMs
+GLMod.GameHistoryService.EntryRecorded += entry => { /* a game just ended */ };
+```
+
 ## Service Architecture
 
 GLMod follows a clean architecture pattern with dependency injection and interface-based services. All services are accessible through static properties in the main `GLMod` class:
@@ -135,6 +180,8 @@ GLMod.RankService      // IRankService
 GLMod.MapService       // IMapService
 GLMod.ServiceManager   // IServiceManager
 GLMod.GameStateManager // IGameStateManager
+GLMod.GameHistoryService // IGameHistoryService
+GLMod.MenuService      // IMenuService
 ```
 
 ### Service Initialization

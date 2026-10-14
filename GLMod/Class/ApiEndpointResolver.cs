@@ -37,5 +37,29 @@ namespace GLMod.Class
         {
             return Resolve(Environment.GetEnvironmentVariable(GameConstants.API_ENDPOINT_ENV_VAR));
         }
+
+        /// <summary>
+        /// Site URL matching an API base URL (https://goodloss.fr/api -> https://goodloss.fr).
+        /// </summary>
+        public static string ToSiteUrl(string apiEndpoint)
+        {
+            string trimmed = Resolve(apiEndpoint);
+            return trimmed.EndsWith(GameConstants.API_PATH_SUFFIX, StringComparison.OrdinalIgnoreCase)
+                ? trimmed.Substring(0, trimmed.Length - GameConstants.API_PATH_SUFFIX.Length)
+                : trimmed;
+        }
+
+        /// <summary>
+        /// Recap page of a game on the site matching the API, or "" without a game id.
+        /// </summary>
+        public static string GameRecapUrl(string apiEndpoint, string gameId)
+        {
+            if (string.IsNullOrWhiteSpace(gameId))
+            {
+                return "";
+            }
+
+            return ToSiteUrl(apiEndpoint) + GameConstants.SITE_GAME_PATH + Uri.EscapeDataString(gameId.Trim());
+        }
     }
 }

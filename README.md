@@ -30,6 +30,16 @@ GLMod provides a comprehensive set of services for tracking game data and enhanc
 - **Service Manager**: Centralized service management with enable/disable capabilities
 - **Game State Manager**: Tracks game state, player actions, and match progression
 
+### Good Loss menu
+
+At rest, GLMod only shows a faint "Good Loss" label in the bottom-left corner of the screen. Press **F2** (or click the label) to slide the menu in, and F2 or **×** to close it.
+- **Left / right arrows** switch tabs, **up / down arrows** (or the mouse wheel) scroll the current tab.
+- **Account**: Good Loss connection status (connected account, not connected, banned with the reason) and the detected mod.
+- **Games**: your last game with a button to open its recap on Good Loss, then your previous games. This history is stored on your computer only (`BepInEx/config/glmod-history.json`, last 20 games).
+- **Rank**: your rank for the detected mod.
+- **DLC**: the Steam DLC owned by your account, as checked by Good Loss.
+- Other mods can add their own tabs (see [docs/dev.MD](docs/dev.MD)).
+
 ### Data Collection
 
 GLMod automatically collects and synchronizes:

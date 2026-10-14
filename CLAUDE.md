@@ -94,7 +94,8 @@ GLMod follows a **service-oriented architecture** with:
 4. `VerifyStartupServices()` — logs the status of each service.
 5. `ConfigureDefaultSettings()` — enables the default services (see §3.3).
 6. `CoroutineRunner.Init()` — creates a persistent `DontDestroyOnLoad` GameObject to run coroutines from outside `MonoBehaviour`s.
-7. `Harmony.PatchAll()` — applies all Harmony patches from the `GLMod.EventPatch` namespace.
+7. `InitializeMenu()` — registers the built-in menu tabs (Account, Games, Rank, DLC) and attaches `MenuBehaviour` through `BasePlugin.AddComponent` (see §8.1).
+8. `Harmony.PatchAll()` — applies all Harmony patches from the `GLMod.EventPatch` namespace.
 
 ### 2.3 Service dependency graph
 ```
@@ -106,6 +107,8 @@ ItemService               ← Logger, AuthService, apiEndpoint
 RankService               ← Logger, AuthService, ConfigService, apiEndpoint
 IntegrityService          ← Logger, apiEndpoint
 MapService                ← Logger
+GameHistoryService        ← Logger, history file path (config folder), max entries
+MenuService               ← (none)
 ```
 
 ### 2.4 Coroutines & async
@@ -177,6 +180,17 @@ Every service is exposed statically via the main `GLMod` class and has a dedicat
 - **Role**: resolve the current map name.
 - **Logic**: reads `GameOptionsManager.Instance.currentGameOptions.MapId`, maps it via `GameMapType` + special case `Dleks → "dlekSehT"`.
 
+### 3.9 `IGameHistoryService` — [Interfaces/IGameHistoryService.cs](GLMod/Services/Interfaces/IGameHistoryService.cs)
+- **Role**: local history of the games played with GLMod (menu, Games tab). **Never sent to the API.**
+- **Storage**: `BepInEx/config/glmod-history.json` (`GAME_HISTORY_FILE_NAME`), most recent first, `GAME_HISTORY_MAX_ENTRIES` games. Written through a uniquely named temporary file then moved (several instances may share the config folder). An unreadable file gives an empty history.
+- **Recording**: `EndGameManager.SetEverythingUp` postfix ([EndGameManagerPatch.cs](GLMod/EventPatch/EndGameManagerPatch.cs)), once per `CurrentGame`: game id, recap URL (`ApiEndpointResolver.GameRecapUrl(GLMod.api, id)`, so preprod games link to preprod), map, mod, local player's role / team, win (`EndGameResult.CachedWinners` contains `IsYou`). Works for host and clients, and whatever `ServiceType`s are enabled.
+- **Members**: `Entries`, `Latest`, `Load()`, `Record(entry)` (replaces an older entry with the same game id), event `EntryRecorded`.
+- Pure list logic (add / dedupe / truncate / JSON) lives in [GameHistoryList.cs](GLMod/Class/GameHistoryList.cs) (unit-tested).
+
+### 3.10 `IMenuService` — [Interfaces/IMenuService.cs](GLMod/Services/Interfaces/IMenuService.cs)
+- **Role**: state of the Good Loss menu — registered tabs (`IMenuTab`), selected tab, open/closed. **Public API for third-party tabs** (`RegisterTab(tab)` / `RegisterTab(title, draw, onShown)`, `UnregisterTab`, `Select`, `SelectNext` / `SelectPrevious` (wrap around), `Open` / `Close` / `Toggle`).
+- Pure logic, no Unity dependency (unit-tested). Drawing and input are in `MenuBehaviour` (§8.1). Main thread only.
+
 ---
 
 ## 4. Domain entities (`GLMod/GLEntities/`)
@@ -191,8 +205,9 @@ Every service is exposed statically via the main `GLMod` class and has a dedicat
 | `GLRank`        | Rank: id, name, link, percent, error. |
 | `GLData` / `GLDataList` | Generic key/value wrappers for API responses. |
 | `GLJson`        | Static helpers `Serialize<T>` / `Deserialize<T>` (System.Text.Json) with try/catch + log. |
+| `GLGameHistoryEntry` | Local history entry (never sent to the API): gameId, recapUrl, endedAtMs, map, modName, role, team, won. |
 
-> **Note**: every numeric property transiting through the API is **encoded as `string`** (`tasks = "0"`, `ranked = "1"`, etc.). This convention matches the Good Loss API protocol and **must not be changed** without coordination with the API team.
+> **Note**: every numeric property transiting through the API is **encoded as `string`** (`tasks = "0"`, `ranked = "1"`, etc.). This convention matches the Good Loss API protocol and **must not be changed** without coordination with the API team. `GLGameHistoryEntry` is local-only and uses plain `long` / `bool`.
 
 ---
 
@@ -243,6 +258,12 @@ Reactor, Coms, Lights, O2
 | `ACTION_PREFIX_DC_ON`         | `DC_ON_` (RPC `OnDisconnect`)                |
 | `ACTION_PREFIX_SAB_START`     | `SAB_START_` (suffixed by sabotage type)     |
 | `ACTION_PREFIX_SAB_END`       | `SAB_END_` (suffixed by sabotage type)       |
+| `API_PATH_SUFFIX`             | `/api` — removed from the API URL to get the site URL |
+| `SITE_GAME_PATH`              | `/game/` — recap page, followed by the game id |
+| `GAME_HISTORY_FILE_NAME`      | `glmod-history.json` (config folder)         |
+| `GAME_HISTORY_MAX_ENTRIES`    | `20`                                         |
+| `MENU_TOGGLE_KEY`             | `F2` (`UnityEngine.KeyCode` name)            |
+| `MENU_REFRESH_SECONDS`        | `60` — minimum delay between two rank reloads in the menu |
 
 ---
 
@@ -259,6 +280,9 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 | `MeetingHudPatch.cs`          | Meeting cycle (vote, exile).                           |
 | `ExileControllerPatch.cs`     | Exile animation and turn rollover.                     |
 | `RPC.cs`                      | Manages **CustomRPC 240** (`HandleRpc`). Contains `GLRPCProcedure.makeRpcCall` and `handleRpc`. |
+| `EndGameManagerPatch.cs`      | `EndGameManager.SetEverythingUp` postfix: records the game in the local history (§3.9). |
+| `KeyboardJoystickPatch.cs`    | `KeyboardJoystick.Update` prefix: while the menu is open and an arrow key is held, the player does not move (arrows navigate the menu). |
+| `PassiveButtonManagerPatch.cs`| `PassiveButtonManager.Update` prefix: skipped while the mouse is over the menu label / panel, so clicks do not reach the game buttons underneath. |
 
 ### 7.1 Custom RPC
 - **Reserved ID**: `240` (`CustomRPC.HandleRpc`).
@@ -280,13 +304,33 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 |------------------------|--------------------------------------------------------------------------------------------|
 | `HttpHelper.cs`        | Shared static `HttpClient`, proxy disabled.                                                |
 | `ApiService.cs`        | `PostFormAsync`, `PostFormWithErrorHandlingAsync`, `ApiResponse` type.                     |
-| `ApiEndpointResolver.cs` | Resolves the API base URL: `API_ENDPOINT`, or the `GLMOD_API_ENDPOINT` environment variable when it is a valid http(s) URL. |
+| `ApiEndpointResolver.cs` | Resolves the API base URL: `API_ENDPOINT`, or the `GLMOD_API_ENDPOINT` environment variable when it is a valid http(s) URL. `ToSiteUrl(api)` / `GameRecapUrl(api, gameId)` give the matching site and recap URLs. |
+| `GameHistoryList.cs`   | Pure operations on the local history (add with dedupe and truncation, JSON serialize / parse). |
+| `SteamDlcCatalog.cs`   | Names of the Among Us DLC read from the local Steam client (`SteamApps.BGetDLCDataByIndex`), "Steam app <id>" otherwise. |
 | `ServerClock.cs`       | `NowMs()` — Unix ms aligned on the API server clock. The offset is refreshed from the `Date` header of every `ApiService` response. **Every timestamp sent to the API (actions, positions) must use `ServerClock.NowMs()`**, never `DateTimeOffset.UtcNow`. |
 | `CoroutineHelpers.cs`  | `RunAsync` / `RunAsync<T>` — async-task ↔ coroutine bridge. Use these instead of re-implementing the `Task.Run` + volatile `done` flag pattern. |
 | `CoroutineRunner.cs`   | `MonoBehaviour` IL2CPP singleton used to run coroutines from static classes.               |
 | `ServiceLogger.cs`     | `Log(logger, serviceName, message)` — shared log formatter producing `[GLMod][Service] PlayerName: message`. Every service must delegate to it. |
 | `BackgroundEvents.cs`  | Background loop: watches DCs, hidden sabotages, etc.                                       |
 | `VanillaEvents.cs`     | Default implementations (`startGameVanilla`, `endGameVanilla`…) used when the matching `ServiceType` is enabled. |
+
+### 8.1 Good Loss menu (`GLMod/Menu/`, namespace `GLMod.Menu`)
+
+- **At rest**: a faint "Good Loss" label (accent color, 40 % opacity, 90 % on hover) in the bottom-left corner, on every screen (menu, lobby, game, meetings, end screen).
+- **Open / close**: `F2` (`MENU_TOGGLE_KEY`) or a click on the label; `F2` or the **×** button closes it. The panel slides in from the left (0.18 s, ease-out) and is anchored bottom-left.
+- **Navigation**: left / right arrows (or the ‹ › buttons, or a click on a tab) switch tabs; up / down arrows and the mouse wheel scroll the current tab. The game does not see these inputs while the menu uses them (§7 patches).
+- **Rendering**: IMGUI from `MenuBehaviour` (`Update` = keys, scrolling and slide animation; `OnGUI` = drawing), in 1080p reference units scaled to the screen height (never below `0.85`). Palette taken from the Good Loss site (`--bg-card #11161E`, `--accent #A78BFA`…). `MenuBehaviour` notifies `IMenuTab.OnShown()` when a tab becomes visible; tab exceptions are logged once and replaced by an error message.
+- **Widgets**: [MenuUI.cs](GLMod/Menu/MenuUI.cs) — public, used by built-in and third-party tabs: `Heading`, `Highlight`, `Label`, `Muted`, `Field`, `Button`, `Row`, `Space`, `Separator`, colors. Backgrounds are `GUI.Box` with a white (or generated rounded, 9-sliced) texture tinted by `GUI.backgroundColor`.
+- **Built-in tabs** (class names end with `MenuTab`: Among Us already has a global `AccountTab` type, which would win name resolution):
+
+| Tab | Class | Content |
+|-----|-------|---------|
+| Account | `AccountMenuTab` | Connection status (connected + account / not connected / banned + reason), detected mod, GLMod version, server when not production. |
+| Games | `GamesMenuTab` | Last game (outcome, map, role, mod, date, "Open the recap" → `Application.OpenURL`), then the rest of the local history with a "Recap" button per recorded game. Selected automatically when a game is recorded (menu closed). |
+| Rank | `RankMenuTab` | `RankService.GetRank` for the detected mod, reloaded on show at most every `MENU_REFRESH_SECONDS`; "Unranked" when `id <= 0`. |
+| DLC | `DlcMenuTab` | `ItemService.ReloadDlcOwnerships` once per session (when shown while connected), names from `SteamDlcCatalog`. |
+
+- **Third-party tabs**: `GLMod.MenuService.RegisterTab(...)` from the mod's `Load()`; documented in `docs/dev.MD`.
 
 ---
 
@@ -301,6 +345,8 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 | `Validation` | `RPC`          | Must be `"YES"` (with history) after a complete match. |
 
 A file `BepInEx/config/<MODNAME>.glmod` (empty) at the root of the config folder serves as a **host-mod marker**: its name (without extension) becomes `ConfigService.ModName`.
+
+`BepInEx/config/glmod-history.json` holds the local game history (§3.9). It is not a BepInEx config file and must not end with `.glmod`.
 
 ---
 
@@ -342,7 +388,7 @@ Base: `https://goodloss.fr/api` (production). It can be overridden at startup wi
 
 ### 11.4 Testing
 - Test framework: xUnit ([GLMod.Tests/GLMod.Tests.csproj](GLMod.Tests/GLMod.Tests.csproj)).
-- Scope: pure logic — entities (`GLGame`, `GLPlayer`, `GLPosition`), enums (`SabotageType`, `GameMapType`), `ServiceManager`, `GameConstants` invariants, `ApiEndpointResolver`, `ServerClock`, and the E2E harness `ScenarioPlan` / `ScenarioVerifier`. Anything that touches IL2CPP / Among Us types stays untestable until further decoupling.
+- Scope: pure logic — entities (`GLGame`, `GLPlayer`, `GLPosition`), enums (`SabotageType`, `GameMapType`), `ServiceManager`, `GameConstants` invariants, `ApiEndpointResolver` (incl. site / recap URLs), `ServerClock`, `MenuService`, `GameHistoryList`, and the E2E harness `ScenarioPlan` / `ScenarioVerifier`. Anything that touches IL2CPP / Among Us types stays untestable until further decoupling.
 - Add new tests for any new pure-logic surface. Refactor toward injectable abstractions before adding tests that would otherwise require IL2CPP mocking.
 
 ### 11.5 End-to-end test (4 Among Us instances, online lobby, 2 games)
@@ -363,7 +409,9 @@ Base: `https://goodloss.fr/api` (production). It can be overridden at startup wi
 - Verification ([ScenarioVerifier.cs](GLMod.TestHarness/ScenarioVerifier.cs), unit-tested), on the `GLGame` snapshot taken right after GLMod's `OnGameEnd`:
   - game 1: `completedTask`, `SAB_START_Lights` / `SAB_END_Lights`, `called an emergency` (turn 1); 4 `voted` incl. 2 skips (target `""`, turn 1001); no `exiled`; `killed` in turn 2; `turns` = `2`; per crewmate `tasks + tasksDead = tasksMax` and as many `completedTask` actions, the ghost only in `tasksDead`; winner `Crewmate`;
   - game 2: `killed`, `reported` (by a crewmate), 3 `voted`, `exiled` (a crewmate), winner `Impostor`, impostor `win=1`;
-  - both: game id set, teams, `/game/end` succeeded on the host (step back to `Initial`), clients received the game id (RPC 1), game 2 has a **new** GLMod game id.
+  - both: game id set, teams, `/game/end` succeeded on the host (step back to `Initial`), clients received the game id (RPC 1), game 2 has a **new** GLMod game id;
+  - every instance, once its end screen is up: the game is the latest entry of the local history (menu, Games tab) with the recap link of the API's site (preprod), the map, the local player's team and the expected victory / defeat.
+- Local history: the script moves the player's `BepInEx/config/glmod-history.json` aside for the run (`glmod-history.before-run.json` in the output folder) and puts it back at the end; the run's history is kept as `glmod-history.json` in the output folder.
 - Multi-instance workarounds: 4 Unity instances on one machine stall for seconds on heavy frames (map load, meeting open) and vanilla Hazel timeouts then drop the client (`ReliablePacketWithoutResponse`): the harness raises `DisconnectTimeoutMs` / `MissingPingsUntilDisconnect` on the client connection. Clients must load the map within a hard-coded 10s (`AmongUsClient.MAX_CLIENT_WAIT_SECONDS` is a native constant: **writing it crashes the game**), so each instance caps its frame rate (20 fps) and sets `Application.backgroundLoadingPriority = High`. It also skips `CosmeticsCache.ClearUnusedCosmetics`, which intermittently throws inside `AmongUsClient.CoStartGame` in multi-instance runs (the client then never becomes ready and is kicked).
 - Output: `GLMod.TestHarness/output/<date>-<runId>/` (gitignored) — `lobby-N.json`, `plan-N.json`, `result-N.json` (per-game results), `instance-N.log`, `player-N.log` (Unity log of each instance, via `-logFile`), copied BepInEx logs.
 - Not covered: disconnections (relaunching clients is too slow), roles, impostor wins by kill / sabotage, shield T1.
@@ -395,7 +443,9 @@ GLMod/                                # Repo root
 │   ├── GLMod.Tests.csproj
 │   ├── EntityTests.cs
 │   ├── EnumTests.cs
-│   ├── GameConstantsTests.cs
+│   ├── GameConstantsTests.cs         # + ApiEndpointResolver.
+│   ├── GameHistoryTests.cs           # GameHistoryList.
+│   ├── MenuServiceTests.cs
 │   ├── ScenarioTests.cs              # ScenarioPlan / ScenarioVerifier (E2E harness logic).
 │   ├── ServerClockTests.cs
 │   └── ServiceManagerTests.cs
@@ -420,9 +470,11 @@ GLMod/                                # Repo root
     │   ├── BackgroundEvents.cs
     │   ├── CoroutineHelpers.cs       # Async-task ↔ coroutine bridge.
     │   ├── CoroutineRunner.cs
+    │   ├── GameHistoryList.cs        # Pure local-history list logic.
     │   ├── HttpHelper.cs
     │   ├── ServerClock.cs            # Timestamps aligned on the API server clock.
     │   ├── ServiceLogger.cs          # Shared [GLMod][Service] log formatter.
+    │   ├── SteamDlcCatalog.cs        # DLC names from the local Steam client.
     │   └── VanillaEvents.cs
     ├── Constants/
     │   └── GameConstants.cs          # Global constants (API, timeouts, defaults).
@@ -433,10 +485,13 @@ GLMod/                                # Repo root
     │   └── ServiceType.cs
     ├── EventPatch/                   # Harmony patches — one file per patched Among Us target.
     │   ├── AmongUsClientPatch.cs
+    │   ├── EndGameManagerPatch.cs    # Records the local history.
     │   ├── ExileControllerPatch.cs
     │   ├── InnerNetClientPatch.cs
+    │   ├── KeyboardJoystickPatch.cs  # No movement while the menu uses the arrows.
     │   ├── MainMenuManagerPatch.cs
     │   ├── MeetingHudPatch.cs
+    │   ├── PassiveButtonManagerPatch.cs # No game click through the menu.
     │   ├── PlayerControlPatch.cs
     │   └── RPC.cs                    # CustomRPC + handleRpc dispatcher.
     ├── GLEntities/                   # Domain entities (API DTOs + models).
@@ -444,11 +499,21 @@ GLMod/                                # Repo root
     │   ├── GLData.cs
     │   ├── GLDataList.cs
     │   ├── GLGame.cs
+    │   ├── GLGameHistoryEntry.cs     # Local history entry (not an API DTO).
     │   ├── GLItem.cs
     │   ├── GLJson.cs                 # Serialize / Deserialize helpers.
     │   ├── GLPlayer.cs
     │   ├── GLPosition.cs
     │   └── GLRank.cs
+    ├── Menu/                         # Good Loss menu (§8.1).
+    │   ├── IMenuTab.cs               # Tab contract (public, third-party tabs).
+    │   ├── MenuTab.cs                # Delegate-based tab.
+    │   ├── MenuUI.cs                 # Public IMGUI widgets + palette.
+    │   ├── MenuBehaviour.cs          # IL2CPP MonoBehaviour: input, animation, drawing.
+    │   ├── AccountMenuTab.cs
+    │   ├── GamesMenuTab.cs
+    │   ├── RankMenuTab.cs
+    │   └── DlcMenuTab.cs
     ├── Properties/
     │   ├── Resources.Designer.cs     # Auto-generated by Visual Studio — DO NOT hand-edit.
     │   └── Resources.resx
@@ -456,19 +521,23 @@ GLMod/                                # Repo root
         ├── Interfaces/               # ONE file per interface, prefixed with "I".
         │   ├── IAuthenticationService.cs
         │   ├── IConfigurationService.cs
+        │   ├── IGameHistoryService.cs
         │   ├── IGameStateManager.cs
         │   ├── IIntegrityService.cs
         │   ├── IItemService.cs
         │   ├── IMapService.cs
+        │   ├── IMenuService.cs
         │   ├── IRankService.cs
         │   └── IServiceManager.cs
         └── Implementations/          # ONE file per implementation, same name without "I".
             ├── AuthenticationService.cs
             ├── ConfigurationService.cs
+            ├── GameHistoryService.cs
             ├── GameStateManager.cs
             ├── IntegrityService.cs
             ├── ItemService.cs
             ├── MapService.cs
+            ├── MenuService.cs
             ├── RankService.cs
             └── ServiceManager.cs
 ```
@@ -486,6 +555,7 @@ GLMod/                                # Repo root
    - `GLMod.Constants` — constants.
    - `GLMod.Enums` — enumerations (+ extensions in the same file).
    - `GLMod.EventPatch` — Harmony patches.
+   - `GLMod.Menu` — Good Loss menu (tab contract, widgets, behaviour, built-in tabs).
    - `GLMod.GLEntities` — DTOs / models.
    - `GLMod.Services.Interfaces` — contracts.
    - `GLMod.Services.Implementations` — logic.
@@ -522,6 +592,7 @@ A third-party mod consumes GLMod by:
    - `GLMod.SendGame()` + `GLMod.AddMyPlayer()` to validate
    - `GLMod.SetWinnerTeams(...)` + `GLMod.AddWinnerPlayer(...)` + `GLMod.EndGame()` at the end
 6. Adding custom actions: `GLMod.addAction(source, target, action)`.
+7. (Optional) Adding a tab to the Good Loss menu: `GLMod.MenuService.RegisterTab(title, draw, onShown)` with the `GLMod.Menu.MenuUI` widgets.
 
 > RPC **240** is **reserved** for GLMod. No third-party mod must use it.
 
@@ -551,6 +622,8 @@ A third-party mod consumes GLMod by:
 - **`token.txt`, `output`, `server`** are gitignored (see `.gitignore`).
 - **Ban**: handled server-side, HTTP 403 response + `"Banned: <reason>"`.
 - **Integrity**: `IntegrityService` can verify a DLL's SHA against a remote checksum to detect mod tampering.
+- **Local history**: `glmod-history.json` stays on the player's computer; it is never uploaded.
+- **Menu**: never shows information that would help during a game (roles, teams, shield T1, other players' positions). The history only shows the local player's role once the game is over. The token is never displayed.
 
 ---
 
@@ -591,9 +664,12 @@ For every change to the project:
 - **The `Among Us/` folder is gitignored** — every developer installs their own copy. Never commit this folder.
 - **IL2CPP calls from worker threads crash the game** (access violation in `coreclr.dll`): `GameStateManager.SyncGameId` used to send RPC 1 from `Task.Run`, which intermittently killed the host right after `[makeRPC] 1`. RPCs and anything touching `AmongUsClient` / `PlayerControl` must be called from the coroutine itself (Unity main thread); `CoroutineHelpers.RunAsync` is for HTTP / pure .NET work only.
 - **Client clock skew**: the site places actions and positions on the game timeline by comparing their timestamps with the server's own start/end times. With a wrong system clock (seen: 2h behind), the recap had no action times and no map data. Always timestamp with `ServerClock.NowMs()` (offset measured from API responses), never `DateTimeOffset.UtcNow`.
+- **IMGUI methods stripped from the Among Us build**: `GUI.DrawTexture` (every overload) and the 4-argument `RectOffset` constructor exist in the interop assemblies but throw "Method unstripping failed" at runtime. Draw backgrounds with `GUI.Box` + a style background tinted by `GUI.backgroundColor` (`MenuUI.DrawRect`), and set `RectOffset` fields one by one. Verified working: `GUI.Label` / `Button` / `Box` / `BeginGroup` / `EndGroup`, `GUI.matrix`, `GUI.color`, `GUIStyle.CalcHeight` / `CalcSize`, `Event.current`, `Texture2D` creation + `SetPixel` + `Apply`.
+- **`MonoBehaviour` messages (`Update`, `OnGUI`)**: attach the component with `BasePlugin.AddComponent<T>()` (BepInEx manager object). A component added in `Load()` to our own `new GameObject` + `DontDestroyOnLoad` never received `Update` / `OnGUI` (coroutines started on such an object do work, see `CoroutineRunner`).
+- **Global Among Us type names**: Assembly-CSharp types live in the global namespace and win over `using` imports (e.g. Among Us's `AccountTab` hid `GLMod.Menu.AccountTab`). Give GLMod types distinctive names (`*MenuTab`).
 - **Auto-generated `Resources.Designer.cs`**: regenerated by Visual Studio in the developer's UI culture and is the only file allowed to contain non-English content. Do not hand-edit; regenerate from a machine with an English UI if needed.
 
 ---
 
-*Last updated: 2026-10-14 — GLMod version 5.4.1.*
+*Last updated: 2026-10-14 — GLMod version 5.4.1 (+ Good Loss menu, unreleased).*
 *Every change to the project must be accompanied by an update of this file.*

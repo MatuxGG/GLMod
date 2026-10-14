@@ -14,6 +14,7 @@ using GLMod.Services.Implementations;
 using Random = System.Random;
 using GLMod.GLEntities;
 using GLMod.Class;
+using GLMod.Menu;
 
 namespace GLMod
 {
@@ -35,6 +36,8 @@ namespace GLMod
         public static IRankService RankService { get; private set; }
         public static IIntegrityService IntegrityService { get; private set; }
         public static IMapService MapService { get; private set; }
+        public static IGameHistoryService GameHistoryService { get; private set; }
+        public static IMenuService MenuService { get; private set; }
 
         public static ConfigEntry<string> connectionState { get; private set; }
         public static ConfigEntry<string> stepConf { get; private set; }
@@ -69,6 +72,7 @@ namespace GLMod
             log("Mod loaded");
 
             CoroutineRunner.Init();
+            InitializeMenu();
             StartVerificationAndPatching();
         }
 
@@ -98,6 +102,20 @@ namespace GLMod
             RankService = new RankService(Logger, AuthService, ConfigService, api);
             IntegrityService = new IntegrityService(Logger, api);
             MapService = new MapService(Logger);
+            GameHistoryService = new GameHistoryService(Logger,
+                Path.Combine(configPathValue, GameConstants.GAME_HISTORY_FILE_NAME), GameConstants.GAME_HISTORY_MAX_ENTRIES);
+            GameHistoryService.Load();
+            MenuService = new MenuService();
+        }
+
+        private void InitializeMenu()
+        {
+            // Built-in tabs first; third-party mods add theirs from their own Load() (see docs/dev.MD)
+            MenuService.RegisterTab(new AccountMenuTab(AuthService, ConfigService, api));
+            MenuService.RegisterTab(new GamesMenuTab(GameHistoryService, MenuService));
+            MenuService.RegisterTab(new RankMenuTab(RankService, AuthService, ConfigService));
+            MenuService.RegisterTab(new DlcMenuTab(ItemService, AuthService));
+            MenuBehaviour.Init(this);
         }
 
         private void VerifyStartupServices()
@@ -192,6 +210,16 @@ namespace GLMod
             else
             {
                 log("[✗] MapService: Failed to initialize");
+            }
+
+            // 9. GameHistoryService
+            if (GameHistoryService != null)
+            {
+                log($"[✓] GameHistoryService: Initialized ({GameHistoryService.Entries.Count} games in the local history)");
+            }
+            else
+            {
+                log("[✗] GameHistoryService: Failed to initialize");
             }
 
             log("=== All services verified ===");

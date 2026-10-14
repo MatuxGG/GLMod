@@ -238,5 +238,50 @@ namespace GLMod.Tests
             Assert.Empty(ScenarioVerifier.VerifyDistinctGames(null, "42"));
             Assert.Single(ScenarioVerifier.VerifyDistinctGames("41", "41"));
         }
+
+        private const string PreprodApi = "https://preprod.goodloss.fr/api";
+
+        private static GLGameHistoryEntry HistoryEntry(string gameId, bool won, string team) => new GLGameHistoryEntry
+        {
+            gameId = gameId,
+            recapUrl = "https://preprod.goodloss.fr/game/" + gameId,
+            map = "TheSkeld",
+            team = team,
+            won = won,
+        };
+
+        [Fact]
+        public void VerifyHistoryEntry_AcceptsExpectedOutcomes()
+        {
+            // Game 1: crewmates win; game 2: the impostor wins
+            Assert.Empty(ScenarioVerifier.VerifyHistoryEntry(HistoryEntry("41", true, "Crewmate"), NewGame("41"), 1, false, PreprodApi));
+            Assert.Empty(ScenarioVerifier.VerifyHistoryEntry(HistoryEntry("41", false, "Impostor"), NewGame("41"), 1, true, PreprodApi));
+            Assert.Empty(ScenarioVerifier.VerifyHistoryEntry(HistoryEntry("42", false, "Crewmate"), NewGame("42"), 2, false, PreprodApi));
+            Assert.Empty(ScenarioVerifier.VerifyHistoryEntry(HistoryEntry("42", true, "Impostor"), NewGame("42"), 2, true, PreprodApi));
+        }
+
+        [Fact]
+        public void VerifyHistoryEntry_DetectsMissingOrOtherGame()
+        {
+            Assert.Single(ScenarioVerifier.VerifyHistoryEntry(null, NewGame("42"), 2, false, PreprodApi));
+            Assert.Single(ScenarioVerifier.VerifyHistoryEntry(HistoryEntry("41", false, "Crewmate"), NewGame("42"), 2, false, PreprodApi));
+        }
+
+        [Fact]
+        public void VerifyHistoryEntry_DetectsWrongOutcomeAndRecapSite()
+        {
+            GLGameHistoryEntry entry = HistoryEntry("42", true, "Crewmate");
+            entry.recapUrl = "https://goodloss.fr/game/42";
+
+            List<string> failures = ScenarioVerifier.VerifyHistoryEntry(entry, NewGame("42"), 2, false, PreprodApi);
+
+            Assert.Equal(2, failures.Count);
+        }
+
+        [Fact]
+        public void VerifyHistoryEntry_SkipsGamesWithoutId()
+        {
+            Assert.Empty(ScenarioVerifier.VerifyHistoryEntry(null, NewGame(""), 1, false, PreprodApi));
+        }
     }
 }

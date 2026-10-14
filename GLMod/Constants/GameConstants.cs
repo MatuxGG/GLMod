@@ -84,5 +84,35 @@ namespace GLMod.Constants
         /// Action code prefix recorded when a sabotage ends (suffixed by the sabotage type).
         /// </summary>
         public const string ACTION_PREFIX_SAB_END = "SAB_END_";
+
+        /// <summary>
+        /// Path segment that ends the API base URL; removing it gives the Good Loss site URL.
+        /// </summary>
+        public const string API_PATH_SUFFIX = "/api";
+
+        /// <summary>
+        /// Site path of a game recap, followed by the game id.
+        /// </summary>
+        public const string SITE_GAME_PATH = "/game/";
+
+        /// <summary>
+        /// Local game history file, stored in the BepInEx config folder.
+        /// </summary>
+        public const string GAME_HISTORY_FILE_NAME = "glmod-history.json";
+
+        /// <summary>
+        /// Number of games kept in the local history.
+        /// </summary>
+        public const int GAME_HISTORY_MAX_ENTRIES = 20;
+
+        /// <summary>
+        /// Name of the UnityEngine.KeyCode that opens / closes the Good Loss menu.
+        /// </summary>
+        public const string MENU_TOGGLE_KEY = "F2";
+
+        /// <summary>
+        /// Seconds after which the menu reloads data fetched from the API (rank) when its tab is shown.
+        /// </summary>
+        public const double MENU_REFRESH_SECONDS = 60;
     }
 }

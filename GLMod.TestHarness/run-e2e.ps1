@@ -129,7 +129,18 @@ if (-not $KeepOtherPlugins) {
 }
 
 $savedScreenPrefs = Save-UnityScreenPrefs
-$mapId = if ($Map -eq 'Keep') { '' } else { "$($mapIds[$Map])" }
+
+# The instances record the test games in GLMod's local history (menu, Games tab): the player's own
+# history is set aside for the run and put back at the end; the run's history is kept in the output.
+$historyFile = Join-Path $bepInExDir 'config\glmod-history.json'
+$historyBackup = Join-Path $outputDir 'glmod-history.before-run.json'
+if (Test-Path $historyFile) { Move-Item $historyFile $historyBackup -Force }
+function Restore-GameHistory {
+    if (Test-Path $historyFile) { Move-Item $historyFile (Join-Path $outputDir 'glmod-history.json') -Force }
+    if (Test-Path $historyBackup) { Move-Item $historyBackup $historyFile -Force }
+}
+
+$mapId =if ($Map -eq 'Keep') { '' } else { "$($mapIds[$Map])" }
 
 $processes = @()
 try {
@@ -153,6 +164,7 @@ catch {
     Remove-Item $installedHarness -Force -ErrorAction SilentlyContinue
     foreach ($name in $isolated) { Move-Item (Join-Path $isolatedDir $name) (Join-Path $pluginsDir $name) -Force -ErrorAction SilentlyContinue }
     Restore-UnityScreenPrefs $savedScreenPrefs
+    Restore-GameHistory
     throw
 }
 finally {
@@ -199,6 +211,7 @@ finally {
     }
     if ((Test-Path $isolatedDir) -and -not (Get-ChildItem $isolatedDir)) { Remove-Item $isolatedDir -Force }
     Restore-UnityScreenPrefs $savedScreenPrefs
+    Restore-GameHistory
     Get-ChildItem $bepInExDir -Filter 'LogOutput*.log' | Copy-Item -Destination $outputDir -ErrorAction SilentlyContinue
 }
 
