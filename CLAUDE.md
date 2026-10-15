@@ -42,7 +42,7 @@ Any code review MUST reject contributions that introduce non-English identifiers
 
 ### 1.1 Identity
 - **Name**: GLMod (Good Loss Mod)
-- **Current version**: `5.5.1` (see [GLMod/GLMod.csproj](GLMod/GLMod.csproj) and [GLMod/GLMod.cs](GLMod/GLMod.cs))
+- **Current version**: `5.6.0` (see [GLMod/GLMod.csproj](GLMod/GLMod.csproj) and [GLMod/GLMod.cs](GLMod/GLMod.cs))
 - **BepInEx plugin Id**: `glmod`
 - **Author**: Matux
 - **License**: GNU GPLv3
@@ -95,7 +95,7 @@ GLMod follows a **service-oriented architecture** with:
 4. `VerifyStartupServices()` — logs the status of each service.
 5. `ConfigureDefaultSettings()` — enables the default services (see §3.3).
 6. `CoroutineRunner.Init()` — creates a persistent `DontDestroyOnLoad` GameObject to run coroutines from outside `MonoBehaviour`s.
-7. `InitializeMenu()` — registers the built-in menu tabs (Account, Last game, Sessions) and attaches `MenuBehaviour` through `BasePlugin.AddComponent` (see §8.1).
+7. `InitializeMenu()` — registers the built-in menu tabs (Account, Stats, Last game, Sessions) and attaches `MenuBehaviour` through `BasePlugin.AddComponent` (see §8.1).
 8. `Harmony.PatchAll()` — applies all Harmony patches from the `GLMod.EventPatch` namespace.
 
 ### 2.3 Service dependency graph
@@ -208,6 +208,11 @@ Every service is exposed statically via the main `GLMod` class and has a dedicat
 - **Endpoints** (GET, no authentication, `?username=<Good Loss account name>` — `AuthService.GetAccountName()`):
   - `GetSessions` → `GET {API}/player/sessions` — the last 10 sessions (`GLSessionList`).
   - `GetLastGame` → `GET {API}/player/last-game` — the last finished game and the player's stats in it (`GLLastGame`).
+  - `GetRanks` → `GET {API}/player/ranks` — the current ranks, one per ranked leaderboard (`GLPlayerRanks`).
+  - `GetStats` → `GET {API}/player/stats` — wins / games in total and by team over all mods (`GLPlayerStats`).
+- **Contract of `/player/ranks` and `/player/stats`** (defined by GLMod, to be served by the site; unit-tested on sample bodies):
+  - ranks: `{"username", "ranks": [{"mod", "season", "name", "image" (absolute PNG URL of the badge), "elo", "rp", "position", "leaderboardUrl" (absolute)}]}`; `rp`, `elo`, `position`, `image`, `leaderboardUrl` may be `null`;
+  - stats: `{"username", "mod", "season", "stats": {"games", "crewmate", "impostor", "neutral": {"wins", "games"}}}` — without query filter, all mods / seasons (`mod` / `season` echo the optional `?mod=` / `?season=` filters, `null` when absent).
 - **Nullable fields**: the API sends `null` for values that do not exist yet (e.g. `end` of a live session) or do not apply; the entities use nullable types for every such number, otherwise the whole response would be unreadable.
 - **Errors**: `{"error":"Player not found"}` (404) / `{"error":"Missing username"}` (400) are passed to `onError` as their message; a non-JSON error (e.g. the endpoint does not exist yet on production) gives `HTTP <code>`, a network failure `Network error`, a body that does not match the entities `Unreadable response` (the log then gives the JSON error and the start of the body).
 - Requests go through `ApiService.GetWithErrorHandlingAsync` (also feeds `ServerClock`); parsing is pure ([PlayerApiResponse.cs](GLMod/Class/PlayerApiResponse.cs), unit-tested with captured preprod responses).
@@ -236,6 +241,8 @@ Every service is exposed statically via the main `GLMod` class and has a dedicat
 | `GLGameHistoryEntry` | Local history entry (never sent to the API): gameId, recapUrl, endedAtMs, map, modName, role, team, won. |
 | `GLSessionList` / `GLSession` | `GET /player/sessions`: username + sessions (id, url, start, end (Unix s, **null while the session is live**), games, live, current). |
 | `GLLastGame` / `GLLastGameInfo` / `GLLastGamePlayer` | `GET /player/last-game`: game (id, url, mod, season, ranked, map, start, end, duration, turns, meetings, players, winners) and player stats (role, team, win, rp, kills, votes, reports, survival… nullable when not applicable). |
+| `GLPlayerRanks` / `GLPlayerRank` | `GET /player/ranks`: username + ranks (mod, season, name, image URL, elo, rp, position, leaderboardUrl; numbers nullable). |
+| `GLPlayerStats` / `GLWinStats` / `GLWinCount` | `GET /player/stats`: username, mod / season filters, wins and games in total (`games`) and per team (`crewmate`, `impostor`, `neutral`). |
 
 > **Note**: every numeric property transiting through the API is **encoded as `string`** (`tasks = "0"`, `ranked = "1"`, etc.). This convention matches the Good Loss API protocol and **must not be changed** without coordination with the API team. `GLGameHistoryEntry` is local-only and uses plain `long` / `bool`. The `/player/sessions` and `/player/last-game` responses are real JSON numbers / booleans / nulls: their entities mirror them (`long`, `int?`, `double?`, `bool?`) and their property names match the JSON keys exactly (camelCase, System.Text.Json is case-sensitive).
 
@@ -297,7 +304,7 @@ Reactor, Coms, Lights, O2
 | `RANKED_LOGO_RESOURCE_NAME`   | `GLMod.Resources.ranked-logo.png` — logo of the Among Us Ranked menu theme |
 | `RANKED_MOD_NAME`             | `Among Us Ranked` — mod name prefix that selects the Among Us Ranked menu theme |
 | `MENU_TOGGLE_KEY`             | `F2` (`UnityEngine.KeyCode` name)            |
-| `MENU_TAB_ACCOUNT` / `MENU_TAB_LAST_GAME` / `MENU_TAB_SESSIONS` | `glmod.account` / `glmod.lastgame` / `glmod.sessions` — ids of the built-in menu tabs (public, for mods) |
+| `MENU_TAB_ACCOUNT` / `MENU_TAB_STATS` / `MENU_TAB_LAST_GAME` / `MENU_TAB_SESSIONS` | `glmod.account` / `glmod.stats` / `glmod.lastgame` / `glmod.sessions` — ids of the built-in menu tabs (public, for mods) |
 | `MENU_REFRESH_SECONDS`        | `60` — a tab reloads its API data when shown after this delay |
 | `MENU_RETRY_SECONDS`          | `10` — delay before retrying a failed API load |
 | `LAST_GAME_WAIT_SECONDS`      | `120` — after a game ends, how long the Last game tab polls for it |
@@ -349,7 +356,7 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 | `GameLanguage.cs`      | `SupportedLangs` name → language code (pure `ToCode`) and `CurrentCode()` (reads the game settings). |
 | `PlayModeHelper.cs`    | `IsFreePlay()` — free play games are never recorded nor sent (§3.3). |
 | `RankedMod.cs`         | `Matches(modName)` — "Among Us Ranked" and its variants ("Among Us Ranked Roles"…), case-insensitive. Pure. |
-| `StatFormat.cs`        | Pure formatting of menu stats: durations ("1 min 05 s", "2 h 05"), ratios, Yes/No, numbers, local dates, vanilla role names. |
+| `StatFormat.cs`        | Pure formatting of menu stats: durations ("1 min 05 s", "2 h 05"), ratios, win percentages (`WinPercent`, rounded like the site), Yes/No, numbers, local dates, vanilla role names. |
 | `ServerClock.cs`       | `NowMs()` — Unix ms aligned on the API server clock. The offset is refreshed from the `Date` header of every `ApiService` response. **Every timestamp sent to the API (actions, positions) must use `ServerClock.NowMs()`**, never `DateTimeOffset.UtcNow`. |
 | `CoroutineHelpers.cs`  | `RunAsync` / `RunAsync<T>` — async-task ↔ coroutine bridge. Use these instead of re-implementing the `Task.Run` + volatile `done` flag pattern. |
 | `CoroutineRunner.cs`   | `MonoBehaviour` IL2CPP singleton used to run coroutines from static classes.               |
@@ -369,13 +376,14 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 - **Fonts**: OS fonts through `Font.CreateDynamicFontFromOSFont`: display text (titles, tabs, buttons, captions) in Bahnschrift SemiBold (condensed DIN-like face of Windows 10+), body text in Segoe UI; Arial / the IMGUI default font elsewhere (Linux / Proton).
 - **Navigation**: left / right arrows (or the ‹ › buttons, or a click on a tab) switch tabs; up / down arrows and the mouse wheel scroll the current tab. The game does not see these inputs while the menu uses them (§7 patches).
 - **Rendering**: IMGUI from `MenuBehaviour` (`Update` = keys, scrolling, slide and content animations; `OnGUI` = drawing). Layout values are 1080p reference units converted to **screen pixels** with `MenuUI.U` (scale = screen height / 1080, never below `0.85`); styles (font sizes) are rebuilt when the scale changes, so text is rendered at its real size and stays sharp (no `GUI.matrix` scaling). Palette based on the Good Loss site (`--accent #A78BFA`, deeper `#7C3AED` for gradients, dark navy surfaces). `MenuBehaviour` notifies `IMenuTab.OnShown()` when a tab becomes visible; tab exceptions are logged once and replaced by an error message.
-- **Widgets**: [MenuUI.cs](GLMod/Menu/MenuUI.cs) — public, used by built-in and third-party tabs: `Heading`, `Highlight`, `Label`, `Muted`, `Field`, `Button`, `Row`, `ProgressBar`, `Tiles`, `StatGrid` (compact 3-column stat tiles, null values skipped), `Tags` (colored pills, wrapping), `Space`, `Separator`, colors. Internal helpers for the built-in tabs: `Reserve`, `DrawRect`, `DrawGlow`, `DrawCircle`, `DrawAccentGradient`, `DrawPill`, `DrawSecondaryButton`, `EmptyState`.
+- **Widgets**: [MenuUI.cs](GLMod/Menu/MenuUI.cs) — public, used by built-in and third-party tabs: `Heading`, `Highlight`, `Label`, `Muted`, `Field`, `Button`, `Row`, `ProgressBar`, `Tiles`, `StatGrid` (compact 3-column stat tiles, null values skipped), `Tags` (colored pills, wrapping), `WinRate` (label, counts, colored bar and percentage), `Space`, `Separator`, colors. Internal helpers for the built-in tabs: `Reserve`, `DrawRect`, `DrawGlow`, `DrawCircle`, `DrawRemoteImage` (image downloaded from a URL through `HttpHelper`, decoded on the main thread, cached by URL), `DrawAccentGradient`, `DrawPill`, `DrawSecondaryButton`, `EmptyState`.
 - **Textures**: generated once with `Texture2D.SetPixel` (white, tinted through `GUI.backgroundColor` and drawn with `GUI.Box` + 9-slice borders): rounded rectangles (4 / 7 / 12 px), circle, soft halos (large and small), accent and panel gradients (colors baked in). A halo whose 9-slice border is larger than the drawn rectangle turns into a block: `DrawGlow` switches to the small halo for elements under 24 px.
 - **Built-in tabs** (class names end with `MenuTab`: Among Us already has a global `AccountTab` type, which would win name resolution):
 
 | Tab | Class | Content |
 |-----|-------|---------|
-| Account | `AccountMenuTab` | Connection status (connected + account / not connected / banned + reason), detected mod, GLMod version, server when not production. |
+| Account | `AccountMenuTab` | Connection status (connected + account / not connected / banned + reason), then the **ranks** (`PlayerService.GetRanks`): one badge per leaderboard, two per row — badge image downloaded from the site (`MenuUI.DrawRemoteImage`, cached by URL), "GOLD 1 · 28 RP" (ELO when the API gives no RP), "#22" position, mod and season, and a "Leaderboard" button opening `leaderboardUrl`; server when not production. The detected mod and GLMod version are no longer shown. Ranks are invalidated when a game ends. |
+| Stats | `StatsMenuTab` | `PlayerService.GetStats`: win rate cards like the profile page of the site — Games (accent), Crewmate (green), Impostor (red), Neutral (purple), each with "wins / games" and the percentage (`MenuUI.WinRate`). Invalidated when a game ends. |
 | Last game | `LastGameMenuTab` | `PlayerService.GetLastGame`, kept concise (little scrolling): result card (VICTORY / DEFEAT, date, "as <in-game name> · <mod> · S<season>", map / role pills); the boolean facts **only when true**, as colored tags (Ranked, First blood, Killed first, First victim, Killed, Exiled; a false value shows nothing); "View recap" → `Application.OpenURL(game.url)`; then every non-null numeric value in a 3-column `StatGrid` (duration, turns, meetings, players, ranking points, kills, double kills, time to first kill, tasks, task speed, death / exile turn, time / turns / meetings alive, good votes, key-meeting votes, skips, votes received, teammate votes, vote order / delay, bodies reported, self reports, report delay, emergencies). The `winners` list is not shown (the result already says it). When a game ends (`IGameHistoryService.EntryRecorded`) the tab is selected for the next opening and reloads every `LAST_GAME_POLL_SECONDS` until Good Loss returns that game id (at most `LAST_GAME_WAIT_SECONDS`), with a "still processing" note meanwhile. |
 | Sessions | `SessionsMenuTab` | `PlayerService.GetSessions`: tiles (sessions, games played), then one row per session (start date, games, duration, LIVE / OPEN badge, "View" → session page). Invalidated when a game ends. |
 
@@ -419,6 +427,8 @@ Base: `https://goodloss.fr/api` (production). It can be overridden at startup wi
 | `/player/rank`                 | POST   | RankService       | Player rank by mod.                    |
 | `/player/sessions?username=`   | GET    | PlayerService     | Last 10 sessions of a player (menu, Sessions tab). |
 | `/player/last-game?username=`  | GET    | PlayerService     | Last finished game of a player + their stats (menu, Last game tab). |
+| `/player/ranks?username=`      | GET    | PlayerService     | Current ranks of a player, one per ranked leaderboard (menu, Account tab). **To be added on the site** (contract in §3.11). |
+| `/player/stats?username=`      | GET    | PlayerService     | Win statistics of a player, total and per team (menu, Stats tab). **To be added on the site** (contract in §3.11). |
 
 > **Keep up to date**: every endpoint added to or removed from the project must be reflected in this table.
 
@@ -564,6 +574,11 @@ GLMod/                                # Repo root
     │   ├── GLLastGame.cs             # GET /player/last-game response…
     │   ├── GLLastGameInfo.cs         # …its game part…
     │   ├── GLLastGamePlayer.cs       # …and its player stats.
+    │   ├── GLPlayerRanks.cs          # GET /player/ranks response…
+    │   ├── GLPlayerRank.cs           # …one rank.
+    │   ├── GLPlayerStats.cs          # GET /player/stats response…
+    │   ├── GLWinStats.cs             # …total and per-team counts…
+    │   ├── GLWinCount.cs             # …wins / games.
     │   ├── GLSession.cs
     │   ├── GLSessionList.cs          # GET /player/sessions response.
     │   ├── GLItem.cs
@@ -578,6 +593,7 @@ GLMod/                                # Repo root
     │   ├── MenuUI.cs                 # Public IMGUI widgets + palette.
     │   ├── MenuBehaviour.cs          # IL2CPP MonoBehaviour: input, animation, drawing.
     │   ├── AccountMenuTab.cs
+    │   ├── StatsMenuTab.cs
     │   ├── LastGameMenuTab.cs
     │   ├── SessionsMenuTab.cs
     │   └── RemoteData.cs             # Cached API data of a tab.
@@ -749,5 +765,5 @@ For every change to the project:
 
 ---
 
-*Last updated: 2026-10-14 — GLMod version 5.5.1.*
+*Last updated: 2026-10-15 — GLMod version 5.6.0.*
 *Every change to the project must be accompanied by an update of this file.*

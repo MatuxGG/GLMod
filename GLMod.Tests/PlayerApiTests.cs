@@ -100,6 +100,48 @@ namespace GLMod.Tests
             Assert.Equal("ab...", PlayerApiResponse.Snippet("abcdef", 2));
         }
 
+        // Contract proposed for GET /player/ranks and GET /player/stats (see CLAUDE.md §3.11)
+        private const string RanksJson =
+            "{\"username\":\"Matux\",\"ranks\":[" +
+            "{\"mod\":\"Among Us Ranked\",\"season\":3,\"name\":\"Silver 2\",\"image\":\"https://amongusranked.orianagames.com/images/ranks/argent2.png\",\"elo\":706,\"rp\":28,\"position\":22,\"leaderboardUrl\":\"https://amongusranked.orianagames.com/leaderboards\"}," +
+            "{\"mod\":\"Among Us Ranked Roles\",\"season\":3,\"name\":\"Unranked\",\"image\":null,\"elo\":1000,\"rp\":null,\"position\":null,\"leaderboardUrl\":null}]}";
+
+        private const string StatsJson =
+            "{\"username\":\"Matux\",\"mod\":null,\"season\":null,\"stats\":{\"games\":{\"wins\":548,\"games\":833},\"crewmate\":{\"wins\":506,\"games\":657},\"impostor\":{\"wins\":38,\"games\":148},\"neutral\":{\"wins\":4,\"games\":28}}}";
+
+        [Fact]
+        public void Ranks_ParseProposedContract()
+        {
+            Assert.True(PlayerApiResponse.TryParse(RanksJson, out GLPlayerRanks ranks, out string error), error);
+
+            Assert.Equal(2, ranks.ranks.Count);
+            GLPlayerRank first = ranks.ranks[0];
+            Assert.Equal("Among Us Ranked", first.mod);
+            Assert.Equal(3, first.season);
+            Assert.Equal("Silver 2", first.name);
+            Assert.Equal(706, first.elo);
+            Assert.Equal(28, first.rp);
+            Assert.Equal(22, first.position);
+            Assert.Equal("https://amongusranked.orianagames.com/leaderboards", first.leaderboardUrl);
+            Assert.Null(ranks.ranks[1].rp);
+            Assert.Null(ranks.ranks[1].position);
+            Assert.Null(ranks.ranks[1].image);
+        }
+
+        [Fact]
+        public void Stats_ParseProposedContract()
+        {
+            Assert.True(PlayerApiResponse.TryParse(StatsJson, out GLPlayerStats stats, out string error), error);
+
+            Assert.Null(stats.mod);
+            Assert.Null(stats.season);
+            Assert.Equal(548, stats.stats.games.wins);
+            Assert.Equal(833, stats.stats.games.games);
+            Assert.Equal(657, stats.stats.crewmate.games);
+            Assert.Equal(38, stats.stats.impostor.wins);
+            Assert.Equal(28, stats.stats.neutral.games);
+        }
+
         [Fact]
         public void LastGame_WithoutGame_ParsesWithNullParts()
         {
@@ -145,6 +187,21 @@ namespace GLMod.Tests
         public void Duration_IsHumanReadable(double seconds, string expected)
         {
             Assert.Equal(expected, StatFormat.Duration(seconds));
+        }
+
+        [Theory]
+        // Values of the profile page of the site
+        [InlineData(548, 833, 66)]
+        [InlineData(506, 657, 77)]
+        [InlineData(38, 148, 26)]
+        [InlineData(4, 28, 14)]
+        [InlineData(0, 0, 0)]
+        [InlineData(5, 0, 0)]
+        [InlineData(1, 2, 50)]
+        [InlineData(9, 4, 100)]
+        public void WinPercent_IsRounded(int wins, int games, int expected)
+        {
+            Assert.Equal(expected, StatFormat.WinPercent(wins, games));
         }
 
         [Fact]

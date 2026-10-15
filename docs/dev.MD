@@ -133,6 +133,7 @@ Every tab has a unique, stable **id**. Built-in tabs, in this order:
 | Tab | Id (`GLMod.Constants.GameConstants`) |
 |-----|--------------------------------------|
 | Account | `MENU_TAB_ACCOUNT` = `"glmod.account"` |
+| Stats | `MENU_TAB_STATS` = `"glmod.stats"` |
 | Last game | `MENU_TAB_LAST_GAME` = `"glmod.lastgame"` |
 | Sessions | `MENU_TAB_SESSIONS` = `"glmod.sessions"` |
 
@@ -187,7 +188,7 @@ IMenuTab found = GLMod.MenuService.FindTab("mymod.rules");
 
 For more control, implement `IMenuTab` (`Id`, `Title`, `OnShown()`, `Draw()`) and register it with `RegisterTab(tab)` or `InsertTab(index, tab)`.
 
-Widgets: `Heading` (section title), `Highlight` (large display text), `Label` (optionally colored), `Muted`, `Field(name, value)`, `Button` (gradient call to action, returns true when clicked), `Row(text, buttonText, color)` (card with a colored edge and an optional small button), `ProgressBar(label, fraction, valueText)`, `Tiles(("Label", "value"), ...)` (row of stat tiles), `StatGrid(columns, ("Label", value), ...)` (compact grid of stat tiles, null values skipped), `Tags(("Text", color), ...)` (colored pills that wrap), `Space`, `Separator`, and the colors `MenuUI.Accent`, `AccentStrong`, `Text`, `MutedText`, `Success`, `Danger`. The colors follow the current theme (`MenuUI.Theme`: Good Loss, or Among Us Ranked when the mod is Among Us Ranked), so read them while drawing instead of caching them. Sizes passed to the widgets (e.g. `Space(10f)`) are 1080p reference units; `MenuUI.Width` is in screen pixels.
+Widgets: `Heading` (section title), `Highlight` (large display text), `Label` (optionally colored), `Muted`, `Field(name, value)`, `Button` (gradient call to action, returns true when clicked), `Row(text, buttonText, color)` (card with a colored edge and an optional small button), `ProgressBar(label, fraction, valueText)`, `Tiles(("Label", "value"), ...)` (row of stat tiles), `StatGrid(columns, ("Label", value), ...)` (compact grid of stat tiles, null values skipped), `Tags(("Text", color), ...)` (colored pills that wrap), `WinRate(label, counts, percent, color)` (win rate card with a colored bar), `Space`, `Separator`, and the colors `MenuUI.Accent`, `AccentStrong`, `Text`, `MutedText`, `Success`, `Danger`. The colors follow the current theme (`MenuUI.Theme`: Good Loss, or Among Us Ranked when the mod is Among Us Ranked), so read them while drawing instead of caching them. Sizes passed to the widgets (e.g. `Space(10f)`) are 1080p reference units; `MenuUI.Width` is in screen pixels.
 
 Rules:
 - Everything runs on the Unity main thread. `Draw()` is called several times per frame (IMGUI): keep it cheap and never start requests from it, start them from `OnShown()` (e.g. with a coroutine) and draw the cached result.
@@ -234,7 +235,7 @@ GLMod.ServiceManager   // IServiceManager
 GLMod.GameStateManager // IGameStateManager
 GLMod.GameHistoryService // IGameHistoryService
 GLMod.MenuService      // IMenuService
-GLMod.PlayerService    // IPlayerService (GET /player/sessions, /player/last-game)
+GLMod.PlayerService    // IPlayerService (GET /player/sessions, /player/last-game, /player/ranks, /player/stats)
 GLMod.TranslationService // ITranslationService (menu texts in the game language)
 ```
 

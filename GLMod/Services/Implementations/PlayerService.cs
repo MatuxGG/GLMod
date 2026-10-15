@@ -35,6 +35,18 @@ namespace GLMod.Services.Implementations
             return Get(endpoint, username, onComplete, onError);
         }
 
+        public IEnumerator GetRanks(string username, Action<GLPlayerRanks> onComplete, Action<string> onError = null)
+        {
+            const string endpoint = "/player/ranks";
+            return Get(endpoint, username, onComplete, onError);
+        }
+
+        public IEnumerator GetStats(string username, Action<GLPlayerStats> onComplete, Action<string> onError = null)
+        {
+            const string endpoint = "/player/stats";
+            return Get(endpoint, username, onComplete, onError);
+        }
+
         private IEnumerator Get<T>(string endpoint, string username, Action<T> onComplete, Action<string> onError) where T : class
         {
             if (string.IsNullOrEmpty(username))

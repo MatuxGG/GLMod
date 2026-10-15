@@ -23,7 +23,7 @@ namespace GLMod
     public class GLMod : BasePlugin
     {
         public const string Id = "glmod";
-        public const string Version = "5.5.1";
+        public const string Version = "5.6.0";
 
         public Harmony Harmony { get; } = new Harmony(Id);
 
@@ -115,7 +115,8 @@ namespace GLMod
         private void InitializeMenu()
         {
             // Built-in tabs first; third-party mods add theirs from their own Load() (see docs/dev.MD)
-            MenuService.RegisterTab(new AccountMenuTab(AuthService, ConfigService, api, TranslationService));
+            MenuService.RegisterTab(new AccountMenuTab(AuthService, PlayerService, GameHistoryService, api, TranslationService));
+            MenuService.RegisterTab(new StatsMenuTab(PlayerService, AuthService, GameHistoryService, TranslationService));
             MenuService.RegisterTab(new LastGameMenuTab(PlayerService, AuthService, GameHistoryService, MenuService, TranslationService));
             MenuService.RegisterTab(new SessionsMenuTab(PlayerService, AuthService, GameHistoryService, TranslationService));
             MenuBehaviour.Init(this);

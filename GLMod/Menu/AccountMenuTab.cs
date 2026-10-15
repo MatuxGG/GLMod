@@ -1,35 +1,54 @@
 using GLMod.Class;
 using GLMod.Constants;
+using GLMod.GLEntities;
 using GLMod.Services.Interfaces;
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace GLMod.Menu
 {
     /// <summary>
-    /// Good Loss account status and detected mod.
+    /// Good Loss account status and current ranks (GET /player/ranks): one badge per ranked leaderboard
+    /// with its points, position and a link to the leaderboard.
     /// </summary>
     public class AccountMenuTab : IMenuTab
     {
+        private const float RankCellHeight = 186f;
+
         private readonly IAuthenticationService _authService;
-        private readonly IConfigurationService _configService;
         private readonly string _apiEndpoint;
         private readonly ITranslationService _t;
+        private readonly RemoteData<GLPlayerRanks> _ranks;
 
         public string Id => GameConstants.MENU_TAB_ACCOUNT;
 
         public string Title => _t.Get("tab.account");
 
-        public AccountMenuTab(IAuthenticationService authService, IConfigurationService configService, string apiEndpoint, ITranslationService translations)
+        public AccountMenuTab(IAuthenticationService authService, IPlayerService playerService, IGameHistoryService historyService, string apiEndpoint, ITranslationService translations)
         {
             _authService = authService ?? throw new ArgumentNullException(nameof(authService));
-            _configService = configService ?? throw new ArgumentNullException(nameof(configService));
+            if (playerService == null)
+            {
+                throw new ArgumentNullException(nameof(playerService));
+            }
             _apiEndpoint = apiEndpoint ?? throw new ArgumentNullException(nameof(apiEndpoint));
             _t = translations ?? throw new ArgumentNullException(nameof(translations));
+            _ranks = new RemoteData<GLPlayerRanks>(playerService.GetRanks);
+
+            // A finished game changes the points and the position
+            if (historyService != null)
+            {
+                historyService.EntryRecorded += _ => _ranks.Invalidate();
+            }
         }
 
         public void OnShown()
         {
+            if (_authService.IsLoggedIn)
+            {
+                _ranks.Refresh(_authService.GetAccountName());
+            }
         }
 
         public void Draw()
@@ -44,13 +63,114 @@ namespace GLMod.Menu
                 MenuUI.Muted(_t.Get("account.offlineHint"));
             }
 
-            MenuUI.Space(8f);
-            MenuUI.Heading(_t.Get("account.mod"));
-            MenuUI.Tiles((_t.Get("account.detectedMod"), _configService.ModName), ("GLMod", "v" + GLMod.Version));
+            if (_authService.IsLoggedIn)
+            {
+                MenuUI.Space(6f);
+                MenuUI.Heading(_t.Get("account.ranks"));
+                DrawRanks();
+            }
+
             if (_apiEndpoint != GameConstants.API_ENDPOINT)
             {
                 MenuUI.Field(_t.Get("account.server"), ApiEndpointResolver.ToSiteUrl(_apiEndpoint), MenuUI.Accent);
             }
+        }
+
+        private void DrawRanks()
+        {
+            GLPlayerRanks data = _ranks.ValueFor(_authService.GetAccountName());
+            if (data == null)
+            {
+                if (_ranks.Error != null && !_ranks.Loading)
+                {
+                    MenuUI.Muted(_t.Get("account.ranks.error", _ranks.Error));
+                    if (MenuUI.Button(_t.Get("state.retry")))
+                    {
+                        _ranks.Refresh(_authService.GetAccountName(), true);
+                    }
+                }
+                else
+                {
+                    MenuUI.Muted(_t.Get("account.ranks.loading"));
+                }
+                return;
+            }
+
+            List<GLPlayerRank> ranks = data.ranks ?? new List<GLPlayerRank>();
+            if (ranks.Count == 0)
+            {
+                MenuUI.Muted(_t.Get("account.ranks.empty"));
+                return;
+            }
+
+            // Two badges per row; a single badge is centered
+            for (int start = 0; start < ranks.Count; start += 2)
+            {
+                Rect row = MenuUI.Reserve(RankCellHeight, 8f);
+                float gap = MenuUI.U(8f);
+                float width = (row.width - gap) / 2f;
+                int count = Math.Min(2, ranks.Count - start);
+                float x = count == 1 ? row.x + (row.width - width) / 2f : row.x;
+                for (int i = 0; i < count; i++)
+                {
+                    DrawRankCell(new Rect(x + i * (width + gap), row.y, width, row.height), ranks[start + i]);
+                }
+            }
+        }
+
+        private void DrawRankCell(Rect cell, GLPlayerRank rank)
+        {
+            MenuUI.DrawRect(cell, MenuUI.Surface, MenuUI.Corner.Medium);
+
+            float imageSize = MenuUI.U(86f);
+            var image = new Rect(cell.x + (cell.width - imageSize) / 2f, cell.y + MenuUI.U(8f), imageSize, imageSize);
+            if (!MenuUI.DrawRemoteImage(image, rank.image))
+            {
+                float placeholder = MenuUI.U(56f);
+                MenuUI.DrawCircle(new Rect(image.x + (imageSize - placeholder) / 2f, image.y + (imageSize - placeholder) / 2f, placeholder, placeholder), MenuUI.SurfaceHover);
+            }
+
+            float y = image.yMax + MenuUI.U(4f);
+            var line = new Rect(cell.x + MenuUI.U(6f), y, cell.width - MenuUI.U(12f), MenuUI.U(22f));
+            MenuUI.DrawText(line, RankTitle(rank), MenuUI.TileValueStyle, MenuUI.Text, TextAnchor.MiddleCenter);
+
+            y += MenuUI.U(22f);
+            if (rank.position.HasValue)
+            {
+                MenuUI.DrawText(new Rect(line.x, y, line.width, MenuUI.U(18f)), _t.Get("account.rank.position", rank.position.Value),
+                    MenuUI.RowStyle, MenuUI.AccentLight, TextAnchor.MiddleCenter);
+            }
+            y += MenuUI.U(18f);
+            string mod = (rank.mod ?? "") + (rank.season.HasValue ? "  ·  S" + rank.season.Value : "");
+            MenuUI.DrawText(new Rect(line.x, y, line.width, MenuUI.U(16f)), mod.ToUpperInvariant(), MenuUI.CaptionStyle, MenuUI.DimText, TextAnchor.MiddleCenter);
+
+            if (!string.IsNullOrEmpty(rank.leaderboardUrl))
+            {
+                string label = _t.Get("account.leaderboard").ToUpperInvariant();
+                float buttonWidth = Mathf.Min(cell.width - MenuUI.U(20f), MenuUI.SmallButtonStyle.CalcSize(new GUIContent(label)).x + MenuUI.U(28f));
+                var button = new Rect(cell.x + (cell.width - buttonWidth) / 2f, cell.yMax - MenuUI.U(32f), buttonWidth, MenuUI.U(24f));
+                if (MenuUI.DrawSecondaryButton(button, label))
+                {
+                    Application.OpenURL(rank.leaderboardUrl);
+                }
+            }
+        }
+
+        /// <summary>
+        /// "GOLD 1 · 28 RP", or with the ELO when the API gives no rank points
+        /// </summary>
+        private string RankTitle(GLPlayerRank rank)
+        {
+            string name = (rank.name ?? "").ToUpperInvariant();
+            if (rank.rp.HasValue)
+            {
+                return name + "  ·  " + _t.Get("account.rank.rp", rank.rp.Value);
+            }
+            if (rank.elo.HasValue)
+            {
+                return name + "  ·  " + _t.Get("account.rank.elo", rank.elo.Value);
+            }
+            return name;
         }
 
         private void DrawProfileCard()

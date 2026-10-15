@@ -1,3 +1,4 @@
+using GLMod.Class;
 using GLMod.Constants;
 using System;
 using System.IO;
@@ -255,6 +256,35 @@ namespace GLMod.Menu
                 DrawText(new Rect(tile.x + U(12f), tile.y + U(27f), tile.width - U(24f), U(28f)),
                     string.IsNullOrEmpty(tiles[i].value) ? "-" : tiles[i].value, TileValueStyle, Text);
             }
+        }
+
+        /// <summary>
+        /// Win rate card: label and counts on top, then a bar in the given color and the percentage
+        /// </summary>
+        /// <param name="label">e.g. "Crewmate"</param>
+        /// <param name="counts">e.g. "24 wins / 33 games"</param>
+        /// <param name="percent">0 to 100</param>
+        /// <param name="color">Bar color</param>
+        public static void WinRate(string label, string counts, int percent, Color color)
+        {
+            Rect card = Reserve(58f, 6f);
+            DrawRect(card, Surface, Corner.Medium);
+            float x = card.x + U(14f);
+            float width = card.width - U(28f);
+            DrawText(new Rect(x, card.y + U(8f), width, U(20f)), label ?? "", RowStyle, Text);
+            DrawText(new Rect(x, card.y + U(8f), width, U(20f)), counts ?? "", CaptionStyle, MutedText, TextAnchor.MiddleRight);
+
+            float percentWidth = U(44f);
+            var track = new Rect(x, card.y + U(37f), width - percentWidth, U(7f));
+            DrawRect(track, Border, Corner.Small);
+            float fill = track.width * Mathf.Clamp01(percent / 100f);
+            if (fill >= 1f)
+            {
+                var bar = new Rect(track.x, track.y, Mathf.Max(fill, track.height), track.height);
+                DrawGlow(bar, WithAlpha(color, 0.3f));
+                DrawRect(bar, color, Corner.Small);
+            }
+            DrawText(new Rect(track.xMax, card.y + U(30f), percentWidth, U(20f)), percent + "%", TileValueStyle, Text, TextAnchor.MiddleRight);
         }
 
         /// <summary>
@@ -700,22 +730,101 @@ namespace GLMod.Menu
 
                 using var buffer = new MemoryStream();
                 stream.CopyTo(buffer);
-                var texture = new Texture2D(2, 2, TextureFormat.ARGB32, true);
-                texture.hideFlags = HideFlags.HideAndDontSave;
-                texture.wrapMode = TextureWrapMode.Clamp;
-                if (!ImageConversion.LoadImage(texture, buffer.ToArray(), false))
-                {
-                    GLMod.log("[Menu] Logo could not be decoded: " + resource);
-                    return null;
-                }
-                texture.filterMode = FilterMode.Trilinear;
-                aspect = texture.width / (float)texture.height;
-                return FillStyle(texture, 0);
+                return DecodeImage(buffer.ToArray(), resource, out aspect);
             }
             catch (Exception e)
             {
                 GLMod.log("[Menu] Logo unavailable, using the initials badge: " + e.Message);
                 return null;
+            }
+        }
+
+        /// <summary>
+        /// PNG / JPG bytes to a drawable style (ImageConversion, as Among Us mods do for sprites); null when invalid
+        /// </summary>
+        private static GUIStyle DecodeImage(byte[] bytes, string source, out float aspect)
+        {
+            aspect = 1f;
+            var texture = new Texture2D(2, 2, TextureFormat.ARGB32, true);
+            texture.hideFlags = HideFlags.HideAndDontSave;
+            texture.wrapMode = TextureWrapMode.Clamp;
+            if (!ImageConversion.LoadImage(texture, bytes, false))
+            {
+                GLMod.log("[Menu] Image could not be decoded: " + source);
+                return null;
+            }
+            texture.filterMode = FilterMode.Trilinear;
+            aspect = texture.width / (float)texture.height;
+            return FillStyle(texture, 0);
+        }
+
+        // ------------------------------------------------------------------ remote images
+
+        private sealed class RemoteImage
+        {
+            public GUIStyle Style;
+            public float Aspect = 1f;
+        }
+
+        private static readonly System.Collections.Generic.Dictionary<string, RemoteImage> _remoteImages =
+            new System.Collections.Generic.Dictionary<string, RemoteImage>();
+
+        /// <summary>
+        /// Draws an image downloaded from a URL (e.g. a rank badge), fitted in the rectangle with its proportions.
+        /// The first call starts the download (cached by URL); false while it is not available.
+        /// </summary>
+        internal static bool DrawRemoteImage(Rect rect, string url)
+        {
+            if (string.IsNullOrEmpty(url))
+            {
+                return false;
+            }
+
+            if (!_remoteImages.TryGetValue(url, out RemoteImage image))
+            {
+                image = new RemoteImage();
+                _remoteImages[url] = image;
+                CoroutineRunner.Run(LoadRemoteImage(url, image));
+            }
+            if (image.Style == null)
+            {
+                return false;
+            }
+
+            float width = rect.width;
+            float height = rect.height;
+            if (width / height > image.Aspect)
+            {
+                width = height * image.Aspect;
+            }
+            else
+            {
+                height = width / image.Aspect;
+            }
+            DrawBox(new Rect(rect.x + (rect.width - width) / 2f, rect.y + (rect.height - height) / 2f, width, height), image.Style, White);
+            return true;
+        }
+
+        private static System.Collections.IEnumerator LoadRemoteImage(string url, RemoteImage image)
+        {
+            byte[] bytes = null;
+            yield return CoroutineHelpers.RunAsync(
+                () => HttpHelper.Client.GetByteArrayAsync(url),
+                result => bytes = result,
+                error => GLMod.log("[Menu] Image not downloaded: " + url + " (" + error.Message + ")"));
+            if (bytes == null)
+            {
+                yield break;
+            }
+
+            try
+            {
+                // Decoded on the main thread (coroutine): Texture2D must not be touched from a worker thread
+                image.Style = DecodeImage(bytes, url, out image.Aspect);
+            }
+            catch (Exception e)
+            {
+                GLMod.log("[Menu] Image unavailable: " + url + " (" + e.Message + ")");
             }
         }
 

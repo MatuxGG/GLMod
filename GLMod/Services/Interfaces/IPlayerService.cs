@@ -25,5 +25,23 @@ namespace GLMod.Services.Interfaces
         /// <param name="onError">Called with a readable error (e.g. "Player not found")</param>
         /// <returns>Coroutine</returns>
         IEnumerator GetLastGame(string username, System.Action<GLLastGame> onComplete, System.Action<string> onError = null);
+
+        /// <summary>
+        /// Gets the current ranks of a player, one per ranked leaderboard (GET /player/ranks)
+        /// </summary>
+        /// <param name="username">Good Loss account name</param>
+        /// <param name="onComplete">Called with the ranks</param>
+        /// <param name="onError">Called with a readable error (e.g. "Player not found")</param>
+        /// <returns>Coroutine</returns>
+        IEnumerator GetRanks(string username, System.Action<GLPlayerRanks> onComplete, System.Action<string> onError = null);
+
+        /// <summary>
+        /// Gets the win statistics of a player over all mods (GET /player/stats)
+        /// </summary>
+        /// <param name="username">Good Loss account name</param>
+        /// <param name="onComplete">Called with the statistics</param>
+        /// <param name="onError">Called with a readable error (e.g. "Player not found")</param>
+        /// <returns>Coroutine</returns>
+        IEnumerator GetStats(string username, System.Action<GLPlayerStats> onComplete, System.Action<string> onError = null);
     }
 }

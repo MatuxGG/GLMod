@@ -43,6 +43,18 @@ namespace GLMod.Class
         }
 
         /// <summary>
+        /// Rounded win percentage (0 to 100); 0 without games
+        /// </summary>
+        public static int WinPercent(int wins, int games)
+        {
+            if (games <= 0)
+            {
+                return 0;
+            }
+            return (int)Math.Round(100.0 * Math.Max(0, Math.Min(wins, games)) / games, MidpointRounding.AwayFromZero);
+        }
+
+        /// <summary>
         /// "Yes" / "No", or null
         /// </summary>
         public static string YesNo(bool? value) => value.HasValue ? (value.Value ? "Yes" : "No") : null;

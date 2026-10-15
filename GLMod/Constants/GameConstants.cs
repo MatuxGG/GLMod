@@ -141,6 +141,11 @@ namespace GLMod.Constants
         public const string MENU_TAB_SESSIONS = "glmod.sessions";
 
         /// <summary>
+        /// Id of the built-in Stats tab of the menu.
+        /// </summary>
+        public const string MENU_TAB_STATS = "glmod.stats";
+
+        /// <summary>
         /// Seconds after which a menu tab reloads its API data when shown.
         /// </summary>
         public const double MENU_REFRESH_SECONDS = 60;
