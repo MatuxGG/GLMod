@@ -235,7 +235,7 @@ GLMod.ServiceManager   // IServiceManager
 GLMod.GameStateManager // IGameStateManager
 GLMod.GameHistoryService // IGameHistoryService
 GLMod.MenuService      // IMenuService
-GLMod.PlayerService    // IPlayerService (GET /player/sessions, /player/last-game, /player/ranks, /player/stats)
+GLMod.PlayerService    // IPlayerService (GET /player/sessions, /player/last-game, /player/ranks, /player/stats; optional theme: null = every mod, "ranked" = Among Us Ranked mods)
 GLMod.TranslationService // ITranslationService (menu texts in the game language)
 ```
 

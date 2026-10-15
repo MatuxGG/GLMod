@@ -42,7 +42,7 @@ Any code review MUST reject contributions that introduce non-English identifiers
 
 ### 1.1 Identity
 - **Name**: GLMod (Good Loss Mod)
-- **Current version**: `5.6.0` (see [GLMod/GLMod.csproj](GLMod/GLMod.csproj) and [GLMod/GLMod.cs](GLMod/GLMod.cs))
+- **Current version**: `5.6.1` (see [GLMod/GLMod.csproj](GLMod/GLMod.csproj) and [GLMod/GLMod.cs](GLMod/GLMod.cs))
 - **BepInEx plugin Id**: `glmod`
 - **Author**: Matux
 - **License**: GNU GPLv3
@@ -210,6 +210,7 @@ Every service is exposed statically via the main `GLMod` class and has a dedicat
   - `GetLastGame` → `GET {API}/player/last-game` — the last finished game and the player's stats in it (`GLLastGame`).
   - `GetRanks` → `GET {API}/player/ranks` — the current ranks, one per ranked leaderboard (`GLPlayerRanks`).
   - `GetStats` → `GET {API}/player/stats` — wins / games in total and by team over all mods (`GLPlayerStats`).
+- **`theme` parameter** (all 4 endpoints): the menu groups its data by **theme**, never by mod. The Good Loss menu theme sends no theme (every mod); the Among Us Ranked theme sends `&theme=ranked` (`GameConstants.API_THEME_RANKED`, `MenuTheme.ApiTheme`), so sessions, last game, ranks and stats only cover the Among Us Ranked mods. URLs are built by [PlayerApiQuery.cs](GLMod/Class/PlayerApiQuery.cs) (pure, unit-tested). The responses may echo `"theme"` / `"mod"`, which GLMod ignores. Deployed on preprod first; an API that does not know the parameter ignores it (the data is then not filtered).
 - **Contract of `/player/ranks` and `/player/stats`** (defined by GLMod, to be served by the site; unit-tested on sample bodies):
   - ranks: `{"username", "ranks": [{"mod", "season", "name", "image" (absolute PNG URL of the badge), "elo", "rp", "position", "leaderboardUrl" (absolute)}]}`; `rp`, `elo`, `position`, `image`, `leaderboardUrl` may be `null`;
   - stats: `{"username", "mod", "season", "stats": {"games", "crewmate", "impostor", "neutral": {"wins", "games"}}}` — without query filter, all mods / seasons (`mod` / `season` echo the optional `?mod=` / `?season=` filters, `null` when absent).
@@ -303,6 +304,7 @@ Reactor, Coms, Lights, O2
 | `LOGO_RESOURCE_NAME`          | `GLMod.Resources.goodloss-logo.png` — embedded logo of the menu header |
 | `RANKED_LOGO_RESOURCE_NAME`   | `GLMod.Resources.ranked-logo.png` — logo of the Among Us Ranked menu theme |
 | `RANKED_MOD_NAME`             | `Among Us Ranked` — mod name prefix that selects the Among Us Ranked menu theme |
+| `API_THEME_RANKED`            | `ranked` — `theme` sent to the `/player/*` GET endpoints by the Among Us Ranked menu theme (§3.11) |
 | `MENU_TOGGLE_KEY`             | `F2` (`UnityEngine.KeyCode` name)            |
 | `MENU_TAB_ACCOUNT` / `MENU_TAB_STATS` / `MENU_TAB_LAST_GAME` / `MENU_TAB_SESSIONS` | `glmod.account` / `glmod.stats` / `glmod.lastgame` / `glmod.sessions` — ids of the built-in menu tabs (public, for mods) |
 | `MENU_REFRESH_SECONDS`        | `60` — a tab reloads its API data when shown after this delay |
@@ -352,6 +354,7 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 | `ApiEndpointResolver.cs` | Resolves the API base URL: `API_ENDPOINT`, or the `GLMOD_API_ENDPOINT` environment variable when it is a valid http(s) URL. `ToSiteUrl(api)` / `GameRecapUrl(api, gameId)` give the matching site and recap URLs. |
 | `GameHistoryList.cs`   | Pure operations on the local history (add with dedupe and truncation, JSON serialize / parse). |
 | `PlayerApiResponse.cs` | Pure parsing of the `/player/*` GET responses (`TryParse<T>`, `ReadError` for `{"error":...}`). |
+| `PlayerApiQuery.cs`    | Pure URL builder of the `/player/*` GET requests: `?username=` plus `&theme=` when a theme is given. |
 | `TranslationTable.cs`  | Pure translation lookup: texts by language and key, fallbacks (base language, English, key), `{0}` formatting, JSON loading. |
 | `GameLanguage.cs`      | `SupportedLangs` name → language code (pure `ToCode`) and `CurrentCode()` (reads the game settings). |
 | `PlayModeHelper.cs`    | `IsFreePlay()` — free play games are never recorded nor sent (§3.3). |
@@ -371,6 +374,7 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 - **Themes** ([MenuTheme.cs](GLMod/Menu/MenuTheme.cs)): the brand and palette follow the detected mod, re-evaluated every frame (`MenuTheme.ForMod(ConfigService.ModName)` → `MenuUI.ApplyTheme`):
   - **Good Loss** (default): "GOOD LOSS", Good Loss logo, `goodloss.fr`, navy + violet palette of goodloss.fr (`--accent #A78BFA`).
   - **Among Us Ranked** when the mod is Among Us Ranked (`RankedMod.Matches`): "AMONG US RANKED", Among Us Ranked logo (`GLMod/Resources/ranked-logo.png`, the transparent `/images/ranked.webp` of amongusranked.orianagames.com converted to PNG: `ImageConversion` cannot decode WebP and the PWA PNGs have an opaque background), `orianagames.com` (the full `amongusranked.orianagames.com` does not fit the footer), stone + amber palette of the `[data-theme="ranked"]` block of amongusranked.orianagames.com (`--accent #F59E0B`, `--accent-hover #D97706`, `--accent-light #FCD34D`, `--bg-body #141210`, `--bg-card #211E1B`, `--border #322D2A`…), dark text on amber buttons (`--on-accent #1C1917`). The site font (Archivo) is not available in game: Bahnschrift is kept.
+  - Each theme also gives the `theme` sent to the `/player/*` endpoints (`MenuTheme.ApiTheme`: none for Good Loss, `ranked` for Among Us Ranked), so the Account, Stats, Last game and Sessions tabs show Among Us Ranked data only with that theme.
   - `MenuUI` colors (`Accent`, `Text`, `MutedText`…) are properties of the current theme; textures baked with theme colors (panel and accent gradients, logo) are built once per theme.
 - **Look** (esport style): vertical gradient panel with a violet halo and an accent line on the top edge; header with the Good Loss logo (embedded `GLMod/Resources/goodloss-logo.png`, 110×128, decoded with `ImageConversion.LoadImage`; a gradient "GL" badge if it cannot be loaded), "GOOD LOSS" and the GLMod version; uppercase tabs with a glowing gradient indicator that glides to the selected tab; tab content fades and slides in from the side of the newly selected tab (0.22 s); keycap hints in the footer (`← →` tabs, `↑ ↓` scroll, `F2` close).
 - **Fonts**: OS fonts through `Font.CreateDynamicFontFromOSFont`: display text (titles, tabs, buttons, captions) in Bahnschrift SemiBold (condensed DIN-like face of Windows 10+), body text in Segoe UI; Arial / the IMGUI default font elsewhere (Linux / Proton).
@@ -387,7 +391,7 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 | Last game | `LastGameMenuTab` | `PlayerService.GetLastGame`, kept concise (little scrolling): result card (VICTORY / DEFEAT, date, "as <in-game name> · <mod> · S<season>", map / role pills); the boolean facts **only when true**, as colored tags (Ranked, First blood, Killed first, First victim, Killed, Exiled; a false value shows nothing); "View recap" → `Application.OpenURL(game.url)`; then every non-null numeric value in a 3-column `StatGrid` (duration, turns, meetings, players, ranking points, kills, double kills, time to first kill, tasks, task speed, death / exile turn, time / turns / meetings alive, good votes, key-meeting votes, skips, votes received, teammate votes, vote order / delay, bodies reported, self reports, report delay, emergencies). The `winners` list is not shown (the result already says it). When a game ends (`IGameHistoryService.EntryRecorded`) the tab is selected for the next opening and reloads every `LAST_GAME_POLL_SECONDS` until Good Loss returns that game id (at most `LAST_GAME_WAIT_SECONDS`), with a "still processing" note meanwhile. |
 | Sessions | `SessionsMenuTab` | `PlayerService.GetSessions`: tiles (sessions, games played), then one row per session (start date, games, duration, LIVE / OPEN badge, "View" → session page). Invalidated when a game ends. |
 
-API tabs load through `RemoteData<T>` (internal): cache per account, reload when shown after `MENU_REFRESH_SECONDS` (`MENU_RETRY_SECONDS` after an error), Loading / Offline / Unavailable states; the Unavailable state has a **Retry** button (forced reload). A live session (no end) shows its duration up to now.
+API tabs load through `RemoteData<T>` (internal): cache per account **and API theme** (the current `MenuUI.Theme.ApiTheme` is sent with every request), reload when shown after `MENU_REFRESH_SECONDS` (`MENU_RETRY_SECONDS` after an error), Loading / Offline / Unavailable states; the Unavailable state has a **Retry** button (forced reload). A live session (no end) shows its duration up to now.
 
 - **Translations**: every text of the menu comes from `ITranslationService` (§3.12) and follows the game language, English otherwise.
 - **Mods built on GLMod**: from their `Load()` (GLMod is loaded first, its built-in tabs already registered) or later, they can hide the menu, remove built-in tabs by id and add / insert their own tabs (§3.10); documented in `docs/dev.MD`. The Last game tab does not poll after a game when the menu is disabled or the tab was removed.
@@ -538,6 +542,7 @@ GLMod/                                # Repo root
     │   ├── CoroutineRunner.cs
     │   ├── GameHistoryList.cs        # Pure local-history list logic.
     │   ├── PlayerApiResponse.cs      # Pure parsing of the /player/* GET responses.
+    │   ├── PlayerApiQuery.cs         # Pure URL builder of the /player/* GET requests.
     │   ├── HttpHelper.cs
     │   ├── ServerClock.cs            # Timestamps aligned on the API server clock.
     │   ├── StatFormat.cs             # Pure formatting of menu stats.
@@ -765,5 +770,5 @@ For every change to the project:
 
 ---
 
-*Last updated: 2026-10-15 — GLMod version 5.6.0.*
+*Last updated: 2026-10-15 — GLMod version 5.6.1.*
 *Every change to the project must be accompanied by an update of this file.*

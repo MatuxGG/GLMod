@@ -17,6 +17,7 @@ namespace GLMod.Menu
             brandInitials: "GL",
             siteLabel: "goodloss.fr",
             logoResource: GameConstants.LOGO_RESOURCE_NAME,
+            apiTheme: null,
             accent: 0xA78BFA, accentStrong: 0x7C3AED, accentLight: 0xC4B5FD, onAccent: 0xFFFFFF,
             text: 0xEEF2F7, mutedText: 0x8B95A5, dimText: 0x5B6577,
             panelTop: 0x171C29, panelBottom: 0x0A0D13, surface: 0x161C28, surfaceHover: 0x1F2738, border: 0x283143);
@@ -28,6 +29,7 @@ namespace GLMod.Menu
             brandInitials: "AUR",
             siteLabel: "orianagames.com",
             logoResource: GameConstants.RANKED_LOGO_RESOURCE_NAME,
+            apiTheme: GameConstants.API_THEME_RANKED,
             accent: 0xF59E0B, accentStrong: 0xD97706, accentLight: 0xFCD34D, onAccent: 0x1C1917,
             text: 0xF5F5F4, mutedText: 0xA8A29E, dimText: 0x8C857F,
             panelTop: 0x1C1917, panelBottom: 0x141210, surface: 0x211E1B, surfaceHover: 0x2E2A27, border: 0x322D2A);
@@ -46,6 +48,9 @@ namespace GLMod.Menu
         /// <summary>Embedded PNG of the logo.</summary>
         public string LogoResource { get; }
 
+        /// <summary>"theme" sent to the /player/* GET endpoints: null for Good Loss (every mod), "ranked" for Among Us Ranked.</summary>
+        public string ApiTheme { get; }
+
         public Color Accent { get; }
         public Color AccentStrong { get; }
         public Color AccentLight { get; }
@@ -62,7 +67,7 @@ namespace GLMod.Menu
         public Color SurfaceHover { get; }
         public Color Border { get; }
 
-        private MenuTheme(string id, string brandName, string brandInitials, string siteLabel, string logoResource,
+        private MenuTheme(string id, string brandName, string brandInitials, string siteLabel, string logoResource, string apiTheme,
             int accent, int accentStrong, int accentLight, int onAccent, int text, int mutedText, int dimText,
             int panelTop, int panelBottom, int surface, int surfaceHover, int border)
         {
@@ -71,6 +76,7 @@ namespace GLMod.Menu
             BrandInitials = brandInitials;
             SiteLabel = siteLabel;
             LogoResource = logoResource;
+            ApiTheme = apiTheme;
             Accent = Rgb(accent);
             AccentStrong = Rgb(accentStrong);
             AccentLight = Rgb(accentLight);

@@ -121,6 +121,12 @@ namespace GLMod.Constants
         public const string RANKED_MOD_NAME = "Among Us Ranked";
 
         /// <summary>
+        /// Value of the "theme" query parameter of the /player/* GET endpoints for the Among Us Ranked menu theme
+        /// (data grouped over the Among Us Ranked mods). The Good Loss theme sends no theme.
+        /// </summary>
+        public const string API_THEME_RANKED = "ranked";
+
+        /// <summary>
         /// Prefix of the embedded translation files (GLMod/Resources/Translations/&lt;language&gt;.json).
         /// </summary>
         public const string TRANSLATION_RESOURCE_PREFIX = "GLMod.Resources.Translations.";

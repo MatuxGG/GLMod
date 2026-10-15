@@ -23,31 +23,31 @@ namespace GLMod.Services.Implementations
 
         private void Log(string message) => ServiceLogger.Log(_logger, nameof(PlayerService), message);
 
-        public IEnumerator GetSessions(string username, Action<GLSessionList> onComplete, Action<string> onError = null)
+        public IEnumerator GetSessions(string username, Action<GLSessionList> onComplete, Action<string> onError = null, string theme = null)
         {
             const string endpoint = "/player/sessions";
-            return Get(endpoint, username, onComplete, onError);
+            return Get(endpoint, username, theme, onComplete, onError);
         }
 
-        public IEnumerator GetLastGame(string username, Action<GLLastGame> onComplete, Action<string> onError = null)
+        public IEnumerator GetLastGame(string username, Action<GLLastGame> onComplete, Action<string> onError = null, string theme = null)
         {
             const string endpoint = "/player/last-game";
-            return Get(endpoint, username, onComplete, onError);
+            return Get(endpoint, username, theme, onComplete, onError);
         }
 
-        public IEnumerator GetRanks(string username, Action<GLPlayerRanks> onComplete, Action<string> onError = null)
+        public IEnumerator GetRanks(string username, Action<GLPlayerRanks> onComplete, Action<string> onError = null, string theme = null)
         {
             const string endpoint = "/player/ranks";
-            return Get(endpoint, username, onComplete, onError);
+            return Get(endpoint, username, theme, onComplete, onError);
         }
 
-        public IEnumerator GetStats(string username, Action<GLPlayerStats> onComplete, Action<string> onError = null)
+        public IEnumerator GetStats(string username, Action<GLPlayerStats> onComplete, Action<string> onError = null, string theme = null)
         {
             const string endpoint = "/player/stats";
-            return Get(endpoint, username, onComplete, onError);
+            return Get(endpoint, username, theme, onComplete, onError);
         }
 
-        private IEnumerator Get<T>(string endpoint, string username, Action<T> onComplete, Action<string> onError) where T : class
+        private IEnumerator Get<T>(string endpoint, string username, string theme, Action<T> onComplete, Action<string> onError) where T : class
         {
             if (string.IsNullOrEmpty(username))
             {
@@ -57,7 +57,7 @@ namespace GLMod.Services.Implementations
 
             ApiResponse response = null;
             yield return ApiService.GetWithErrorHandlingAsync(
-                _apiEndpoint + endpoint + "?username=" + Uri.EscapeDataString(username),
+                PlayerApiQuery.Build(_apiEndpoint, endpoint, username, theme),
                 result => response = result);
 
             if (response == null || !response.IsSuccess)

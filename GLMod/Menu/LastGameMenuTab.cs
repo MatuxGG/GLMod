@@ -36,7 +36,7 @@ namespace GLMod.Menu
             }
             _authService = authService ?? throw new ArgumentNullException(nameof(authService));
             _t = translations ?? throw new ArgumentNullException(nameof(translations));
-            _lastGame = new RemoteData<GLLastGame>(playerService.GetLastGame);
+            _lastGame = new RemoteData<GLLastGame>((user, theme, ok, error) => playerService.GetLastGame(user, ok, error, theme));
 
             if (historyService != null)
             {

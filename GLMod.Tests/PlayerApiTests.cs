@@ -1,5 +1,6 @@
 using System.Globalization;
 using GLMod.Class;
+using GLMod.Constants;
 using GLMod.GLEntities;
 using Xunit;
 
@@ -171,6 +172,32 @@ namespace GLMod.Tests
         public void ReadError_ExtractsApiMessage(string json, string expected)
         {
             Assert.Equal(expected, PlayerApiResponse.ReadError(json));
+        }
+    }
+
+    public class PlayerApiQueryTests
+    {
+        [Fact]
+        public void Build_WithoutTheme_OnlyHasTheUsername()
+        {
+            Assert.Equal("https://goodloss.fr/api/player/stats?username=Matux",
+                PlayerApiQuery.Build("https://goodloss.fr/api", "/player/stats", "Matux", null));
+            Assert.Equal("https://goodloss.fr/api/player/stats?username=Matux",
+                PlayerApiQuery.Build("https://goodloss.fr/api", "/player/stats", "Matux", " "));
+        }
+
+        [Fact]
+        public void Build_WithRankedTheme()
+        {
+            Assert.Equal("https://goodloss.fr/api/player/ranks?username=Matux&theme=ranked",
+                PlayerApiQuery.Build("https://goodloss.fr/api", "/player/ranks", "Matux", GameConstants.API_THEME_RANKED));
+        }
+
+        [Fact]
+        public void Build_EscapesValues()
+        {
+            Assert.Equal("https://goodloss.fr/api/player/sessions?username=Jean%20Pierre%26co&theme=a%2Bb",
+                PlayerApiQuery.Build("https://goodloss.fr/api", "/player/sessions", "Jean Pierre&co", "a+b"));
         }
     }
 

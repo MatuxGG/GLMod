@@ -34,7 +34,7 @@ namespace GLMod.Menu
             }
             _apiEndpoint = apiEndpoint ?? throw new ArgumentNullException(nameof(apiEndpoint));
             _t = translations ?? throw new ArgumentNullException(nameof(translations));
-            _ranks = new RemoteData<GLPlayerRanks>(playerService.GetRanks);
+            _ranks = new RemoteData<GLPlayerRanks>((user, theme, ok, error) => playerService.GetRanks(user, ok, error, theme));
 
             // A finished game changes the points and the position
             if (historyService != null)

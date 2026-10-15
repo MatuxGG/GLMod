@@ -33,7 +33,7 @@ namespace GLMod.Menu
             }
             _authService = authService ?? throw new ArgumentNullException(nameof(authService));
             _t = translations ?? throw new ArgumentNullException(nameof(translations));
-            _stats = new RemoteData<GLPlayerStats>(playerService.GetStats);
+            _stats = new RemoteData<GLPlayerStats>((user, theme, ok, error) => playerService.GetStats(user, ok, error, theme));
 
             // A finished game changes the statistics
             if (historyService != null)

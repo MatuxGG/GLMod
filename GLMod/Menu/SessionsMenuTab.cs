@@ -30,7 +30,7 @@ namespace GLMod.Menu
             }
             _authService = authService ?? throw new ArgumentNullException(nameof(authService));
             _t = translations ?? throw new ArgumentNullException(nameof(translations));
-            _sessions = new RemoteData<GLSessionList>(playerService.GetSessions);
+            _sessions = new RemoteData<GLSessionList>((user, theme, ok, error) => playerService.GetSessions(user, ok, error, theme));
 
             // A finished game changes the current session
             if (historyService != null)
