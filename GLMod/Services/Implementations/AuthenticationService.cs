@@ -60,24 +60,6 @@ namespace GLMod.Services.Implementations
                 yield break;
             }
 
-            // true / false = final answer of the Steam ticket login; null = use the legacy login
-            bool? ticketResult = null;
-            yield return LoginWithSteamTicket(result => { ticketResult = result; });
-            if (ticketResult.HasValue)
-            {
-                onComplete?.Invoke(ticketResult.Value);
-                yield break;
-            }
-
-            yield return LoginWithSteamId(onComplete);
-        }
-
-        /// <summary>
-        /// Login proven by a Steam session ticket. Reports null when it cannot conclude
-        /// (no ticket, API without ticket support, Steam outage…) so the legacy login is tried.
-        /// </summary>
-        private IEnumerator LoginWithSteamTicket(System.Action<bool?> onComplete)
-        {
             string ticket = null;
             HAuthTicket handle = default;
             bool created;
@@ -92,8 +74,9 @@ namespace GLMod.Services.Implementations
             }
             if (!created)
             {
-                Log("[Login] no Steam ticket, legacy SteamID login");
-                onComplete(null);
+                Log("[Login] failed: no Steam session ticket");
+                SetLoginState(false, "", false, "");
+                onComplete?.Invoke(false);
                 yield break;
             }
 
@@ -137,10 +120,13 @@ namespace GLMod.Services.Implementations
 
             if (response != null && response.IsSuccess && LoginResponse.TryParseTicketLogin(response.Content, out GLLoginResponse login))
             {
-                Log("[Login] success (Steam ticket)");
-                LogClockOffset();
+                Log("[Login] success");
+                if (ServerClock.OffsetMs != 0)
+                {
+                    Log($"[Login] local clock differs from the server by {ServerClock.OffsetMs} ms; timestamps are corrected");
+                }
                 SetGameTokenLogin(login);
-                onComplete(true);
+                onComplete?.Invoke(true);
                 yield break;
             }
 
@@ -149,80 +135,16 @@ namespace GLMod.Services.Implementations
             {
                 Log("[Login] User banned, reason: " + banReason);
                 SetLoginState(false, "", true, banReason);
-                onComplete(false);
+                onComplete?.Invoke(false);
                 yield break;
             }
 
             string detail = response == null
                 ? "no response"
                 : $"HTTP {response.StatusCode} {PlayerApiResponse.ReadError(response.Content) ?? PlayerApiResponse.Snippet(response.Content, 100)}";
-            Log($"[Login] Steam ticket login failed ({detail}), legacy SteamID login");
-            onComplete(null);
-        }
-
-        /// <summary>
-        /// Legacy login: the API trusts the SteamID it is given. Kept while the API accepts it.
-        /// </summary>
-        private IEnumerator LoginWithSteamId(System.Action<bool> onComplete)
-        {
-            var steamId = SteamUser.GetSteamID().m_SteamID.ToString();
-            var form = new Dictionary<string, string> { { "steamId", steamId } };
-
-            ApiResponse response = null;
-
-            // Call API service
-            yield return ApiService.PostFormWithErrorHandlingAsync(
-                _apiEndpoint + "/user/login",
-                form,
-                apiResponse => { response = apiResponse; }
-            );
-
-            // Check if response is null
-            if (response == null)
-            {
-                Log("[Login] failed, no response");
-                SetLoginState(false, "", false, "");
-                onComplete?.Invoke(false);
-                yield break;
-            }
-
-            // Interpret response
-            if (response.IsSuccess)
-            {
-                Log("[Login] success (legacy SteamID)");
-                LogClockOffset();
-                SetLoginState(true, response.Content, false, "");
-                onComplete?.Invoke(true);
-            }
-            else if (response.StatusCode == 403)
-            {
-                string reason = LoginResponse.ReadBanReason(response.Content);
-                if (reason != null)
-                {
-                    Log("[Login] User banned, reason: " + reason);
-                    SetLoginState(false, "", true, reason);
-                }
-                else
-                {
-                    Log($"[Login] failed 403: {response.Content?.Trim('"').Trim()}");
-                    SetLoginState(false, "", false, "");
-                }
-                onComplete?.Invoke(false);
-            }
-            else
-            {
-                Log($"[Login] failed - Status code: {response.StatusCode}");
-                SetLoginState(false, "", false, "");
-                onComplete?.Invoke(false);
-            }
-        }
-
-        private void LogClockOffset()
-        {
-            if (ServerClock.OffsetMs != 0)
-            {
-                Log($"[Login] local clock differs from the server by {ServerClock.OffsetMs} ms; timestamps are corrected");
-            }
+            Log($"[Login] failed: {detail}");
+            SetLoginState(false, "", false, "");
+            onComplete?.Invoke(false);
         }
 
         public void Logout()

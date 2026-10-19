@@ -8,14 +8,14 @@ namespace GLMod.Services.Interfaces
     public interface IAuthenticationService
     {
         /// <summary>
-        /// Gets the authentication token: the secret game token ("glm_…") after a Steam ticket login,
-        /// or the legacy "username#keycloakId" after the legacy SteamID login. Never log or display it.
+        /// Gets the authentication token: the secret game token ("glm_…") of the Steam ticket login.
+        /// Never log or display it.
         /// </summary>
         string Token { get; }
 
         /// <summary>
         /// Gets the secret game token sent as "Authorization: Bearer" to the API,
-        /// or an empty string when the login did not prove the SteamID (legacy login, logged out)
+        /// or an empty string when not logged in
         /// </summary>
         string BearerToken { get; }
 
@@ -35,9 +35,9 @@ namespace GLMod.Services.Interfaces
         string BanReason { get; }
 
         /// <summary>
-        /// Logs in to Good Loss with a Steam session ticket (the API has Steam prove the SteamID);
-        /// falls back to the legacy SteamID login when no ticket can be used. A still valid game
-        /// token is reused without a new ticket. Main thread only (Steam API).
+        /// Logs in to Good Loss with a Steam session ticket (the API has Steam prove the SteamID).
+        /// No other login exists: without a usable ticket the player stays logged out. A still
+        /// valid game token is reused without a new ticket. Main thread only (Steam API).
         /// </summary>
         /// <param name="onComplete">Callback with success status</param>
         /// <returns>Coroutine</returns>
@@ -55,7 +55,8 @@ namespace GLMod.Services.Interfaces
         string GetAccountName();
 
         /// <summary>
-        /// Updates the login state (as a legacy, unproven login: no bearer token)
+        /// Updates the login state without a game token (no bearer: the API calls acting for the
+        /// player will not identify it). Used to log out or mark a ban.
         /// </summary>
         /// <param name="isLoggedIn">Whether user is logged in</param>
         /// <param name="token">Legacy authentication token ("username#keycloakId")</param>

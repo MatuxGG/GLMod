@@ -356,12 +356,10 @@ namespace GLMod.Services.Implementations
                 yield return new WaitForSeconds(0.1f);
             }
 
-            // Prepare the form. With a game token the API takes the account from the token
-            // and ignores "login" (still sent for APIs without the Steam ticket login).
+            // Prepare the form. The API takes the account from the game token (Bearer).
             var form = new Dictionary<string, string>
             {
                 { "gameId", CurrentGame.id },
-                { "login", _authService.GetAccountName() },
                 { "playerName", me.Data.PlayerName }
             };
 

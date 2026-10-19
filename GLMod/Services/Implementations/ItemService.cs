@@ -87,8 +87,8 @@ namespace GLMod.Services.Implementations
 
         public IEnumerator ReloadDlcOwnerships()
         {
-            // The API reads the SteamID of the account behind the game token: only a
-            // Steam ticket login has one (the former "token" form value was never read).
+            // The API reads the SteamID of the account behind the game token
+            // (the former "token" form value was never read).
             if (!_authService.IsLoggedIn || string.IsNullOrEmpty(_authService.BearerToken))
                 yield break;
 

@@ -132,12 +132,12 @@ Every service is exposed statically via the main `GLMod` class and has a dedicat
 - **Steam ticket login** (since 5.7.0): `Login()` asks Steam for a session ticket ([SteamSessionTicket.cs](GLMod/Class/SteamSessionTicket.cs), `SteamUser.GetAuthSessionTicket` — Among Us's Steam SDK has no `GetAuthTicketForWebApi`) and sends its hex as `POST {API}/user/login` `steamTicket`. The site has Steam validate it for the Among Us app id (945360), so the SteamID is **proven**, not declared. Answers:
   - `200` JSON `{"token": "glm_…", "username", "expiresAt"}` (`GLLoginResponse`) → logged in; the token is secret and goes as `Authorization: Bearer` on the calls that act for the player (`/game/addMyPlayer`, `/user/steamownerships`).
   - `401 {"error":"Invalid ticket"}` → sent once more after `STEAM_TICKET_RETRY_DELAY` (Steam may not have registered a brand new ticket yet).
-  - `403` + body prefixed `"Banned: "` → banned, reason follows the prefix (final, no fallback).
-  - anything else (no ticket, API without ticket support — the old API answers 403 with an empty body —, `429`, `503` Steam outage, network) → **legacy login**.
+  - `403` + body prefixed `"Banned: "` → banned, reason follows the prefix.
+  - anything else (no ticket, `429`, `503` Steam outage, network, an API without the ticket login — the old one answers 403 with an empty body) → **not logged in**, the reason is logged (`[Login] failed: …`).
   - The ticket is cancelled (`CancelAuthTicket`) as soon as the login answered, whatever the outcome: it cannot be replayed.
   - A game token still valid for at least `GAME_TOKEN_REUSE_MARGIN_SECONDS` (compared with `ServerClock`) is reused by the next `Login()` (it runs on every main menu) without a new ticket.
-- **Legacy login** (kept while the site accepts it): `POST {API}/user/login` with `steamId` (unproven). `200` → the text token `username#keycloakId` (not a secret, no bearer); `403` + `"Banned: "` → banned; others → failure.
-- **Exposed state**: `Token` (game token or legacy token — never log it), `BearerToken` (game token, empty after a legacy login), `IsLoggedIn`, `IsBanned`, `BanReason`, `GetAccountName()` (the `username` of the answer, or the part of the legacy token before `#`; Among Us Ranked uses it). Pure parsing in [LoginResponse.cs](GLMod/Class/LoginResponse.cs) (unit-tested).
+- **No legacy fallback** (user decision 2026-10-19): GLMod ≥ 5.7.0 never sends the unproven `steamId` login nor the `login` account name of `/game/addMyPlayer`, so a broken ticket login shows at once instead of being hidden by the old path. The site still accepts those for older GLMod versions until it closes them. Consequence: **GLMod ≥ 5.7.0 needs an API with the Steam ticket login** — deploy the site to production before publishing it.
+- **Exposed state**: `Token` / `BearerToken` (the game token — never log it; `BearerToken` is empty when logged out), `IsLoggedIn`, `IsBanned`, `BanReason`, `GetAccountName()` (the `username` of the answer; Among Us Ranked uses it). `SetLoginState(…)` (public, kept for mods) sets a state without game token. Pure parsing in [LoginResponse.cs](GLMod/Class/LoginResponse.cs) (unit-tested).
 
 ### 3.2 `IServiceManager` — [Interfaces/IServiceManager.cs](GLMod/Services/Interfaces/IServiceManager.cs)
 - **Role**: enable / disable **data collectors** (see enum `ServiceType`).
@@ -155,7 +155,7 @@ Every service is exposed statically via the main `GLMod` class and has a dedicat
   - `AddPlayer(name, role, team, color)` — adds a player to the current match.
   - `SendGame(onComplete)` — uploads the match to the API (coroutine).
   - `SyncGameId(onComplete)` — broadcasts the match ID to non-hosts via RPC.
-  - `AddMyPlayer(onComplete)` — registers the local player on the server (with the game token as Bearer the site takes the account from it and ignores `login`, still sent for APIs without the Steam ticket login).
+  - `AddMyPlayer(onComplete)` — registers the local player on the server (`gameId`, `playerName`; the site takes the account from the Bearer game token).
   - `GetShieldPlayer(onComplete, onError)` — returns the player who would have benefited from a T1 shield (retries on HTTP 400).
   - `SetWinnerTeams(winners)` / `AddWinnerPlayer(name)` — sets the outcome.
   - `EndGame()` — closes the match server-side.
@@ -431,11 +431,11 @@ Base: `https://goodloss.fr/api` (production). It can be overridden at startup wi
 
 | Endpoint                       | Method | Service           | Usage                                  |
 |--------------------------------|--------|-------------------|----------------------------------------|
-| `/user/login`                  | POST   | AuthService       | Steam login: `steamTicket` → JSON game token (§3.1); legacy `steamId` fallback. |
+| `/user/login`                  | POST   | AuthService       | Steam login: `steamTicket` → JSON game token (§3.1). |
 | `/user/steamownerships`        | POST   | ItemService       | Steam DLC ownerships of the account (Bearer game token). |
 | `/data`                        | POST   | IntegrityService  | Generic data lookup by id; `checksum_*` ids hold DLL checksums (§3.6). |
 | `/game/start`                  | POST   | GameStateManager  | Sends a new match.                     |
-| `/game/addMyPlayer`            | POST   | GameStateManager  | Registers the local player (Bearer game token when there is one). |
+| `/game/addMyPlayer`            | POST   | GameStateManager  | Registers the local player (Bearer game token). |
 | `/game/getShieldPlayer`        | POST   | GameStateManager  | Returns the T1 shield candidate.       |
 | `/game/end`                    | POST   | GameStateManager  | Finalizes a match.                     |
 | `/player/challengerItems`      | POST   | ItemService       | Player's unlocked items.               |
@@ -731,7 +731,7 @@ A third-party mod consumes GLMod by:
 
 ## 15. Security & privacy
 
-- **Identifier**: SteamID, **proven by a Steam session ticket** that the site has Steam validate (since 5.7.0; the ticket is cancelled right after the login). The legacy unproven `steamId` login is only a fallback while the site still accepts it.
+- **Identifier**: SteamID, **proven by a Steam session ticket** that the site has Steam validate (since 5.7.0; the ticket is cancelled right after the login). GLMod no longer uses the unproven `steamId` login.
 - **No password**: login = Steam ticket → secret Good Loss game token (`glm_…`, the site stores only its SHA-256, 30 days). The token goes only to the Good Loss API as `Authorization: Bearer`; never log or display it.
 - **`token.txt`, `output`, `server`** are gitignored (see `.gitignore`).
 - **Ban**: handled server-side, HTTP 403 response + `"Banned: <reason>"`.
