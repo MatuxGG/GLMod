@@ -2,11 +2,13 @@ using BepInEx.Configuration;
 using BepInEx.Logging;
 using GLMod.Class;
 using GLMod.Constants;
+using GLMod.GLEntities;
 using GLMod.Services.Interfaces;
 using Steamworks;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace GLMod.Services.Implementations
 {
@@ -16,6 +18,9 @@ namespace GLMod.Services.Implementations
     public class AuthenticationService : IAuthenticationService
     {
         private string _token;
+        private string _bearerToken;
+        private string _accountName;
+        private long? _tokenExpiresAt;
         private bool _isLoggedIn;
         private bool _isBanned;
         private string _banReason;
@@ -24,6 +29,7 @@ namespace GLMod.Services.Implementations
         private readonly string _apiEndpoint;
 
         public string Token => _token;
+        public string BearerToken => _bearerToken;
         public bool IsLoggedIn => _isLoggedIn;
         public bool IsBanned => _isBanned;
         public string BanReason => _banReason;
@@ -34,6 +40,9 @@ namespace GLMod.Services.Implementations
             _connectionState = connectionState ?? throw new ArgumentNullException(nameof(connectionState));
             _apiEndpoint = apiEndpoint ?? throw new ArgumentNullException(nameof(apiEndpoint));
             _token = null;
+            _bearerToken = "";
+            _accountName = "";
+            _tokenExpiresAt = null;
             _isLoggedIn = false;
             _isBanned = false;
             _banReason = "";
@@ -42,6 +51,119 @@ namespace GLMod.Services.Implementations
         private void Log(string message) => ServiceLogger.Log(_logger, nameof(AuthenticationService), message);
 
         public IEnumerator Login(System.Action<bool> onComplete = null)
+        {
+            if (_isLoggedIn && !string.IsNullOrEmpty(_bearerToken)
+                && LoginResponse.CanReuseToken(_tokenExpiresAt, ServerClock.NowMs() / 1000))
+            {
+                Log("[Login] game token still valid, reused");
+                onComplete?.Invoke(true);
+                yield break;
+            }
+
+            // true / false = final answer of the Steam ticket login; null = use the legacy login
+            bool? ticketResult = null;
+            yield return LoginWithSteamTicket(result => { ticketResult = result; });
+            if (ticketResult.HasValue)
+            {
+                onComplete?.Invoke(ticketResult.Value);
+                yield break;
+            }
+
+            yield return LoginWithSteamId(onComplete);
+        }
+
+        /// <summary>
+        /// Login proven by a Steam session ticket. Reports null when it cannot conclude
+        /// (no ticket, API without ticket support, Steam outage…) so the legacy login is tried.
+        /// </summary>
+        private IEnumerator LoginWithSteamTicket(System.Action<bool?> onComplete)
+        {
+            string ticket = null;
+            HAuthTicket handle = default;
+            bool created;
+            try
+            {
+                created = SteamSessionTicket.TryCreate(out ticket, out handle);
+            }
+            catch (Exception e)
+            {
+                Log("[Login] Steam ticket unavailable: " + e.Message);
+                created = false;
+            }
+            if (!created)
+            {
+                Log("[Login] no Steam ticket, legacy SteamID login");
+                onComplete(null);
+                yield break;
+            }
+
+            ApiResponse response = null;
+            try
+            {
+                var form = new Dictionary<string, string> { { "steamTicket", ticket } };
+                for (int attempt = 1; attempt <= 2; attempt++)
+                {
+                    response = null;
+                    yield return ApiService.PostFormWithErrorHandlingAsync(
+                        _apiEndpoint + "/user/login",
+                        form,
+                        apiResponse => { response = apiResponse; },
+                        unescape: false
+                    );
+
+                    // Steam may not know a ticket created a moment ago: send it once more
+                    bool unknownTicket = response != null && response.StatusCode == 401
+                        && PlayerApiResponse.ReadError(response.Content) == "Invalid ticket";
+                    if (!unknownTicket || attempt == 2)
+                    {
+                        break;
+                    }
+                    Log("[Login] Steam ticket not accepted yet, retrying");
+                    yield return new WaitForSeconds(GameConstants.STEAM_TICKET_RETRY_DELAY);
+                }
+            }
+            finally
+            {
+                // A used ticket must not stay valid: anyone holding it could open a session
+                try
+                {
+                    SteamSessionTicket.Cancel(handle);
+                }
+                catch (Exception e)
+                {
+                    Log("[Login] cancel Steam ticket failed: " + e.Message);
+                }
+            }
+
+            if (response != null && response.IsSuccess && LoginResponse.TryParseTicketLogin(response.Content, out GLLoginResponse login))
+            {
+                Log("[Login] success (Steam ticket)");
+                LogClockOffset();
+                SetGameTokenLogin(login);
+                onComplete(true);
+                yield break;
+            }
+
+            string banReason = response?.StatusCode == 403 ? LoginResponse.ReadBanReason(response.Content) : null;
+            if (banReason != null)
+            {
+                Log("[Login] User banned, reason: " + banReason);
+                SetLoginState(false, "", true, banReason);
+                onComplete(false);
+                yield break;
+            }
+
+            string detail = response == null
+                ? "no response"
+                : $"HTTP {response.StatusCode} {PlayerApiResponse.ReadError(response.Content) ?? PlayerApiResponse.Snippet(response.Content, 100)}";
+            Log($"[Login] Steam ticket login failed ({detail}), legacy SteamID login");
+            onComplete(null);
+        }
+
+        /// <summary>
+        /// Legacy login: the API trusts the SteamID it is given. Kept while the API accepts it.
+        /// </summary>
+        private IEnumerator LoginWithSteamId(System.Action<bool> onComplete)
         {
             var steamId = SteamUser.GetSteamID().m_SteamID.ToString();
             var form = new Dictionary<string, string> { { "steamId", steamId } };
@@ -67,26 +189,22 @@ namespace GLMod.Services.Implementations
             // Interpret response
             if (response.IsSuccess)
             {
-                Log("[Login] success");
-                if (ServerClock.OffsetMs != 0)
-                {
-                    Log($"[Login] local clock differs from the server by {ServerClock.OffsetMs} ms; timestamps are corrected");
-                }
+                Log("[Login] success (legacy SteamID)");
+                LogClockOffset();
                 SetLoginState(true, response.Content, false, "");
                 onComplete?.Invoke(true);
             }
             else if (response.StatusCode == 403)
             {
-                var trimmed = response.Content?.Trim('"').Trim();
-                if (!string.IsNullOrEmpty(trimmed) && trimmed.StartsWith("Banned: ", StringComparison.OrdinalIgnoreCase))
+                string reason = LoginResponse.ReadBanReason(response.Content);
+                if (reason != null)
                 {
-                    string reason = trimmed.Substring("Banned: ".Length);
                     Log("[Login] User banned, reason: " + reason);
                     SetLoginState(false, "", true, reason);
                 }
                 else
                 {
-                    Log($"[Login] failed 403: {trimmed}");
+                    Log($"[Login] failed 403: {response.Content?.Trim('"').Trim()}");
                     SetLoginState(false, "", false, "");
                 }
                 onComplete?.Invoke(false);
@@ -96,6 +214,14 @@ namespace GLMod.Services.Implementations
                 Log($"[Login] failed - Status code: {response.StatusCode}");
                 SetLoginState(false, "", false, "");
                 onComplete?.Invoke(false);
+            }
+        }
+
+        private void LogClockOffset()
+        {
+            if (ServerClock.OffsetMs != 0)
+            {
+                Log($"[Login] local clock differs from the server by {ServerClock.OffsetMs} ms; timestamps are corrected");
             }
         }
 
@@ -116,35 +242,31 @@ namespace GLMod.Services.Implementations
 
         public string GetAccountName()
         {
-            try
-            {
-                if (!_isLoggedIn || string.IsNullOrEmpty(_token))
-                {
-                    return "";
-                }
-
-                int hashIndex = _token.IndexOf("#");
-                if (hashIndex > 0)
-                {
-                    return _token.Substring(0, hashIndex);
-                }
-
-                return "";
-            }
-            catch (Exception e)
-            {
-                Log("[GetAccountName] Catch exception " + e.Message);
-                return "";
-            }
+            return _isLoggedIn ? _accountName ?? "" : "";
         }
 
         public void SetLoginState(bool isLoggedIn, string token, bool isBanned, string banReason)
         {
             _isLoggedIn = isLoggedIn;
             _token = token ?? "";
+            _bearerToken = "";
+            _accountName = LoginResponse.AccountNameOfLegacyToken(_token);
+            _tokenExpiresAt = null;
             _isBanned = isBanned;
             _banReason = banReason ?? "";
             _connectionState.Value = isLoggedIn ? "Yes" : "No";
+        }
+
+        private void SetGameTokenLogin(GLLoginResponse login)
+        {
+            _isLoggedIn = true;
+            _token = login.token;
+            _bearerToken = login.token;
+            _accountName = login.username;
+            _tokenExpiresAt = login.expiresAt;
+            _isBanned = false;
+            _banReason = "";
+            _connectionState.Value = "Yes";
         }
     }
 }

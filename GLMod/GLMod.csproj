@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <TargetFramework>net6.0</TargetFramework>
-        <Version>5.6.1</Version>
+        <Version>5.7.0</Version>
         <GameVersion>2026.3.31</GameVersion>
 
         <Description>GLMod</Description>

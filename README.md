@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://github.com/MatuxGG/GLMod">
-    <img src="https://img.shields.io/badge/GLMod-v5.6.1-blue" alt="GLMod Version">
+    <img src="https://img.shields.io/badge/GLMod-v5.7.0-blue" alt="GLMod Version">
   </a>
   <a href="https://goodloss.fr/discord">
     <img src="https://img.shields.io/badge/Good%20Loss%20Discord%20Server-Join-7289DA?logo=discord&logoColor=white" alt="Good Loss Discord Server">
@@ -23,7 +23,7 @@ GLMod provides a comprehensive set of services for tracking game data and enhanc
 
 ### Core Services
 
-- **Authentication Service**: Manages Good Loss authentication with Steam, login/logout functionality, and ban status handling
+- **Authentication Service**: Manages Good Loss authentication with Steam (a Steam session ticket proves your account to Good Loss, which then gives GLMod a secret session token), login/logout functionality, and ban status handling
 - **Integrity Service**: Verifies file integrity and checksums to ensure mod authenticity
 - **Item Service**: Manages in-game items (successes) and DLC ownership tracking
 - **Rank Service**: Fetches and displays player ranks from Good Loss
@@ -59,7 +59,7 @@ GLMod automatically collects and synchronizes (free play games are never collect
 
 # Installation
 
-Currently, GLMod uses your Steam ID to collect your data.
+Currently, GLMod uses your Steam account to collect your data: Steam proves your Steam ID to Good Loss with a session ticket, so nobody else can log in as you.
 Therefore, it's only available with Steam version of Among Us.
 There is no support for any other platform.
 

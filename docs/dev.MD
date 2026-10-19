@@ -30,7 +30,9 @@ Manages Steam authentication and user login state.
 if (GLMod.AuthService.IsLoggedIn)
 {
     string accountName = GLMod.AuthService.GetAccountName();
-    string token = GLMod.AuthService.Token;
+    // Secret session token of the player's Good Loss account (since 5.7.0, "glm_…" after a
+    // Steam ticket login). Never log it, display it or send it anywhere but the Good Loss API.
+    string token = GLMod.AuthService.BearerToken;
 }
 
 // Perform login

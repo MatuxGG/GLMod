@@ -42,7 +42,7 @@ Any code review MUST reject contributions that introduce non-English identifiers
 
 ### 1.1 Identity
 - **Name**: GLMod (Good Loss Mod)
-- **Current version**: `5.6.1` (see [GLMod/GLMod.csproj](GLMod/GLMod.csproj) and [GLMod/GLMod.cs](GLMod/GLMod.cs))
+- **Current version**: `5.7.0` (see [GLMod/GLMod.csproj](GLMod/GLMod.csproj) and [GLMod/GLMod.cs](GLMod/GLMod.cs))
 - **BepInEx plugin Id**: `glmod`
 - **Author**: Matux
 - **License**: GNU GPLv3
@@ -129,12 +129,15 @@ Every service is exposed statically via the main `GLMod` class and has a dedicat
 
 ### 3.1 `IAuthenticationService` — [Interfaces/IAuthenticationService.cs](GLMod/Services/Interfaces/IAuthenticationService.cs)
 - **Role**: handle Steam → Good Loss authentication.
-- **Endpoint**: `POST {API}/user/login` with `steamId`.
-- **HTTP codes**:
-  - `200` → token returned in `response.Content`.
-  - `403` + body prefixed `"Banned: "` → user is banned, reason follows the prefix.
-  - Others → silent failure.
-- **Exposed state**: `Token`, `IsLoggedIn`, `IsBanned`, `BanReason`.
+- **Steam ticket login** (since 5.7.0): `Login()` asks Steam for a session ticket ([SteamSessionTicket.cs](GLMod/Class/SteamSessionTicket.cs), `SteamUser.GetAuthSessionTicket` — Among Us's Steam SDK has no `GetAuthTicketForWebApi`) and sends its hex as `POST {API}/user/login` `steamTicket`. The site has Steam validate it for the Among Us app id (945360), so the SteamID is **proven**, not declared. Answers:
+  - `200` JSON `{"token": "glm_…", "username", "expiresAt"}` (`GLLoginResponse`) → logged in; the token is secret and goes as `Authorization: Bearer` on the calls that act for the player (`/game/addMyPlayer`, `/user/steamownerships`).
+  - `401 {"error":"Invalid ticket"}` → sent once more after `STEAM_TICKET_RETRY_DELAY` (Steam may not have registered a brand new ticket yet).
+  - `403` + body prefixed `"Banned: "` → banned, reason follows the prefix (final, no fallback).
+  - anything else (no ticket, API without ticket support — the old API answers 403 with an empty body —, `429`, `503` Steam outage, network) → **legacy login**.
+  - The ticket is cancelled (`CancelAuthTicket`) as soon as the login answered, whatever the outcome: it cannot be replayed.
+  - A game token still valid for at least `GAME_TOKEN_REUSE_MARGIN_SECONDS` (compared with `ServerClock`) is reused by the next `Login()` (it runs on every main menu) without a new ticket.
+- **Legacy login** (kept while the site accepts it): `POST {API}/user/login` with `steamId` (unproven). `200` → the text token `username#keycloakId` (not a secret, no bearer); `403` + `"Banned: "` → banned; others → failure.
+- **Exposed state**: `Token` (game token or legacy token — never log it), `BearerToken` (game token, empty after a legacy login), `IsLoggedIn`, `IsBanned`, `BanReason`, `GetAccountName()` (the `username` of the answer, or the part of the legacy token before `#`; Among Us Ranked uses it). Pure parsing in [LoginResponse.cs](GLMod/Class/LoginResponse.cs) (unit-tested).
 
 ### 3.2 `IServiceManager` — [Interfaces/IServiceManager.cs](GLMod/Services/Interfaces/IServiceManager.cs)
 - **Role**: enable / disable **data collectors** (see enum `ServiceType`).
@@ -152,7 +155,7 @@ Every service is exposed statically via the main `GLMod` class and has a dedicat
   - `AddPlayer(name, role, team, color)` — adds a player to the current match.
   - `SendGame(onComplete)` — uploads the match to the API (coroutine).
   - `SyncGameId(onComplete)` — broadcasts the match ID to non-hosts via RPC.
-  - `AddMyPlayer(onComplete)` — registers the local player on the server.
+  - `AddMyPlayer(onComplete)` — registers the local player on the server (with the game token as Bearer the site takes the account from it and ignores `login`, still sent for APIs without the Steam ticket login).
   - `GetShieldPlayer(onComplete, onError)` — returns the player who would have benefited from a T1 shield (retries on HTTP 400).
   - `SetWinnerTeams(winners)` / `AddWinnerPlayer(name)` — sets the outcome.
   - `EndGame()` — closes the match server-side.
@@ -163,6 +166,7 @@ Every service is exposed statically via the main `GLMod` class and has a dedicat
 ### 3.4 `IItemService` — [Interfaces/IItemService.cs](GLMod/Services/Interfaces/IItemService.cs)
 - **Role**: fetch unlocked items (achievements) and owned Steam DLCs.
 - **Methods**: `ReloadItems()`, `IsUnlocked(id)`, `ReloadDlcOwnerships()`, `HasDlc(appId)`.
+- `ReloadDlcOwnerships()` only runs after a Steam ticket login: `/user/steamownerships` reads the SteamID of the account behind the Bearer game token (before 5.7.0 GLMod sent a `token` form value the site never read, so ownerships were never loaded).
 
 ### 3.5 `IRankService` — [Interfaces/IRankService.cs](GLMod/Services/Interfaces/IRankService.cs)
 - **Role**: fetch a player rank for a given mod.
@@ -239,6 +243,7 @@ Every service is exposed statically via the main `GLMod` class and has a dedicat
 | `GLRank`        | Rank: id, name, link, percent, error. |
 | `GLData` / `GLDataList` | Generic key/value wrappers for API responses. |
 | `GLJson`        | Static helpers `Serialize<T>` / `Deserialize<T>` (System.Text.Json) with try/catch + log. |
+| `GLLoginResponse` | `POST /user/login` answer to a Steam ticket: token (`glm_…`, secret), username, expiresAt (Unix s, nullable). |
 | `GLGameHistoryEntry` | Local history entry (never sent to the API): gameId, recapUrl, endedAtMs, map, modName, role, team, won. |
 | `GLSessionList` / `GLSession` | `GET /player/sessions`: username + sessions (id, url, start, end (Unix s, **null while the session is live**), games, live, current). |
 | `GLLastGame` / `GLLastGameInfo` / `GLLastGamePlayer` | `GET /player/last-game`: game (id, url, mod, season, ranked, map, start, end, duration, turns, meetings, players, winners) and player stats (role, team, win, rp, kills, votes, reports, survival… nullable when not applicable). |
@@ -306,6 +311,10 @@ Reactor, Coms, Lights, O2
 | `RANKED_MOD_NAME`             | `Among Us Ranked` — mod name prefix that selects the Among Us Ranked menu theme |
 | `API_THEME_RANKED`            | `ranked` — `theme` sent to the `/player/*` GET endpoints by the Among Us Ranked menu theme (§3.11) |
 | `MENU_TOGGLE_KEY`             | `F2` (`UnityEngine.KeyCode` name)            |
+| `STEAM_TICKET_BUFFER_SIZE`    | `1024` — buffer of a Steam session ticket (real ones ≈ 250 bytes) |
+| `STEAM_TICKET_RETRY_DELAY`    | `2f` seconds — before sending a ticket again after "Invalid ticket" |
+| `GAME_TOKEN_PREFIX`           | `glm_` — prefix of the secret game token of the Steam ticket login |
+| `GAME_TOKEN_REUSE_MARGIN_SECONDS` | `86400` — a game token is reused by the next login while it stays valid this long |
 | `MENU_TAB_ACCOUNT` / `MENU_TAB_STATS` / `MENU_TAB_LAST_GAME` / `MENU_TAB_SESSIONS` | `glmod.account` / `glmod.stats` / `glmod.lastgame` / `glmod.sessions` — ids of the built-in menu tabs (public, for mods) |
 | `MENU_REFRESH_SECONDS`        | `60` — a tab reloads its API data when shown after this delay |
 | `MENU_RETRY_SECONDS`          | `10` — delay before retrying a failed API load |
@@ -350,7 +359,9 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 | File                   | Role                                                                                       |
 |------------------------|--------------------------------------------------------------------------------------------|
 | `HttpHelper.cs`        | Shared static `HttpClient`, proxy disabled.                                                |
-| `ApiService.cs`        | `PostFormAsync`, `PostFormWithErrorHandlingAsync`, `ApiResponse` type.                     |
+| `ApiService.cs`        | `PostFormAsync`, `PostFormWithErrorHandlingAsync` (optional `bearerToken` → `Authorization: Bearer`; `unescape: false` keeps a JSON body intact), `GetWithErrorHandlingAsync`, `ApiResponse` type. |
+| `SteamSessionTicket.cs` | `TryCreate` / `Cancel` — Steam session ticket (hex) of the Steam ticket login (§3.1). Main thread only. |
+| `LoginResponse.cs`     | Pure login helpers: ticket bytes → hex, ticket login answer (`GLLoginResponse`), ban reason, account name of a legacy token, token reuse. |
 | `ApiEndpointResolver.cs` | Resolves the API base URL: `API_ENDPOINT`, or the `GLMOD_API_ENDPOINT` environment variable when it is a valid http(s) URL. `ToSiteUrl(api)` / `GameRecapUrl(api, gameId)` give the matching site and recap URLs. |
 | `GameHistoryList.cs`   | Pure operations on the local history (add with dedupe and truncation, JSON serialize / parse). |
 | `PlayerApiResponse.cs` | Pure parsing of the `/player/*` GET responses (`TryParse<T>`, `ReadError` for `{"error":...}`). |
@@ -420,11 +431,11 @@ Base: `https://goodloss.fr/api` (production). It can be overridden at startup wi
 
 | Endpoint                       | Method | Service           | Usage                                  |
 |--------------------------------|--------|-------------------|----------------------------------------|
-| `/user/login`                  | POST   | AuthService       | Steam login.                           |
-| `/user/steamownerships`        | POST   | ItemService       | Steam DLC ownerships.                  |
+| `/user/login`                  | POST   | AuthService       | Steam login: `steamTicket` → JSON game token (§3.1); legacy `steamId` fallback. |
+| `/user/steamownerships`        | POST   | ItemService       | Steam DLC ownerships of the account (Bearer game token). |
 | `/data`                        | POST   | IntegrityService  | Generic data lookup by id; `checksum_*` ids hold DLL checksums (§3.6). |
 | `/game/start`                  | POST   | GameStateManager  | Sends a new match.                     |
-| `/game/addMyPlayer`            | POST   | GameStateManager  | Registers the local player.            |
+| `/game/addMyPlayer`            | POST   | GameStateManager  | Registers the local player (Bearer game token when there is one). |
 | `/game/getShieldPlayer`        | POST   | GameStateManager  | Returns the T1 shield candidate.       |
 | `/game/end`                    | POST   | GameStateManager  | Finalizes a match.                     |
 | `/player/challengerItems`      | POST   | ItemService       | Player's unlocked items.               |
@@ -455,7 +466,7 @@ Base: `https://goodloss.fr/api` (production). It can be overridden at startup wi
 
 ### 11.4 Testing
 - Test framework: xUnit ([GLMod.Tests/GLMod.Tests.csproj](GLMod.Tests/GLMod.Tests.csproj)).
-- Scope: pure logic — entities (`GLGame`, `GLPlayer`, `GLPosition`), enums (`SabotageType`, `GameMapType`), `ServiceManager`, `GameConstants` invariants, `ApiEndpointResolver` (incl. site / recap URLs), `ServerClock`, `MenuService`, `GameHistoryList`, `PlayerApiResponse` (on captured preprod responses), `StatFormat`, and the E2E harness `ScenarioPlan` / `ScenarioVerifier`. Anything that touches IL2CPP / Among Us types stays untestable until further decoupling.
+- Scope: pure logic — entities (`GLGame`, `GLPlayer`, `GLPosition`), enums (`SabotageType`, `GameMapType`), `ServiceManager`, `GameConstants` invariants, `ApiEndpointResolver` (incl. site / recap URLs), `ServerClock`, `MenuService`, `GameHistoryList`, `PlayerApiResponse` (on captured preprod responses), `LoginResponse`, `StatFormat`, and the E2E harness `ScenarioPlan` / `ScenarioVerifier`. Anything that touches IL2CPP / Among Us types stays untestable until further decoupling.
 - Add new tests for any new pure-logic surface. Refactor toward injectable abstractions before adding tests that would otherwise require IL2CPP mocking.
 
 ### 11.5 End-to-end test (4 Among Us instances, online lobby, 2 games)
@@ -512,6 +523,7 @@ GLMod/                                # Repo root
 │   ├── EnumTests.cs
 │   ├── GameConstantsTests.cs         # + ApiEndpointResolver.
 │   ├── GameHistoryTests.cs           # GameHistoryList.
+│   ├── LoginResponseTests.cs         # LoginResponse (Steam ticket login answer, legacy token).
 │   ├── MenuServiceTests.cs
 │   ├── PlayerApiTests.cs             # PlayerApiResponse (captured preprod responses), StatFormat.
 │   ├── RankedModTests.cs             # RankedMod (theme selection).
@@ -541,10 +553,12 @@ GLMod/                                # Repo root
     │   ├── CoroutineHelpers.cs       # Async-task ↔ coroutine bridge.
     │   ├── CoroutineRunner.cs
     │   ├── GameHistoryList.cs        # Pure local-history list logic.
+    │   ├── LoginResponse.cs          # Pure login helpers (ticket hex, login answers).
     │   ├── PlayerApiResponse.cs      # Pure parsing of the /player/* GET responses.
     │   ├── PlayerApiQuery.cs         # Pure URL builder of the /player/* GET requests.
     │   ├── HttpHelper.cs
     │   ├── ServerClock.cs            # Timestamps aligned on the API server clock.
+    │   ├── SteamSessionTicket.cs     # Steam session ticket of the login (IL2CPP).
     │   ├── StatFormat.cs             # Pure formatting of menu stats.
     │   ├── TranslationTable.cs       # Pure translation lookup with fallbacks.
     │   ├── GameLanguage.cs           # Game language -> language code.
@@ -576,6 +590,7 @@ GLMod/                                # Repo root
     │   ├── GLDataList.cs
     │   ├── GLGame.cs
     │   ├── GLGameHistoryEntry.cs     # Local history entry (not an API DTO).
+    │   ├── GLLoginResponse.cs        # POST /user/login answer to a Steam ticket.
     │   ├── GLLastGame.cs             # GET /player/last-game response…
     │   ├── GLLastGameInfo.cs         # …its game part…
     │   ├── GLLastGamePlayer.cs       # …and its player stats.
@@ -716,8 +731,8 @@ A third-party mod consumes GLMod by:
 
 ## 15. Security & privacy
 
-- **Identifier**: SteamID (only transmitted to `goodloss.fr` for authentication).
-- **No password**: login = SteamID → Good Loss token.
+- **Identifier**: SteamID, **proven by a Steam session ticket** that the site has Steam validate (since 5.7.0; the ticket is cancelled right after the login). The legacy unproven `steamId` login is only a fallback while the site still accepts it.
+- **No password**: login = Steam ticket → secret Good Loss game token (`glm_…`, the site stores only its SHA-256, 30 days). The token goes only to the Good Loss API as `Authorization: Bearer`; never log or display it.
 - **`token.txt`, `output`, `server`** are gitignored (see `.gitignore`).
 - **Ban**: handled server-side, HTTP 403 response + `"Banned: <reason>"`.
 - **Integrity**: `IntegrityService` can verify a DLL's SHA against a remote checksum to detect mod tampering.
@@ -766,9 +781,10 @@ For every change to the project:
 - **IMGUI methods stripped from the Among Us build**: `GUI.DrawTexture` (every overload) and the 4-argument `RectOffset` constructor exist in the interop assemblies but throw "Method unstripping failed" at runtime. Draw backgrounds with `GUI.Box` + a style background tinted by `GUI.backgroundColor` (`MenuUI.DrawRect`), and set `RectOffset` fields one by one. Verified working: `GUI.Label` / `Button` / `Box` / `BeginGroup` / `EndGroup`, `GUI.matrix`, `GUI.color`, `GUIStyle.CalcHeight` / `CalcSize`, `Event.current`, `Texture2D` creation + `SetPixel` + `Apply`, `Font.CreateDynamicFontFromOSFont` + `GUIStyle.font`, and `ScreenCapture.CaptureScreenshot` (captures the IMGUI overlay too: handy to check the menu without sending input to the game window).
 - **`MonoBehaviour` messages (`Update`, `OnGUI`)**: attach the component with `BasePlugin.AddComponent<T>()` (BepInEx manager object). A component added in `Load()` to our own `new GameObject` + `DontDestroyOnLoad` never received `Update` / `OnGUI` (coroutines started on such an object do work, see `CoroutineRunner`).
 - **Global Among Us type names**: Assembly-CSharp types live in the global namespace and win over `using` imports (e.g. Among Us's `AccountTab` hid `GLMod.Menu.AccountTab`). Give GLMod types distinctive names (`*MenuTab`).
+- **Old Steam SDK in Among Us**: the bundled `steam_api.dll` exposes `SteamUser021` — `GetAuthSessionTicket` exists, `GetAuthTicketForWebApi` does not. Steam's Web API still validates `GetAuthSessionTicket` tickets for the Among Us app id (checked 2026-10-19, also tampered / cancelled / other-app tickets refused). A ticket is usable about a second after its creation; the login retries once on "Invalid ticket".
 - **Auto-generated `Resources.Designer.cs`**: regenerated by Visual Studio in the developer's UI culture and is the only file allowed to contain non-English content. Do not hand-edit; regenerate from a machine with an English UI if needed.
 
 ---
 
-*Last updated: 2026-10-15 — GLMod version 5.6.1.*
+*Last updated: 2026-10-19 — GLMod version 5.7.0.*
 *Every change to the project must be accompanied by an update of this file.*

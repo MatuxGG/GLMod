@@ -175,5 +175,26 @@ namespace GLMod.Constants
         /// Name of the UnityEngine.KeyCode that opens / closes the Good Loss menu.
         /// </summary>
         public const string MENU_TOGGLE_KEY = "F2";
+
+        /// <summary>
+        /// Size of the buffer receiving a Steam session ticket (real tickets are about 250 bytes).
+        /// </summary>
+        public const int STEAM_TICKET_BUFFER_SIZE = 1024;
+
+        /// <summary>
+        /// Delay before sending a Steam ticket again when the API answered "Invalid ticket"
+        /// (Steam may not have registered a ticket created a moment ago).
+        /// </summary>
+        public const float STEAM_TICKET_RETRY_DELAY = 2f;
+
+        /// <summary>
+        /// Prefix of the secret game token issued by /user/login for a Steam ticket.
+        /// </summary>
+        public const string GAME_TOKEN_PREFIX = "glm_";
+
+        /// <summary>
+        /// A game token is reused by the next login while it stays valid at least this long.
+        /// </summary>
+        public const long GAME_TOKEN_REUSE_MARGIN_SECONDS = 86400;
     }
 }
