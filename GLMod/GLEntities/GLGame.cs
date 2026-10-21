@@ -95,7 +95,12 @@ namespace GLMod.GLEntities
 
         public void AddPosition(string playerName, float x, float y, string timestampStr)
         {
-            this.players.Find(p => p.playerName == playerName).AddPosition(x, y, timestampStr, this.turns);
+            AddPosition(playerName, x, y, timestampStr, this.turns);
+        }
+
+        public void AddPosition(string playerName, float x, float y, string timestampStr, string turn)
+        {
+            this.players.Find(p => p.playerName == playerName)?.AddPosition(x, y, timestampStr, turn);
         }
     }
 }

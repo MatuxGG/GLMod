@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://github.com/MatuxGG/GLMod">
-    <img src="https://img.shields.io/badge/GLMod-v5.7.0-blue" alt="GLMod Version">
+    <img src="https://img.shields.io/badge/GLMod-v5.7.1-blue" alt="GLMod Version">
   </a>
   <a href="https://goodloss.fr/discord">
     <img src="https://img.shields.io/badge/Good%20Loss%20Discord%20Server-Join-7289DA?logo=discord&logoColor=white" alt="Good Loss Discord Server">
@@ -47,6 +47,7 @@ GLMod automatically collects and synchronizes (free play games are never collect
 - Match history with detailed player statistics
 - Role assignments and team compositions
 - In-game actions (kills, reports, votes, sabotages, etc.)
+- Player positions on the map (sampled every 0.1 s, only the points needed to redraw the path are sent), shown on the game recap
 - Task completion progress
 - Custom role actions and events
 - Player ranks and achievements

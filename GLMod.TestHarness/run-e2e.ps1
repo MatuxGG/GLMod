@@ -7,7 +7,10 @@
     2. Installs GLMod.TestHarness.dll in the plugins folder for the duration of the run.
     3. Launches 4 instances with GLMOD_API_ENDPOINT pointing to the preprod API:
        instance 0 creates an online game on the currently selected (custom) region, 1-3 join it.
-    4. Plays game 1 (crewmates win by tasks), goes back to the lobby, plays game 2 (impostor wins by vote).
+    4. Session scenario (default): plays game 1 (crewmates win by tasks), goes back to the lobby,
+       plays game 2 (impostor wins by vote).
+       Movement scenario: one game where every player walks around the map and the impostor kills
+       twice with a wait in between; the host compares the positions GLMod sent with the real ones.
     5. Waits for every instance to write result-N.json, then prints a summary.
     6. Stops the instances it launched and uninstalls the harness.
 
@@ -15,9 +18,15 @@
 
 .EXAMPLE
     ./GLMod.TestHarness/run-e2e.ps1
+.EXAMPLE
+    ./GLMod.TestHarness/run-e2e.ps1 -Scenario Movement
 #>
 param(
+    [ValidateSet('Session', 'Movement')]
+    [string]$Scenario = 'Session',
     [int]$TimeoutSeconds = 960,
+    # Server region every instance selects for the run (a custom one: official servers are refused)
+    [string]$Region = 'Ranked EU',
     [string]$ApiEndpoint = 'https://preprod.goodloss.fr/api',
     # Mod name the games are recorded under (GLMod.ConfigService.SetModName); empty keeps GLMod's own (Vanilla)
     [string]$ModName = 'Among Us Ranked',
@@ -112,7 +121,7 @@ $outputDir = Join-Path $PSScriptRoot ("output\{0}-{1}" -f (Get-Date -Format 'yyy
 New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 
 Copy-Item $harnessDll $installedHarness -Force
-Write-Host "==> Run $runId, API $ApiEndpoint, mod '$ModName', map $Map, output: $outputDir"
+Write-Host "==> Run $runId, scenario $Scenario, region '$Region', API $ApiEndpoint, mod '$ModName', map $Map, output: $outputDir"
 
 # Other mods change GLMod's mod name (e.g. ChallengerLevel sets "Challenger Maps"): set them aside
 # so the session runs as Vanilla. Restored in the final block below.
@@ -142,21 +151,47 @@ function Restore-GameHistory {
 
 $mapId =if ($Map -eq 'Keep') { '' } else { "$($mapIds[$Map])" }
 
+# Instances share BepInEx/config/glmod.cfg: GLMod fails to load ("being used by another process")
+# when two instances write it at once. Each instance is started once the previous one has loaded
+# GLMod and the harness (its instance-N.log exists), and restarted when GLMod did not load.
+$loadTimeoutSeconds = 90
+$loadAttempts = 3
+
 $processes = @()
 try {
+    $env:GLMOD_TEST_RUN_ID = $runId
+    $env:GLMOD_TEST_OUTPUT = $outputDir
+    $env:GLMOD_API_ENDPOINT = $ApiEndpoint
+    $env:GLMOD_TEST_MOD_NAME = $ModName
+    $env:GLMOD_TEST_MAP_ID = $mapId
+    $env:GLMOD_TEST_SCENARIO = $Scenario.ToLowerInvariant()
+    $env:GLMOD_TEST_REGION = $Region
     for ($i = 0; $i -lt $playerCount; $i++) {
         $env:GLMOD_TEST_INSTANCE = "$i"
-        $env:GLMOD_TEST_RUN_ID = $runId
-        $env:GLMOD_TEST_OUTPUT = $outputDir
-        $env:GLMOD_API_ENDPOINT = $ApiEndpoint
-        $env:GLMOD_TEST_MOD_NAME = $ModName
-        $env:GLMOD_TEST_MAP_ID = $mapId
         # Unity only writes the shared Player.log for one process: give each instance its own log
         $unityLog = Join-Path $outputDir "player-$i.log"
-        $processes += Start-Process -FilePath $gameExe -WorkingDirectory $gameDir -ArgumentList '-logFile', "`"$unityLog`"" -PassThru
-        Write-Host "    started instance $i (pid $($processes[-1].Id))"
-        # Stagger startups: BepInEx caches are shared between instances
-        Start-Sleep -Seconds $(if ($i -eq 0) { 8 } else { 4 })
+        $harnessLog = Join-Path $outputDir "instance-$i.log"
+        $loaded = $false
+        for ($attempt = 1; $attempt -le $loadAttempts -and -not $loaded; $attempt++) {
+            $process = Start-Process -FilePath $gameExe -WorkingDirectory $gameDir -ArgumentList '-logFile', "`"$unityLog`"" -PassThru
+            Write-Host "    started instance $i (pid $($process.Id))"
+            $loadDeadline = (Get-Date).AddSeconds($loadTimeoutSeconds)
+            while ((Get-Date) -lt $loadDeadline -and -not $process.HasExited -and -not (Test-Path $harnessLog)) {
+                Start-Sleep -Milliseconds 500
+            }
+            $loaded = Test-Path $harnessLog
+            if ($loaded) {
+                $processes += $process
+            }
+            else {
+                Write-Host "    instance $i did not load GLMod (attempt $attempt/$loadAttempts), restarting it" -ForegroundColor Yellow
+                Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+                $process.WaitForExit(10000) | Out-Null
+            }
+        }
+        if (-not $loaded) { throw "Instance $i did not load GLMod after $loadAttempts attempts (see BepInEx/LogOutput*.log)" }
+        # Let it finish writing its config before the next instance loads
+        Start-Sleep -Seconds 4
     }
 }
 catch {
@@ -168,7 +203,7 @@ catch {
     throw
 }
 finally {
-    Remove-Item Env:GLMOD_TEST_INSTANCE, Env:GLMOD_TEST_RUN_ID, Env:GLMOD_TEST_OUTPUT, Env:GLMOD_API_ENDPOINT, Env:GLMOD_TEST_MOD_NAME, Env:GLMOD_TEST_MAP_ID -ErrorAction SilentlyContinue
+    Remove-Item Env:GLMOD_TEST_INSTANCE, Env:GLMOD_TEST_RUN_ID, Env:GLMOD_TEST_OUTPUT, Env:GLMOD_API_ENDPOINT, Env:GLMOD_TEST_MOD_NAME, Env:GLMOD_TEST_MAP_ID, Env:GLMOD_TEST_SCENARIO, Env:GLMOD_TEST_REGION -ErrorAction SilentlyContinue
 }
 
 # Window tiling: a window is re-placed until it sits in its cell (Unity may resize it while loading),
@@ -232,13 +267,19 @@ for ($i = 0; $i -lt $playerCount; $i++) {
     Write-Host ("  [{0}] {1,-6} {2} (phase: {3})" -f $i, $role, $status, $result.Phase) -ForegroundColor $color
     foreach ($game in $result.Games) {
         Write-Host ("        game {0}: {1}, GLMod id {2}, {3} failure(s)" -f $game.Number, $game.EndReason, $game.GameId, @($game.Failures).Count)
+        foreach ($m in @($game.Movement)) {
+            if (-not $m) { continue }
+            Write-Host ("          {0,-12} sent {1,4} pts (10 Hz {2,4}, 0.5 s {3,4}) | max/mean gap to real position: sent {4:0.00}/{5:0.000}, 10 Hz {6:0.00}/{7:0.000}, 0.5 s {8:0.00}/{9:0.000}" -f `
+                $m.Player, $m.PointsSent, $m.Points10Hz, $m.PointsLegacy,
+                $m.Sent.MaxDeviation, $m.Sent.MeanDeviation, $m.Fixed10Hz.MaxDeviation, $m.Fixed10Hz.MeanDeviation, $m.Legacy.MaxDeviation, $m.Legacy.MeanDeviation)
+        }
     }
     foreach ($f in $result.Failures) { Write-Host "        - $f" -ForegroundColor Red }
     foreach ($w in $result.Warnings) { Write-Host "        ! $w" -ForegroundColor Yellow }
     if (-not $result.Passed) { $allPassed = $false }
 }
 
-foreach ($n in 1, 2) {
+foreach ($n in 1, 2, 3) {
     $plan = Join-Path $outputDir "plan-$n.json"
     if (Test-Path $plan) {
         $p = Get-Content $plan -Raw | ConvertFrom-Json

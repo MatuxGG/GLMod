@@ -14,8 +14,9 @@ using GLModPlugin = global::GLMod.GLMod;
 namespace GLMod.TestHarness
 {
     /// <summary>
-    /// Drives one Among Us instance through the scripted session (see ScenarioPlan):
-    /// an online lobby, game 1 (crewmates win by tasks), back to the lobby, game 2 (impostor wins by vote).
+    /// Drives one Among Us instance through the scripted scenario (see ScenarioPlan): an online lobby, then
+    /// either the session (game 1: crewmates win by tasks, back to the lobby, game 2: impostor wins by vote)
+    /// or the movement game (players walk around, the impostor kills twice).
     /// Every instance runs the same coroutine; each one only performs the actions it owns.
     /// Instances coordinate through files in the run output folder (lobby code, plans).
     /// </summary>
@@ -42,6 +43,9 @@ namespace GLMod.TestHarness
 
         // Set by OpenConsole
         private static bool _consoleOpened;
+
+        // Movement game, host: real positions per player name (RecordTruth)
+        private static readonly Dictionary<string, List<TrackPoint>> _truth = new Dictionary<string, List<TrackPoint>>();
 
         // Host map setting before SelectMap changed it
         private static byte? _originalMapId;
@@ -97,6 +101,7 @@ namespace GLMod.TestHarness
             SetPhase("menu");
             yield return new WaitForSeconds(HarnessConstants.MENU_SETTLE_DELAY);
             HarnessLog.Info($"GLMod login: {GLModPlugin.AuthService?.IsLoggedIn} ({GLModPlugin.AuthService?.GetAccountName()}), mod: {GLModPlugin.ConfigService?.ModName}");
+            if (!Try($"select the server region '{_context.Region}'", SelectRegion)) yield break;
             if (!Try("check the server region", () => _region = CheckRegion())) yield break;
             HarnessLog.Info("Region: " + _region);
 
@@ -105,16 +110,17 @@ namespace GLMod.TestHarness
             if (_finished) yield break;
 
             string previousGameId = null;
-            for (int gameNumber = 1; gameNumber <= ScenarioPlan.GAME_COUNT; gameNumber++)
+            int[] gameNumbers = _context.GameNumbers;
+            for (int i = 0; i < gameNumbers.Length; i++)
             {
-                yield return PlayGame(gameNumber, previousGameId);
+                yield return PlayGame(gameNumbers[i], previousGameId);
                 if (_finished) yield break;
 
                 previousGameId = _endGame?.id;
 
-                if (gameNumber < ScenarioPlan.GAME_COUNT)
+                if (i + 1 < gameNumbers.Length)
                 {
-                    yield return ReturnToLobby(gameNumber + 1);
+                    yield return ReturnToLobby(gameNumbers[i + 1]);
                     if (_finished) yield break;
                 }
             }
@@ -166,13 +172,17 @@ namespace GLMod.TestHarness
             yield return WaitFor("intro finished (CanMove)", () => PlayerControl.LocalPlayer.CanMove, HarnessConstants.CAN_MOVE_TIMEOUT, required: false);
             yield return new WaitForSeconds(HarnessConstants.POST_INTRO_DELAY);
 
-            if (gameNumber == ScenarioPlan.GAME_CREWMATES_WIN_BY_TASKS)
+            switch (gameNumber)
             {
-                yield return PlayGameOne();
-            }
-            else
-            {
-                yield return PlayGameTwo();
+                case ScenarioPlan.GAME_CREWMATES_WIN_BY_TASKS:
+                    yield return PlayGameOne();
+                    break;
+                case ScenarioPlan.GAME_IMPOSTOR_WINS_BY_VOTE:
+                    yield return PlayGameTwo();
+                    break;
+                default:
+                    yield return PlayMovementGame();
+                    break;
             }
             if (_finished) yield break;
 
@@ -282,6 +292,145 @@ namespace GLMod.TestHarness
             }
 
             yield return VoteInMeeting(waitForMeetingEnd: false);
+        }
+
+        // ---------------------------------------------------------------- game 3: movement
+
+        /// <summary>
+        /// Everyone walks from console to console; the impostor roams, hunts and kills the first
+        /// victim, roams again for MOVEMENT_KILL_GAP seconds, then hunts and kills the second one.
+        /// The host records where every player really is on each frame (truth) to measure the
+        /// accuracy of the positions GLMod sends.
+        /// </summary>
+        private static IEnumerator PlayMovementGame()
+        {
+            byte me = PlayerControl.LocalPlayer.PlayerId;
+            var random = new System.Random(Environment.TickCount + _context.Instance * 7919);
+
+            if (_context.IsHost)
+            {
+                CoroutineRunner.Run(RecordTruth());
+            }
+
+            SetPhase("g3:grid");
+            if (!Try("build the navigation grid", HarnessWalker.BuildGrid)) yield break;
+
+            float start = Time.realtimeSinceStartup;
+            SetPhase("g3:roam");
+            if (me != _plan.Impostor.Id)
+            {
+                yield return HarnessWalker.Roam(random, () => _gameEnded || PlayerControl.LocalPlayer.Data.IsDead);
+                yield break;
+            }
+
+            yield return HarnessWalker.Roam(random, () => _gameEnded || Time.realtimeSinceStartup - start > HarnessConstants.MOVEMENT_FIRST_KILL_DELAY);
+            if (_finished || _gameEnded) yield break;
+
+            SetPhase("g3:kill1");
+            yield return Hunt(_plan.FirstVictim);
+            if (_finished || _gameEnded) yield break;
+
+            float firstKill = Time.realtimeSinceStartup;
+            SetPhase("g3:wait");
+            HarnessLog.Info($"Waiting {HarnessConstants.MOVEMENT_KILL_GAP}s before the second kill");
+            yield return HarnessWalker.Roam(random, () => _gameEnded || Time.realtimeSinceStartup - firstKill > HarnessConstants.MOVEMENT_KILL_GAP);
+            if (_finished || _gameEnded) yield break;
+
+            SetPhase("g3:kill2");
+            yield return Hunt(_plan.SecondVictim);
+        }
+
+        /// <summary>
+        /// Walks after the victim and presses Kill once the kill button targets it and is ready.
+        /// </summary>
+        private static IEnumerator Hunt(ScenarioPlayer victim)
+        {
+            HarnessLog.Info($"Hunting {victim.Name}#{victim.Id}");
+            float deadline = Time.realtimeSinceStartup + HarnessConstants.MOVEMENT_HUNT_TIMEOUT;
+            while (!_finished && !_gameEnded && !IsDead(victim.Id))
+            {
+                float remaining = deadline - Time.realtimeSinceStartup;
+                if (remaining <= 0f)
+                {
+                    Fail($"Could not kill {victim.Name} within {HarnessConstants.MOVEMENT_HUNT_TIMEOUT}s");
+                    yield break;
+                }
+
+                if (SafeEvaluate(() => CanKill(victim.Id)))
+                {
+                    HarnessLog.Info($"Killing {victim.Name}");
+                    if (!Try("press Kill", () => HudManager.Instance.KillButton.DoClick())) yield break;
+                    yield return WaitForQuiet(() => _gameEnded || IsDead(victim.Id), HarnessConstants.MOVEMENT_KILL_CONFIRM_TIMEOUT);
+                    continue;
+                }
+
+                yield return HarnessWalker.Walk(() => PositionOf(victim.Id), () => _gameEnded || IsDead(victim.Id) || CanKill(victim.Id),
+                    remaining, HarnessConstants.MOVEMENT_HUNT_REPLAN_INTERVAL);
+                yield return null;
+            }
+
+            if (IsDead(victim.Id))
+            {
+                HarnessLog.Info($"{victim.Name} killed");
+            }
+        }
+
+        private static bool CanKill(byte victimId)
+        {
+            PlayerControl me = PlayerControl.LocalPlayer;
+            KillButton button = HudManager.Instance?.KillButton;
+            return me != null
+                && me.CanMove
+                && me.killTimer <= 0f
+                && button != null
+                && button.currentTarget != null
+                && button.currentTarget.PlayerId == victimId;
+        }
+
+        private static System.Numerics.Vector2? PositionOf(byte playerId)
+        {
+            PlayerControl player = FindPlayer(playerId);
+            return player != null ? HarnessWalker.ToNumerics(player.GetTruePosition()) : (System.Numerics.Vector2?)null;
+        }
+
+        private static bool IsDead(byte playerId)
+        {
+            return SafeEvaluate(() => FindPlayer(playerId)?.Data?.IsDead == true);
+        }
+
+        /// <summary>
+        /// Host: position of every alive player on every frame, as GLMod reads it, until the game ends.
+        /// </summary>
+        private static IEnumerator RecordTruth()
+        {
+            _truth.Clear();
+            while (!_finished && !_gameEnded)
+            {
+                try
+                {
+                    if (MeetingHud.Instance == null)
+                    {
+                        long now = ServerClock.NowMs();
+                        foreach (PlayerControl player in PlayerControl.AllPlayerControls)
+                        {
+                            if (player?.Data == null || player.Data.IsDead) continue;
+
+                            Vector3 position = player.MyPhysics.body.transform.position;
+                            if (!_truth.TryGetValue(player.Data.PlayerName, out List<TrackPoint> track))
+                            {
+                                track = new List<TrackPoint>();
+                                _truth[player.Data.PlayerName] = track;
+                            }
+                            track.Add(new TrackPoint(now, position.x, position.y));
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    HarnessLog.Warn("Could not record the real positions: " + e.Message);
+                }
+                yield return null;
+            }
         }
 
         // ---------------------------------------------------------------- shared steps
@@ -548,6 +697,31 @@ namespace GLMod.TestHarness
         // ---------------------------------------------------------------- network / lobby
 
         /// <summary>
+        /// Selects the test region for this session only: the choice is not saved, so the instances never
+        /// write the shared regionInfo.json at the same time and the player's own choice is kept.
+        /// </summary>
+        private static void SelectRegion()
+        {
+            ServerManager servers = DestroyableSingleton<ServerManager>.Instance;
+            if (servers.CurrentRegion?.Name == _context.Region) return;
+
+            var names = new List<string>();
+            foreach (IRegionInfo region in servers.AvailableRegions)
+            {
+                if (region == null) continue;
+                if (region.Name == _context.Region)
+                {
+                    servers.CurrentRegion = region;
+                    servers.ReselectServer();
+                    HarnessLog.Info($"Region {region.Name} selected");
+                    return;
+                }
+                names.Add(region.Name);
+            }
+            throw new InvalidOperationException($"region not found (available: {string.Join(", ", names)})");
+        }
+
+        /// <summary>
         /// Refuses official Innersloth servers: the harness teleports players and runs 4 clients on one account.
         /// </summary>
         private static string CheckRegion()
@@ -808,6 +982,17 @@ namespace GLMod.TestHarness
             checks.AddRange(ScenarioVerifier.VerifyHistoryEntry(
                 GLModPlugin.GameHistoryService?.Latest, _endGame, gameNumber, _localIsImpostor, GLModPlugin.api));
 
+            List<PlayerMovementStats> movement = null;
+            if (_context.IsHost && gameNumber == ScenarioPlan.GAME_MOVEMENT && _plan != null)
+            {
+                movement = new List<PlayerMovementStats>();
+                checks.AddRange(ScenarioVerifier.VerifyPositions(_endGame, _plan, _truth, movement));
+                foreach (PlayerMovementStats line in movement)
+                {
+                    HarnessLog.Info("Positions " + line);
+                }
+            }
+
             var result = new GameResult
             {
                 Number = gameNumber,
@@ -816,7 +1001,8 @@ namespace GLMod.TestHarness
                 GameId = _endGame?.id,
                 GameStep = GLModPlugin.GameStateManager?.Step.ToString(),
                 Failures = checks,
-                GameJson = _endGameJson
+                GameJson = _endGameJson,
+                Movement = movement
             };
             _games.Add(result);
 
@@ -850,7 +1036,7 @@ namespace GLMod.TestHarness
                 RunId = _context.RunId,
                 Instance = _context.Instance,
                 IsHost = _context.IsHost,
-                Passed = _failures.Count == 0 && _games.Count == ScenarioPlan.GAME_COUNT,
+                Passed = _failures.Count == 0 && _games.Count == _context.GameNumbers.Length,
                 Phase = _phase,
                 LocalPlayer = SafeLocalName(),
                 Region = _region,
@@ -869,7 +1055,7 @@ namespace GLMod.TestHarness
                 HarnessLog.Error("Could not write result file: " + e.Message);
             }
 
-            HarnessLog.Info(result.Passed ? "RESULT: PASSED" : $"RESULT: FAILED ({_failures.Count} failure(s), {_games.Count}/{ScenarioPlan.GAME_COUNT} game(s) played)");
+            HarnessLog.Info(result.Passed ? "RESULT: PASSED" : $"RESULT: FAILED ({_failures.Count} failure(s), {_games.Count}/{_context.GameNumbers.Length} game(s) played)");
             CoroutineRunner.Run(QuitLater());
         }
 

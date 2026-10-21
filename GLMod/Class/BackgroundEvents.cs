@@ -16,7 +16,8 @@ namespace GLMod.Class
         private static List<string> playersDc;
         private static bool processEnabled = false;
         private static SabotageType? cachedSabotage = null;
-        private static Coroutine backgroundCoroutine = null;
+        // Incremented on each start: loops of a previous game stop even if they missed processEnabled = false
+        private static int generation = 0;
 
         public static void handleDc(string reason, string playerName)
         {
@@ -37,71 +38,73 @@ namespace GLMod.Class
             playersDc = new List<string>() { };
             processEnabled = true;
             cachedSabotage = null;
+            PositionRecorder.Reset();
 
-            // Stop the previous coroutine if it exists
-            if (backgroundCoroutine != null)
-            {
-                CoroutineRunner.Run(StopBackgroundCoroutine());
-            }
-
-            // Start the new coroutine
-            backgroundCoroutine = CoroutineRunner.Run(handleProcess());
+            // Note: Unity's StopCoroutine does not always behave correctly under IL2CPP.
+            // Loops stop through processEnabled and the generation instead.
+            generation++;
+            CoroutineRunner.Run(handleProcess(generation));
+            CoroutineRunner.Run(handlePositions(generation));
         }
 
         public static void endBackgroundProcess()
         {
             processEnabled = false;
 
-            // Stop the coroutine
-            if (backgroundCoroutine != null)
-            {
-                CoroutineRunner.Run(StopBackgroundCoroutine());
-            }
+            // The last samples of each player are still pending in the simplifier
+            PositionRecorder.FlushAll(GLMod.GameStateManager?.CurrentGame);
         }
 
-        private static IEnumerator StopBackgroundCoroutine()
+        private static bool IsRunning(int runGeneration)
         {
-            if (backgroundCoroutine != null)
-            {
-                // Note: Unity's StopCoroutine does not always behave correctly under IL2CPP.
-                // We rely on the processEnabled flag for a clean shutdown instead.
-                backgroundCoroutine = null;
-            }
-            yield break;
+            return processEnabled && runGeneration == generation;
         }
 
-        private static IEnumerator handleProcess()
+        private static IEnumerator handleProcess(int runGeneration)
         {
-            while (processEnabled)
+            while (IsRunning(runGeneration))
             {
                 yield return new WaitForSeconds(GameConstants.BACKGROUND_POLLING_INTERVAL);
+                if (!IsRunning(runGeneration)) break;
 
                 // Check if not in meeting
                 int turn = int.Parse(GLMod.GameStateManager.CurrentGame.turns);
                 if (turn > 1000) continue;
 
-                TrackPlayerPositions();
                 DetectPlayerDisconnections();
                 TrackSabotageState();
             }
-
-            backgroundCoroutine = null;
         }
 
         /// <summary>
-        /// Tracks and records positions of all alive players
+        /// Samples the positions of all alive players; the simplifier only keeps the useful ones
         /// </summary>
-        private static void TrackPlayerPositions()
+        private static IEnumerator handlePositions(int runGeneration)
         {
-            long timestamp = ServerClock.NowMs();
-
-            foreach (PlayerControl player in PlayerControl.AllPlayerControls)
+            while (IsRunning(runGeneration))
             {
-                if (player.Data.IsDead) continue;
+                yield return new WaitForSeconds(GameConstants.POSITION_SAMPLING_INTERVAL);
+                if (!IsRunning(runGeneration)) break;
 
-                float x = player.MyPhysics.body.transform.position.x;
-                float y = player.MyPhysics.body.transform.position.y;
-                GLMod.GameStateManager.CurrentGame.AddPosition(player.Data.PlayerName, x, y, timestamp.ToString());
+                try
+                {
+                    GLGame game = GLMod.GameStateManager.CurrentGame;
+                    if (game == null) continue;
+
+                    if (int.Parse(game.turns) > 1000)
+                    {
+                        // Meeting: nobody moves, send what was pending before it
+                        PositionRecorder.FlushAll(game);
+                    }
+                    else
+                    {
+                        PositionRecorder.SampleAlivePlayers(game);
+                    }
+                }
+                catch (System.Exception e)
+                {
+                    GLMod.log("[TrackPositions] Catch exception " + e.Message);
+                }
             }
         }
 

@@ -41,13 +41,79 @@ namespace GLMod.TestHarness
 
             if (!VerifyPlayers(game, plan, failures)) return failures;
 
-            if (plan.GameNumber == ScenarioPlan.GAME_CREWMATES_WIN_BY_TASKS)
+            switch (plan.GameNumber)
             {
-                VerifyGameOne(game, plan, failures);
+                case ScenarioPlan.GAME_CREWMATES_WIN_BY_TASKS:
+                    VerifyGameOne(game, plan, failures);
+                    break;
+                case ScenarioPlan.GAME_IMPOSTOR_WINS_BY_VOTE:
+                    VerifyGameTwo(game, plan, failures);
+                    break;
+                default:
+                    VerifyMovementGame(game, plan, failures);
+                    break;
             }
-            else
+            return failures;
+        }
+
+        /// <summary>
+        /// Movement game, host: compares the positions GLMod sent with the positions the host saw
+        /// every frame (truth, per player name). Fills stats with one line per player.
+        /// </summary>
+        public static List<string> VerifyPositions(GLGame game, ScenarioPlan plan, IDictionary<string, List<TrackPoint>> truth, List<PlayerMovementStats> stats)
+        {
+            var failures = new List<string>();
+            if (game?.players == null) return failures;
+
+            // A kill moves the killer onto the victim between two samples: not a recording error
+            List<(long From, long To)> excluded = (game.actions ?? new List<GLAction>())
+                .Where(a => a.action == "killed" && long.TryParse(a.triggerTimeMs, out _))
+                .Select(a => long.Parse(a.triggerTimeMs))
+                .Select(t => (t - HarnessConstants.MOVEMENT_KILL_EXCLUSION_MS, t + HarnessConstants.MOVEMENT_KILL_EXCLUSION_MS))
+                .ToList();
+
+            foreach (ScenarioPlayer expected in plan.Players)
             {
-                VerifyGameTwo(game, plan, failures);
+                GLPlayer player = FindPlayer(game, expected.Name);
+                if (player == null) continue;
+
+                List<TrackPoint> sent = ToTrack(player.positions);
+                List<TrackPoint> real = truth != null && truth.TryGetValue(expected.Name, out List<TrackPoint> points) ? points : new List<TrackPoint>();
+                List<TrackPoint> fixed10Hz = PositionAccuracy.Resample(real, HarnessConstants.CURRENT_SAMPLING_MS);
+                List<TrackPoint> legacy = PositionAccuracy.Resample(real, HarnessConstants.LEGACY_SAMPLING_MS);
+
+                var line = new PlayerMovementStats
+                {
+                    Player = expected.Name,
+                    PointsSent = sent.Count,
+                    Points10Hz = fixed10Hz.Count,
+                    PointsLegacy = legacy.Count,
+                    PathLength = PositionAccuracy.PathLength(sent),
+                    Sent = PositionAccuracy.Measure(sent, real, excluded),
+                    Fixed10Hz = PositionAccuracy.Measure(fixed10Hz, real, excluded),
+                    Legacy = PositionAccuracy.Measure(legacy, real, excluded)
+                };
+                stats?.Add(line);
+
+                if (sent.Count < 2)
+                {
+                    failures.Add($"{expected.Name}: expected positions, got {sent.Count}");
+                    continue;
+                }
+
+                if (line.PathLength < HarnessConstants.MOVEMENT_MIN_PATH_LENGTH)
+                {
+                    failures.Add($"{expected.Name} barely moved in the positions sent: path of {line.PathLength:0.0} units");
+                }
+
+                if (line.Sent.Samples == 0)
+                {
+                    failures.Add($"{expected.Name}: no real position recorded by the harness to compare with");
+                }
+                else if (line.Sent.MaxDeviation > HarnessConstants.MOVEMENT_MAX_DEVIATION)
+                {
+                    failures.Add($"{expected.Name}: the recap would draw the player up to {line.Sent.MaxDeviation:0.00} units away from its real position (max {HarnessConstants.MOVEMENT_MAX_DEVIATION})");
+                }
             }
             return failures;
         }
@@ -121,7 +187,7 @@ namespace GLMod.TestHarness
                 failures.Add($"History map is '{entry.map}', expected '{game.map}'");
             }
 
-            bool impostorsWin = gameNumber == ScenarioPlan.GAME_IMPOSTOR_WINS_BY_VOTE;
+            bool impostorsWin = ScenarioPlan.ImpostorsWin(gameNumber);
             bool expectedWon = localIsImpostor == impostorsWin;
             if (entry.won != expectedWon)
             {
@@ -186,6 +252,53 @@ namespace GLMod.TestHarness
             ExpectCount(actions, "called an emergency", 0, failures);
 
             ExpectWinner(game, plan, TEAM_IMPOSTOR, failures);
+        }
+
+        // Movement game: two kills by the impostor with a wait in between, no meeting, impostor wins by kill
+        private static void VerifyMovementGame(GLGame game, ScenarioPlan plan, List<string> failures)
+        {
+            List<GLAction> actions = game.actions ?? new List<GLAction>();
+
+            ExpectAction(actions, plan.Impostor.Name, plan.FirstVictim.Name, "killed", TURN_FIRST, failures);
+            ExpectAction(actions, plan.Impostor.Name, plan.SecondVictim.Name, "killed", TURN_FIRST, failures);
+            ExpectCount(actions, "killed", 2, failures);
+            ExpectCount(actions, "reported", 0, failures);
+            ExpectCount(actions, "called an emergency", 0, failures);
+            ExpectCount(actions, "voted", 0, failures);
+
+            if (game.turns != TURN_FIRST)
+            {
+                failures.Add($"Expected turns '{TURN_FIRST}' without meeting, got '{game.turns}'");
+            }
+
+            long? first = KillTime(actions, plan.Impostor.Name, plan.FirstVictim.Name);
+            long? second = KillTime(actions, plan.Impostor.Name, plan.SecondVictim.Name);
+            long minimumGap = (long)(HarnessConstants.MOVEMENT_KILL_GAP * 1000);
+            if (first.HasValue && second.HasValue && second.Value - first.Value < minimumGap)
+            {
+                failures.Add($"Expected at least {minimumGap} ms between the two kills, got {second.Value - first.Value} ms");
+            }
+
+            ExpectWinner(game, plan, TEAM_IMPOSTOR, failures);
+        }
+
+        private static long? KillTime(List<GLAction> actions, string killer, string victim)
+        {
+            GLAction kill = actions.FirstOrDefault(a => a.action == "killed" && a.source == killer && a.target == victim);
+            return kill != null && long.TryParse(kill.triggerTimeMs, out long time) ? time : (long?)null;
+        }
+
+        private static List<TrackPoint> ToTrack(List<GLPosition> positions)
+        {
+            var track = new List<TrackPoint>();
+            foreach (GLPosition position in positions ?? new List<GLPosition>())
+            {
+                if (long.TryParse(position.triggerTime, out long time))
+                {
+                    track.Add(new TrackPoint(time, position.x, position.y));
+                }
+            }
+            return track;
         }
 
         private static bool VerifyPlayers(GLGame game, ScenarioPlan plan, List<string> failures)

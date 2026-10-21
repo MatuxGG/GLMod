@@ -65,9 +65,7 @@ namespace GLMod
             foreach (PlayerControl player in PlayerControl.AllPlayerControls)
             {
                 if (player.Data.IsDead) continue;
-                float x = player.MyPhysics.body.transform.position.x;
-                float y = player.MyPhysics.body.transform.position.y;
-                GLMod.GameStateManager.CurrentGame.AddPosition(player.Data.PlayerName, x, y, timestampSeconds.ToString());
+                PositionRecorder.AddKeyPosition(GLMod.GameStateManager.CurrentGame, player, timestampSeconds);
             }
         }
     }

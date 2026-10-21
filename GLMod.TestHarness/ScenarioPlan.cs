@@ -44,12 +44,16 @@ namespace GLMod.TestHarness
     ///   2. Reporter (B) walks to the body and reports it.
     ///   3. Votes: Impostor and Reporter vote ExiledCrewmate (C), who votes Impostor.
     ///   4. ExiledCrewmate is exiled: 1 impostor vs 1 crewmate.
+    ///
+    /// Game 3 — movement (its own scenario): every player walks around the map;
+    ///   the impostor roams, hunts and kills FirstVictim (A), roams again for a while,
+    ///   then hunts and kills SecondVictim (B): 1 impostor vs 1 crewmate, impostor wins by kill.
     /// </summary>
     public sealed class ScenarioPlan
     {
         public const int GAME_CREWMATES_WIN_BY_TASKS = 1;
         public const int GAME_IMPOSTOR_WINS_BY_VOTE = 2;
-        public const int GAME_COUNT = 2;
+        public const int GAME_MOVEMENT = 3;
 
         /// <summary>Marker for "skip" in vote targets (PlayerVoteArea.SkippedVote in game).</summary>
         public const byte SKIP_VOTE = 253;
@@ -67,14 +71,26 @@ namespace GLMod.TestHarness
         [JsonIgnore] public ScenarioPlayer Caller => CrewC;
         [JsonIgnore] public ScenarioPlayer Reporter => CrewB;
         [JsonIgnore] public ScenarioPlayer ExiledCrewmate => CrewC;
+        [JsonIgnore] public ScenarioPlayer FirstVictim => CrewA;
+        [JsonIgnore] public ScenarioPlayer SecondVictim => CrewB;
+        [JsonIgnore] public ScenarioPlayer Survivor => CrewC;
         [JsonIgnore] public IEnumerable<ScenarioPlayer> Crewmates => new[] { CrewA, CrewB, CrewC };
+        [JsonIgnore] public IEnumerable<ScenarioPlayer> Players => new[] { Impostor, CrewA, CrewB, CrewC };
+
+        /// <summary>
+        /// True when the impostor is expected to win the given game.
+        /// </summary>
+        public static bool ImpostorsWin(int gameNumber)
+        {
+            return gameNumber == GAME_IMPOSTOR_WINS_BY_VOTE || gameNumber == GAME_MOVEMENT;
+        }
 
         public static ScenarioPlan Build(string runId, int gameNumber, IEnumerable<ScenarioPlayer> players)
         {
             if (players == null) throw new ArgumentNullException(nameof(players));
-            if (gameNumber < 1 || gameNumber > GAME_COUNT)
+            if (gameNumber < GAME_CREWMATES_WIN_BY_TASKS || gameNumber > GAME_MOVEMENT)
             {
-                throw new ArgumentOutOfRangeException(nameof(gameNumber), $"Game number must be between 1 and {GAME_COUNT}");
+                throw new ArgumentOutOfRangeException(nameof(gameNumber), $"Game number must be between {GAME_CREWMATES_WIN_BY_TASKS} and {GAME_MOVEMENT}");
             }
 
             List<ScenarioPlayer> all = players.ToList();
@@ -125,6 +141,9 @@ namespace GLMod.TestHarness
                 return null;
             }
 
+            // No meeting in the movement game
+            if (GameNumber == GAME_MOVEMENT) return null;
+
             if (voterId == Impostor.Id || voterId == Reporter.Id) return ExiledCrewmate.Id;
             if (voterId == ExiledCrewmate.Id) return Impostor.Id;
             return null;
@@ -132,9 +151,15 @@ namespace GLMod.TestHarness
 
         public override string ToString()
         {
-            return GameNumber == GAME_CREWMATES_WIN_BY_TASKS
-                ? $"game 1: impostor={Impostor.Name}#{Impostor.Id}, victim={Victim.Name}#{Victim.Id}, tasker={Tasker.Name}#{Tasker.Id}, caller={Caller.Name}#{Caller.Id}"
-                : $"game 2: impostor={Impostor.Name}#{Impostor.Id}, victim={Victim.Name}#{Victim.Id}, reporter={Reporter.Name}#{Reporter.Id}, exiled={ExiledCrewmate.Name}#{ExiledCrewmate.Id}";
+            switch (GameNumber)
+            {
+                case GAME_CREWMATES_WIN_BY_TASKS:
+                    return $"game 1: impostor={Impostor.Name}#{Impostor.Id}, victim={Victim.Name}#{Victim.Id}, tasker={Tasker.Name}#{Tasker.Id}, caller={Caller.Name}#{Caller.Id}";
+                case GAME_IMPOSTOR_WINS_BY_VOTE:
+                    return $"game 2: impostor={Impostor.Name}#{Impostor.Id}, victim={Victim.Name}#{Victim.Id}, reporter={Reporter.Name}#{Reporter.Id}, exiled={ExiledCrewmate.Name}#{ExiledCrewmate.Id}";
+                default:
+                    return $"game 3 (movement): impostor={Impostor.Name}#{Impostor.Id}, first victim={FirstVictim.Name}#{FirstVictim.Id}, second victim={SecondVictim.Name}#{SecondVictim.Id}, survivor={Survivor.Name}#{Survivor.Id}";
+            }
         }
     }
 }

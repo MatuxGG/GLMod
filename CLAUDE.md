@@ -42,7 +42,7 @@ Any code review MUST reject contributions that introduce non-English identifiers
 
 ### 1.1 Identity
 - **Name**: GLMod (Good Loss Mod)
-- **Current version**: `5.7.0` (see [GLMod/GLMod.csproj](GLMod/GLMod.csproj) and [GLMod/GLMod.cs](GLMod/GLMod.cs))
+- **Current version**: `5.7.1` (see [GLMod/GLMod.csproj](GLMod/GLMod.csproj) and [GLMod/GLMod.cs](GLMod/GLMod.cs))
 - **BepInEx plugin Id**: `glmod`
 - **Author**: Matux
 - **License**: GNU GPLv3
@@ -291,7 +291,10 @@ Reactor, Coms, Lights, O2
 | `SUPPORT_ID_CHARS`            | `A-Za-z1-9` (no `0`)                         |
 | `SUPPORT_ID_LENGTH`           | `10`                                         |
 | `RPC_SYNC_TIMEOUT`            | `5.0f` seconds                               |
-| `BACKGROUND_POLLING_INTERVAL` | `0.5f` seconds                               |
+| `BACKGROUND_POLLING_INTERVAL` | `0.5f` seconds (DCs, sabotages)              |
+| `POSITION_SAMPLING_INTERVAL`  | `0.1f` seconds — player positions are sampled at this rate (§14.2) |
+| `POSITION_SIMPLIFY_TOLERANCE` | `0.1f` map units — a sample is dropped when the recap would still draw the player within this distance of it |
+| `POSITION_MAX_GAP_MS`         | `5000` — at least one sent position per player in this time, even standing still |
 | `RPC_POLLING_INTERVAL`        | `0.1f` seconds                               |
 | `DEFAULT_GAME_CODE`           | `XXXXXX`                                     |
 | `DEFAULT_MAP_NAME`            | `Unknown`                                    |
@@ -375,7 +378,9 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 | `CoroutineHelpers.cs`  | `RunAsync` / `RunAsync<T>` — async-task ↔ coroutine bridge. Use these instead of re-implementing the `Task.Run` + volatile `done` flag pattern. |
 | `CoroutineRunner.cs`   | `MonoBehaviour` IL2CPP singleton used to run coroutines from static classes.               |
 | `ServiceLogger.cs`     | `Log(logger, serviceName, message)` — shared log formatter producing `[GLMod][Service] PlayerName: message`. Every service must delegate to it. |
-| `BackgroundEvents.cs`  | Background loop: watches DCs, hidden sabotages, etc.                                       |
+| `BackgroundEvents.cs`  | Background loops of a game: DCs and hidden sabotages every 0.5 s, player positions every 0.1 s (through `PositionRecorder`). Each start increments a generation, so loops of a previous game stop. `endBackgroundProcess` flushes the pending positions. |
+| `PositionRecorder.cs`  | Records positions through one `PositionSimplifier` per player. `AddKeyPosition` (kill, report / emergency, meeting start) always records the position, after the player's pending samples; meetings and the end of the game flush the pending samples. Main thread only. |
+| `PositionSimplifier.cs` | Pure, unit-tested: online trajectory simplification (opening window). A sample is dropped when the linear interpolation **in time** between the sent positions (how the site draws a player) stays within `POSITION_SIMPLIFY_TOLERANCE` of every dropped sample; at most `POSITION_MAX_GAP_MS` between two sent positions. Turns, stops and teleports keep their samples. |
 | `VanillaEvents.cs`     | Default implementations (`startGameVanilla`, `endGameVanilla`…) used when the matching `ServiceType` is enabled. |
 
 ### 8.1 Good Loss menu (`GLMod/Menu/`, namespace `GLMod.Menu`)
@@ -466,33 +471,39 @@ Base: `https://goodloss.fr/api` (production). It can be overridden at startup wi
 
 ### 11.4 Testing
 - Test framework: xUnit ([GLMod.Tests/GLMod.Tests.csproj](GLMod.Tests/GLMod.Tests.csproj)).
-- Scope: pure logic — entities (`GLGame`, `GLPlayer`, `GLPosition`), enums (`SabotageType`, `GameMapType`), `ServiceManager`, `GameConstants` invariants, `ApiEndpointResolver` (incl. site / recap URLs), `ServerClock`, `MenuService`, `GameHistoryList`, `PlayerApiResponse` (on captured preprod responses), `LoginResponse`, `StatFormat`, and the E2E harness `ScenarioPlan` / `ScenarioVerifier`. Anything that touches IL2CPP / Among Us types stays untestable until further decoupling.
+- Scope: pure logic — entities (`GLGame`, `GLPlayer`, `GLPosition`), enums (`SabotageType`, `GameMapType`), `ServiceManager`, `GameConstants` invariants, `ApiEndpointResolver` (incl. site / recap URLs), `ServerClock`, `MenuService`, `GameHistoryList`, `PlayerApiResponse` (on captured preprod responses), `LoginResponse`, `StatFormat`, `PositionSimplifier`, and the E2E harness `ScenarioPlan` / `ScenarioVerifier` / `NavGrid` / `PositionAccuracy`. Anything that touches IL2CPP / Among Us types stays untestable until further decoupling.
 - Add new tests for any new pure-logic surface. Refactor toward injectable abstractions before adding tests that would otherwise require IL2CPP mocking.
 
-### 11.5 End-to-end test (4 Among Us instances, online lobby, 2 games)
+### 11.5 End-to-end test (4 Among Us instances, online lobby: 2-game session or movement game)
 - Project: [GLMod.TestHarness/](GLMod.TestHarness/) — a separate BepInEx plugin (`glmod.testharness`, depends on `glmod`). **Inert** unless the `GLMOD_TEST_INSTANCE` environment variable is set; it has no AfterBuild copy and is only installed in `Among Us/BepInEx/plugins/` for the duration of a run.
-- Entry point: `powershell -ExecutionPolicy Bypass -File GLMod.TestHarness/run-e2e.ps1` (options: `-ApiEndpoint` (default `https://preprod.goodloss.fr/api`), `-ModName`, `-Map`, `-NoTile`, `-NoBuild`, `-KeepPlugin`, `-KeepOtherPlugins`, `-TimeoutSeconds`). Refuses to start if Among Us is already running.
+- Entry point: `powershell -ExecutionPolicy Bypass -File GLMod.TestHarness/run-e2e.ps1` (options: `-Scenario` (`Session` by default, or `Movement`, passed as `GLMOD_TEST_SCENARIO`), `-Region` (default `Ranked EU`, passed as `GLMOD_TEST_REGION`), `-ApiEndpoint` (default `https://preprod.goodloss.fr/api`), `-ModName`, `-Map`, `-NoTile`, `-NoBuild`, `-KeepPlugin`, `-KeepOtherPlugins`, `-TimeoutSeconds`). Refuses to start if Among Us is already running.
 - Plugin isolation: other mods change GLMod's mod name (e.g. ChallengerLevel sets "Challenger Maps", which the site records without a season). Unless `-KeepOtherPlugins`, the script moves every plugin except `GLMod.dll`, `GLMod.TestHarness.dll` and `Mini.RegionInstall.dll` (custom server region) to `BepInEx/plugins-disabled-by-e2e/` for the run and moves them back at the end, so the session runs as **Vanilla**.
 - Mod and map: `-ModName` (default `Among Us Ranked`, applied by the harness through `GLMod.ConfigService.SetModName`, like a third-party mod; empty keeps GLMod's own name) and `-Map` (default `Polus`; `Keep` leaves the lobby setting). The host switches the lobby map (`IGameOptions.SetByte(MapId)` + `LogicOptions.SyncOptions`) and restores its saved map setting at the end. The site only draws the map visualization for maps it has an image for (`/images/maps/polusmap.png`, Challenger maps, Submerged…): **not for The Skeld**.
+- Startup: the instances share `BepInEx/config/glmod.cfg`, and GLMod fails to load (`IOException: ... being used by another process`) when two instances write it at once. The script therefore starts instance N+1 only once instance N has loaded GLMod and the harness (`instance-N.log` exists, 90 s max), and restarts an instance whose GLMod did not load (3 attempts).
 - Windows: the script tiles the 4 game windows in a 2×2 grid on the primary screen (`-NoTile` to disable) and restores Unity's `Screenmanager*` registry values (window size/position) afterwards.
 - Recap check: preprod recaps can be read at `https://preprod.goodloss.fr/game/<id>` (SSO account provided by the maintainer). Expected on Polus: every action line timed, map visualization with all positions inside the game window, `completedTask` actions on the map. Known site-side gaps (data sent by GLMod but not shown): `SAB_START_*` / `SAB_END_*`, and ghost tasks (`tasksDead`) in the `x/y` task count.
 - API: the script sets `GLMOD_API_ENDPOINT` for the 4 instances, so every match goes to the **preprod** API. All 4 instances share the local Steam / Good Loss account.
-- Network: **online games** (RPCs behave differently from LAN). Instance 0 creates a game on the currently selected region (`AmongUsClient.CoCreateOnlineGame`) and publishes its code in `lobby-1.json`; instances 1–3 join it (`CoJoinOnlineGameFromCode`). The harness **refuses official Innersloth servers** (region name / ping server containing `among.us` or `innersloth`): use a custom region (e.g. Impranked).
+- Network: **online games** (RPCs behave differently from LAN). Every instance first selects the `-Region` region from the game's regions (`ServerManager.CurrentRegion` + `ReselectServer`, **not saved**: no concurrent write of the shared `regionInfo.json`, the player's own choice is kept), so the run does not depend on the region selected in the game. Instance 0 creates a game on it (`AmongUsClient.CoCreateOnlineGame`) and publishes its code in `lobby-1.json`; instances 1–3 join it (`CoJoinOnlineGameFromCode`). The harness **refuses official Innersloth servers** (region name / ping server containing `among.us` or `innersloth`): use a custom region (e.g. Impranked).
 - Session ([ScenarioPlan.cs](GLMod.TestHarness/ScenarioPlan.cs)); per game, crewmates sorted by player id → A, B, C:
   - **Game 1 — crewmates win by tasks**: B (tasker) plays one task; the impostor sabotages the lights (`RpcUpdateSystem(Sabotage, Electrical)`) and C fixes them at the panel (one `RpcUpdateSystem(Electrical, i)` per wrong switch, like the minigame); C presses the emergency button (`EmergencyMinigame.CallMeeting`); votes impostor + A → B, B + C → skip: **tie, nobody exiled**; the impostor kills A; every crewmate, including A **as a ghost**, plays all its remaining tasks.
   - **Return to the lobby**: everyone presses "Play Again" (`EndGameNavigation.NextGame`), the host first (it publishes `lobby-2.json` once back).
   - **Game 2 — impostor wins by vote**: the impostor kills A; B walks to the body and reports it (`ReportClosest`); votes impostor + B → C, C → impostor; C is exiled → 1 vs 1.
+- Movement scenario (`-Scenario Movement`, one game, `plan-3.json`) — a recap with real movements to check the position recording (§14.2):
+  - every player **walks for real** from console to console (`ShipStatus.AllConsoles`) with 1.5–4 s pauses: [HarnessWalker.cs](GLMod.TestHarness/HarnessWalker.cs) builds a walkable grid of the map ([NavGrid.cs](GLMod.TestHarness/NavGrid.cs), pure, A* + path smoothing; a cell is free when `Physics2D.OverlapCircleAll` finds no solid collider of `Constants.ShipAndObjectsMask` within the player clearance) and a `PlayerPhysics.FixedUpdate` postfix replaces the joystick input of the local player with the walk direction (normal speed, collisions, network sync);
+  - the impostor roams `MOVEMENT_FIRST_KILL_DELAY`, hunts A (walks after it, re-planned every second) and presses Kill (`KillButton.DoClick`) once the kill button targets A and the cooldown is over; roams again `MOVEMENT_KILL_GAP` seconds, then hunts and kills B → 1 vs 1, **impostor wins by kill**;
+  - the host records where every alive player is on every frame (the "truth", `ServerClock.NowMs()` + `body.transform.position`, like GLMod), then compares it with the positions GLMod sent, interpolated in time like the site draws them ([PositionAccuracy.cs](GLMod.TestHarness/PositionAccuracy.cs), pure). Positions within 1 s of a kill are not compared (the kill moves the killer onto the victim). The result (`GameResult.Movement`, printed by the script) also gives the deviation a fixed 10 Hz and the former 0.5 s sampling would have had.
 - Task play: for each step the player finds the step's console (`PlayerTask.FindConsoles`), moves there (`NetTransform.RpcSnapTo`), opens the minigame (`Console.Use`) and finishes it with `NormalPlayerTask.NextStep()` + `Minigame.Close()` (the last step sends `RpcCompleteTask` itself). The host makes the impostor kill (`RpcMurderPlayer`). Meetings wait for their "Proceed" button after the results, which the harness presses (`MeetingHud.HandleProceed`).
 - Coordination: files in the run output folder (`lobby-N.json`, `plan-N.json`), no extra RPC.
 - Verification ([ScenarioVerifier.cs](GLMod.TestHarness/ScenarioVerifier.cs), unit-tested), on the `GLGame` snapshot taken right after GLMod's `OnGameEnd`:
   - game 1: `completedTask`, `SAB_START_Lights` / `SAB_END_Lights`, `called an emergency` (turn 1); 4 `voted` incl. 2 skips (target `""`, turn 1001); no `exiled`; `killed` in turn 2; `turns` = `2`; per crewmate `tasks + tasksDead = tasksMax` and as many `completedTask` actions, the ghost only in `tasksDead`; winner `Crewmate`;
   - game 2: `killed`, `reported` (by a crewmate), 3 `voted`, `exiled` (a crewmate), winner `Impostor`, impostor `win=1`;
-  - both: game id set, teams, `/game/end` succeeded on the host (step back to `Initial`), clients received the game id (RPC 1), game 2 has a **new** GLMod game id;
+  - movement game: 2 `killed` by the impostor (A then B, turn 1) at least `MOVEMENT_KILL_GAP` s apart, no report / emergency / vote, `turns` = `1`, winner `Impostor`; on the host, per player: positions sent, a path of at least `MOVEMENT_MIN_PATH_LENGTH` units, and the recap never draws the player more than `MOVEMENT_MAX_DEVIATION` (0.5) units from its real position;
+  - all games: game id set, teams, `/game/end` succeeded on the host (step back to `Initial`), clients received the game id (RPC 1), game 2 has a **new** GLMod game id;
   - every instance, once its end screen is up: the game is the latest entry of the local history (the menu end-of-game signal, §3.9) with the recap link of the API's site (preprod), the map, the local player's team and the expected victory / defeat.
 - Local history: the script moves the player's `BepInEx/config/glmod-history.json` aside for the run (`glmod-history.before-run.json` in the output folder) and puts it back at the end; the run's history is kept as `glmod-history.json` in the output folder.
 - Multi-instance workarounds: 4 Unity instances on one machine stall for seconds on heavy frames (map load, meeting open) and vanilla Hazel timeouts then drop the client (`ReliablePacketWithoutResponse`): the harness raises `DisconnectTimeoutMs` / `MissingPingsUntilDisconnect` on the client connection. Clients must load the map within a hard-coded 10s (`AmongUsClient.MAX_CLIENT_WAIT_SECONDS` is a native constant: **writing it crashes the game**), so each instance caps its frame rate (20 fps) and sets `Application.backgroundLoadingPriority = High`. It also skips `CosmeticsCache.ClearUnusedCosmetics`, which intermittently throws inside `AmongUsClient.CoStartGame` in multi-instance runs (the client then never becomes ready and is kicked).
 - Output: `GLMod.TestHarness/output/<date>-<runId>/` (gitignored) — `lobby-N.json`, `plan-N.json`, `result-N.json` (per-game results), `instance-N.log`, `player-N.log` (Unity log of each instance, via `-logFile`), copied BepInEx logs.
-- Not covered: disconnections (relaunching clients is too slow), roles, impostor wins by kill / sabotage, shield T1.
+- Not covered: disconnections (relaunching clients is too slow), roles, impostor wins by sabotage, shield T1.
 
 ### 11.3 Release
 - Build driven by [build.cake](build.cake) (Cake).
@@ -526,6 +537,8 @@ GLMod/                                # Repo root
 │   ├── LoginResponseTests.cs         # LoginResponse (Steam ticket login answer, legacy token).
 │   ├── MenuServiceTests.cs
 │   ├── PlayerApiTests.cs             # PlayerApiResponse (captured preprod responses), StatFormat.
+│   ├── MovementTests.cs              # NavGrid, PositionAccuracy, ScenarioVerifier.VerifyPositions.
+│   ├── PositionSimplifierTests.cs    # PositionSimplifier.
 │   ├── RankedModTests.cs             # RankedMod (theme selection).
 │   ├── TranslationTests.cs           # TranslationTable, GameLanguage, embedded translation files.
 │   ├── ScenarioTests.cs              # ScenarioPlan / ScenarioVerifier (E2E harness logic).
@@ -538,8 +551,11 @@ GLMod/                                # Repo root
 │   ├── HarnessConstants.cs
 │   ├── HarnessContext.cs
 │   ├── HarnessLog.cs
-│   ├── HarnessPatches.cs             # MainMenuManager.Start / AmongUsClient.OnGameEnd hooks.
+│   ├── HarnessPatches.cs             # MainMenuManager.Start / AmongUsClient.OnGameEnd / PlayerPhysics.FixedUpdate hooks.
 │   ├── HarnessResult.cs
+│   ├── HarnessWalker.cs              # Real walking of the local player (movement scenario).
+│   ├── NavGrid.cs                    # Pure logic: walkable grid + A*.
+│   ├── PositionAccuracy.cs           # Pure logic: sent positions vs real trajectory.
 │   ├── ScenarioPlan.cs               # Pure logic.
 │   ├── ScenarioRunner.cs             # In-game coroutine driving the scenario.
 │   └── ScenarioVerifier.cs           # Pure logic.
@@ -563,6 +579,8 @@ GLMod/                                # Repo root
     │   ├── TranslationTable.cs       # Pure translation lookup with fallbacks.
     │   ├── GameLanguage.cs           # Game language -> language code.
     │   ├── PlayModeHelper.cs         # Free play detection.
+    │   ├── PositionRecorder.cs       # Player positions of the current game (IL2CPP).
+    │   ├── PositionSimplifier.cs     # Pure trajectory simplification.
     │   ├── RankedMod.cs              # Among Us Ranked detection (menu theme).
     │   ├── ServiceLogger.cs          # Shared [GLMod][Service] log formatter.
     │   └── VanillaEvents.cs
@@ -721,6 +739,7 @@ A third-party mod consumes GLMod by:
 
 ### 14.2 Player data
 - Name (PseudoInGame), Good Loss account (if connected), Role, Team (`Crewmate` / `Impostor` / `Neutral` / other), Tasks alive, Tasks dead, Tasks max, Win (0/1), Color, Positions.
+- **Positions** (`x`, `y` rounded to 0.01, `triggerTime` from `ServerClock`, `turn`): alive players are sampled every `POSITION_SAMPLING_INTERVAL` (0.1 s; 0.5 s before 5.7.1) outside meetings, and only the samples needed to redraw the path within `POSITION_SIMPLIFY_TOLERANCE` are sent (`PositionSimplifier`), plus one at least every `POSITION_MAX_GAP_MS`. Positions at a kill (killer and victim), a report / emergency (caller) and the start of a meeting (alive players) are always sent. The site interpolates linearly in time between two positions: that is the contract the simplification relies on.
 
 ### 14.3 Actions
 - `source`, `target`, `action`, `turn`, `triggerTimeMs`.
@@ -786,5 +805,5 @@ For every change to the project:
 
 ---
 
-*Last updated: 2026-10-19 — GLMod version 5.7.0.*
+*Last updated: 2026-10-21 — GLMod version 5.7.1.*
 *Every change to the project must be accompanied by an update of this file.*

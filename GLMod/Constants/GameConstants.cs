@@ -41,6 +41,22 @@ namespace GLMod.Constants
         public const float BACKGROUND_POLLING_INTERVAL = 0.5f;
 
         /// <summary>
+        /// Interval between two samples of the player positions, in seconds
+        /// </summary>
+        public const float POSITION_SAMPLING_INTERVAL = 0.1f;
+
+        /// <summary>
+        /// A sampled position is only sent when the straight line between the sent positions
+        /// would move the player further than this from where it really was (map units)
+        /// </summary>
+        public const float POSITION_SIMPLIFY_TOLERANCE = 0.1f;
+
+        /// <summary>
+        /// Longest time between two sent positions of a player, even when it does not move (ms)
+        /// </summary>
+        public const long POSITION_MAX_GAP_MS = 5000;
+
+        /// <summary>
         /// Polling interval for RPC checks in seconds
         /// </summary>
         public const float RPC_POLLING_INTERVAL = 0.1f;

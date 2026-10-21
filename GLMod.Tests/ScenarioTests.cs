@@ -58,7 +58,42 @@ namespace GLMod.Tests
             players[2].Name = players[1].Name;
 
             Assert.Throws<InvalidOperationException>(() => ScenarioPlan.Build("run", 1, players));
-            Assert.Throws<ArgumentOutOfRangeException>(() => ScenarioPlan.Build("run", 3, Players(impostorId: 0)));
+            Assert.Throws<ArgumentOutOfRangeException>(() => ScenarioPlan.Build("run", 0, Players(impostorId: 0)));
+            Assert.Throws<ArgumentOutOfRangeException>(() => ScenarioPlan.Build("run", 4, Players(impostorId: 0)));
+        }
+
+        [Fact]
+        public void MovementGame_HasVictimsInIdOrderAndNoVote()
+        {
+            ScenarioPlan plan = ScenarioPlan.Build("run", ScenarioPlan.GAME_MOVEMENT, Players(impostorId: 2));
+
+            Assert.Equal(0, plan.FirstVictim.Id);
+            Assert.Equal(1, plan.SecondVictim.Id);
+            Assert.Equal(3, plan.Survivor.Id);
+            foreach (ScenarioPlayer player in plan.Players)
+            {
+                Assert.Null(plan.GetVoteTarget(player.Id));
+            }
+        }
+
+        [Fact]
+        public void ImpostorsWin_GamesTwoAndMovement()
+        {
+            Assert.False(ScenarioPlan.ImpostorsWin(ScenarioPlan.GAME_CREWMATES_WIN_BY_TASKS));
+            Assert.True(ScenarioPlan.ImpostorsWin(ScenarioPlan.GAME_IMPOSTOR_WINS_BY_VOTE));
+            Assert.True(ScenarioPlan.ImpostorsWin(ScenarioPlan.GAME_MOVEMENT));
+        }
+
+        [Fact]
+        public void Scenario_ParsesAndListsItsGames()
+        {
+            Assert.Equal(HarnessConstants.SCENARIO_SESSION, HarnessContext.ParseScenario(null));
+            Assert.Equal(HarnessConstants.SCENARIO_SESSION, HarnessContext.ParseScenario(" "));
+            Assert.Equal(HarnessConstants.SCENARIO_MOVEMENT, HarnessContext.ParseScenario("Movement"));
+            Assert.Throws<InvalidOperationException>(() => HarnessContext.ParseScenario("chaos"));
+
+            Assert.Equal(new[] { 1, 2 }, new HarnessContext(0, "run", "out").GameNumbers);
+            Assert.Equal(new[] { 3 }, new HarnessContext(0, "run", "out", scenario: HarnessConstants.SCENARIO_MOVEMENT).GameNumbers);
         }
 
         [Fact]
@@ -156,11 +191,49 @@ namespace GLMod.Tests
             return game;
         }
 
+        /// <summary>Movement game as GLMod should record it: two kills 40 s apart, no meeting.</summary>
+        private static GLGame ExpectedMovementGame()
+        {
+            GLGame game = NewGame("43");
+            game.AddAction("Imp", "A", "killed");
+            game.AddAction("Imp", "B", "killed");
+            game.actions[0].triggerTimeMs = "1000000";
+            game.actions[1].triggerTimeMs = "1040000";
+            game.SetWinners(new List<string> { "Impostor" });
+            return game;
+        }
+
         [Fact]
         public void VerifyHostGame_PassesOnExpectedGames()
         {
             Assert.Empty(ScenarioVerifier.VerifyHostGame(ExpectedGameOne(), Plan(1)));
             Assert.Empty(ScenarioVerifier.VerifyHostGame(ExpectedGameTwo(), Plan(2)));
+            Assert.Empty(ScenarioVerifier.VerifyHostGame(ExpectedMovementGame(), Plan(3)));
+        }
+
+        [Fact]
+        public void VerifyMovementGame_ReportsKillsTooCloseAndMeeting()
+        {
+            GLGame game = ExpectedMovementGame();
+            game.actions[1].triggerTimeMs = "1005000";
+            game.AddAction("C", "", "called an emergency");
+
+            List<string> failures = ScenarioVerifier.VerifyHostGame(game, Plan(3));
+
+            Assert.Contains(failures, f => f.Contains("between the two kills"));
+            Assert.Contains(failures, f => f.Contains("called an emergency"));
+        }
+
+        [Fact]
+        public void VerifyMovementGame_ReportsMissingSecondKill()
+        {
+            GLGame game = ExpectedMovementGame();
+            game.actions.RemoveAt(1);
+
+            List<string> failures = ScenarioVerifier.VerifyHostGame(game, Plan(3));
+
+            Assert.Contains(failures, f => f.Contains("'Imp' killed 'B'"));
+            Assert.Contains(failures, f => f.Contains("Expected exactly 2 'killed'"));
         }
 
         [Fact]
@@ -258,6 +331,9 @@ namespace GLMod.Tests
             Assert.Empty(ScenarioVerifier.VerifyHistoryEntry(HistoryEntry("41", false, "Impostor"), NewGame("41"), 1, true, PreprodApi));
             Assert.Empty(ScenarioVerifier.VerifyHistoryEntry(HistoryEntry("42", false, "Crewmate"), NewGame("42"), 2, false, PreprodApi));
             Assert.Empty(ScenarioVerifier.VerifyHistoryEntry(HistoryEntry("42", true, "Impostor"), NewGame("42"), 2, true, PreprodApi));
+            // Movement game: the impostor wins
+            Assert.Empty(ScenarioVerifier.VerifyHistoryEntry(HistoryEntry("43", false, "Crewmate"), NewGame("43"), 3, false, PreprodApi));
+            Assert.Empty(ScenarioVerifier.VerifyHistoryEntry(HistoryEntry("43", true, "Impostor"), NewGame("43"), 3, true, PreprodApi));
         }
 
         [Fact]

@@ -36,6 +36,37 @@ namespace GLMod.TestHarness
     }
 
     /// <summary>
+    /// Movement game: the walker's direction replaces the joystick input of the local player
+    /// (vanilla FixedUpdate sets the velocity from the joystick just before).
+    /// </summary>
+    [HarmonyPatch(typeof(PlayerPhysics), nameof(PlayerPhysics.FixedUpdate))]
+    public static class HarnessPlayerPhysicsFixedUpdatePatch
+    {
+        private static bool _errorLogged;
+
+        public static void Postfix(PlayerPhysics __instance)
+        {
+            UnityEngine.Vector2? direction = HarnessWalker.Direction;
+            if (!direction.HasValue) return;
+
+            try
+            {
+                PlayerControl player = __instance.myPlayer;
+                if (player != null && player.AmOwner && player.CanMove)
+                {
+                    __instance.SetNormalizedVelocity(direction.Value);
+                }
+            }
+            catch (Exception e)
+            {
+                if (_errorLogged) return;
+                _errorLogged = true;
+                HarnessLog.Error("[PlayerPhysics.FixedUpdate] " + e);
+            }
+        }
+    }
+
+    /// <summary>
     /// Runs after GLMod's own OnGameEnd postfix so the snapshot contains the winners GLMod just set.
     /// </summary>
     [HarmonyPatch(typeof(AmongUsClient), nameof(AmongUsClient.OnGameEnd))]

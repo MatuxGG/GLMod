@@ -18,15 +18,29 @@ namespace GLMod.TestHarness
         /// <summary>Map the host selects in the lobby (Among Us MapId), or null to keep the lobby's.</summary>
         public byte? MapId { get; }
 
+        /// <summary>HarnessConstants.SCENARIO_SESSION or SCENARIO_MOVEMENT.</summary>
+        public string Scenario { get; }
+
+        /// <summary>Name of the server region every instance selects (HarnessConstants.DEFAULT_REGION by default).</summary>
+        public string Region { get; }
+
         public bool IsHost => Instance == HarnessConstants.HOST_INSTANCE;
 
-        public HarnessContext(int instance, string runId, string outputDir, string modName = null, byte? mapId = null)
+        /// <summary>The games played by the scenario, in order (ScenarioPlan game numbers).</summary>
+        public int[] GameNumbers => Scenario == HarnessConstants.SCENARIO_MOVEMENT
+            ? new[] { ScenarioPlan.GAME_MOVEMENT }
+            : new[] { ScenarioPlan.GAME_CREWMATES_WIN_BY_TASKS, ScenarioPlan.GAME_IMPOSTOR_WINS_BY_VOTE };
+
+        public HarnessContext(int instance, string runId, string outputDir, string modName = null, byte? mapId = null,
+            string scenario = HarnessConstants.SCENARIO_SESSION, string region = HarnessConstants.DEFAULT_REGION)
         {
             Instance = instance;
             RunId = runId;
             OutputDir = outputDir;
             ModName = modName;
             MapId = mapId;
+            Scenario = scenario;
+            Region = region;
         }
 
         /// <summary>
@@ -71,8 +85,28 @@ namespace GLMod.TestHarness
                 mapId = parsed;
             }
 
+            string scenario = ParseScenario(Environment.GetEnvironmentVariable(HarnessConstants.ENV_SCENARIO));
+
+            string region = Environment.GetEnvironmentVariable(HarnessConstants.ENV_REGION);
+            region = string.IsNullOrWhiteSpace(region) ? HarnessConstants.DEFAULT_REGION : region.Trim();
+
             Directory.CreateDirectory(outputDir);
-            return new HarnessContext(instance, runId, outputDir, string.IsNullOrWhiteSpace(modName) ? null : modName.Trim(), mapId);
+            return new HarnessContext(instance, runId, outputDir, string.IsNullOrWhiteSpace(modName) ? null : modName.Trim(), mapId, scenario, region);
+        }
+
+        /// <summary>
+        /// Empty means the session; otherwise the scenario name, case-insensitive.
+        /// </summary>
+        public static string ParseScenario(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return HarnessConstants.SCENARIO_SESSION;
+
+            string scenario = value.Trim().ToLowerInvariant();
+            if (scenario != HarnessConstants.SCENARIO_SESSION && scenario != HarnessConstants.SCENARIO_MOVEMENT)
+            {
+                throw new InvalidOperationException($"{HarnessConstants.ENV_SCENARIO} must be '{HarnessConstants.SCENARIO_SESSION}' or '{HarnessConstants.SCENARIO_MOVEMENT}', got '{value}'");
+            }
+            return scenario;
         }
 
         public string PlanPath(int gameNumber) => Path.Combine(OutputDir, string.Format(HarnessConstants.PLAN_FILE_FORMAT, gameNumber));

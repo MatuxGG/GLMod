@@ -11,6 +11,15 @@ namespace GLMod.TestHarness
         public const string ENV_OUTPUT = "GLMOD_TEST_OUTPUT";
         public const string ENV_MOD_NAME = "GLMOD_TEST_MOD_NAME";
         public const string ENV_MAP_ID = "GLMOD_TEST_MAP_ID";
+        public const string ENV_SCENARIO = "GLMOD_TEST_SCENARIO";
+        public const string ENV_REGION = "GLMOD_TEST_REGION";
+
+        // Server region selected by every instance (a custom one: official servers are refused)
+        public const string DEFAULT_REGION = "Ranked EU";
+
+        // Scenarios (ENV_SCENARIO): the 2-game session, or the movement game
+        public const string SCENARIO_SESSION = "session";
+        public const string SCENARIO_MOVEMENT = "movement";
 
         // Scenario shape
         public const int PLAYER_COUNT = 4;
@@ -80,6 +89,36 @@ namespace GLMod.TestHarness
         public const float MINIGAME_VISIBLE_DELAY_FAST = 0.5f;
         public const int TASK_EXTRA_STEP_ATTEMPTS = 2;
         public const int MAX_TASKS_PER_PLAYER = 20;
+
+        // Movement game: everyone walks around the map, the impostor kills twice with a wait in between
+        public const float MOVEMENT_FIRST_KILL_DELAY = 25f;
+        public const float MOVEMENT_KILL_GAP = 35f;
+        public const float MOVEMENT_HUNT_TIMEOUT = 150f;
+        public const float MOVEMENT_HUNT_REPLAN_INTERVAL = 1f;
+        public const float MOVEMENT_KILL_CONFIRM_TIMEOUT = 5f;
+        public const float MOVEMENT_PAUSE_MIN = 1.5f;
+        public const float MOVEMENT_PAUSE_MAX = 4f;
+        public const float MOVEMENT_WALK_TIMEOUT = 45f;
+        // Positions within this time of a kill are not compared (the kill moves the killer onto the victim)
+        public const long MOVEMENT_KILL_EXCLUSION_MS = 1000;
+        // Largest distance allowed between where a player was and where the recap draws it (map units)
+        public const double MOVEMENT_MAX_DEVIATION = 0.5;
+        // Interval of the former position sampling, measured for comparison only
+        public const long LEGACY_SAMPLING_MS = 500;
+        public const long CURRENT_SAMPLING_MS = 100;
+        // A player must have walked at least this far (map units) in the positions sent
+        public const double MOVEMENT_MIN_PATH_LENGTH = 10;
+
+        // Navigation grid (built from the ship colliders, see HarnessWalker)
+        public const float NAV_CELL_SIZE = 0.2f;
+        public const float NAV_CLEARANCE = 0.3f;
+        public const float NAV_BOUNDS_MARGIN = 1f;
+        public const int NAV_MAX_CELLS = 400000;
+        public const float NAV_NEAREST_SEARCH = 2f;
+        public const float WALK_WAYPOINT_REACHED = 0.2f;
+        public const float WALK_STUCK_TIMEOUT = 1.5f;
+        public const float WALK_STUCK_DISTANCE = 0.1f;
+        public const int WALK_MAX_STUCK_REPLANS = 3;
 
         // Where to stand relative to a console when trying to use it (first one that works)
         public static readonly UnityEngine.Vector2[] CONSOLE_APPROACH_OFFSETS =
