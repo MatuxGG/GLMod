@@ -373,24 +373,33 @@ namespace GLMod.Services.Implementations
                 { "playerName", me.Data.PlayerName }
             };
 
-            string responseString = null;
+            yield return PostMyPlayer(_apiEndpoint + "/game/addMyPlayer", form, _authService.BearerToken, Log, onComplete);
+        }
+
+        /// <summary>
+        /// Sends the addMyPlayer form and calls onComplete(false) on an HTTP or network error,
+        /// onComplete(true) otherwise.
+        /// </summary>
+        public static IEnumerator PostMyPlayer(string url, Dictionary<string, string> form, string bearerToken,
+            System.Action<string> log, System.Action<bool> onComplete = null)
+        {
             string error = null;
 
             // Call the ApiService coroutine
-            yield return ApiService.PostFormAsync(_apiEndpoint + "/game/addMyPlayer", form,
-                result => {
-                    responseString = result;
-                },
+            yield return ApiService.PostFormAsync(url, form,
+                result => { },
                 err => {
                     error = err;
                 },
-                _authService.BearerToken
+                bearerToken
             );
 
             // Error handling
             if (error != null)
             {
-                Log("[AddMyPlayer] Add my player fail, error: " + error);
+                log?.Invoke("[AddMyPlayer] Add my player fail, error: " + error);
+                onComplete?.Invoke(false);
+                yield break;
             }
             onComplete?.Invoke(true);
         }

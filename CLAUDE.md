@@ -155,7 +155,7 @@ Every service is exposed statically via the main `GLMod` class and has a dedicat
   - `AddPlayer(name, role, team, color)` — adds a player to the current match.
   - `SendGame(onComplete)` — uploads the match to the API (coroutine).
   - `SyncGameId(onComplete)` — broadcasts the match ID to non-hosts via RPC.
-  - `AddMyPlayer(onComplete)` — registers the local player on the server (`gameId`, `playerName`; the site takes the account from the Bearer game token). Calls `onComplete(false)` when the host's game id has not arrived after `GAME_ID_WAIT_TIMEOUT`, or when the game is reset meanwhile.
+  - `AddMyPlayer(onComplete)` — registers the local player on the server (`gameId`, `playerName`; the site takes the account from the Bearer game token). Calls `onComplete(false)` when the host's game id has not arrived after `GAME_ID_WAIT_TIMEOUT`, when the game is reset meanwhile, or when `/game/addMyPlayer` fails (HTTP error or network failure).
   - `GetShieldPlayer(onComplete, onError)` — returns the player who would have benefited from a T1 shield (retries on HTTP 400).
   - `SetWinnerTeams(winners)` / `AddWinnerPlayer(name)` — sets the outcome.
   - `EndGame()` — closes the match server-side.
@@ -534,6 +534,7 @@ GLMod/                                # Repo root
 │   ├── GLMod.Tests.csproj
 │   ├── ApiServiceTests.cs            # ApiService response bodies (local TCP stub server).
 │   ├── EntityTests.cs
+│   ├── AddMyPlayerTests.cs           # AddMyPlayer result on HTTP / network errors (local TCP stub server).
 │   ├── EnumTests.cs
 │   ├── GameConstantsTests.cs         # + ApiEndpointResolver.
 │   ├── GameHistoryTests.cs           # GameHistoryList.
