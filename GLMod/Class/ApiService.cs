@@ -20,8 +20,8 @@ namespace GLMod.Class
                 {
                     var response = await PostAndSyncClockAsync(url, formValues, bearerToken).ConfigureAwait(false);
                     response.EnsureSuccessStatusCode();
-                    var responseString = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                    return Regex.Unescape(responseString);
+                    // Body returned as sent: Regex.Unescape would break JSON escapes (\" and \\)
+                    return await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 },
                 onCompleted: onComplete,
                 onError: ex => onError?.Invoke(ex.Message)
@@ -30,10 +30,11 @@ namespace GLMod.Class
 
         /// <summary>
         /// POST form; network errors and non-2xx statuses come back as a failed ApiResponse.
-        /// bearerToken (when not empty) is sent as "Authorization: Bearer". unescape = false keeps
-        /// the body as sent (JSON bodies: Regex.Unescape would turn " into a raw quote).
+        /// bearerToken (when not empty) is sent as "Authorization: Bearer". The body is kept as
+        /// sent; unescape = true applies Regex.Unescape (never on JSON bodies: it turns \" into a raw
+        /// quote and throws on unknown escapes).
         /// </summary>
-        public static IEnumerator PostFormWithErrorHandlingAsync(string url, Dictionary<string, string> formValues, System.Action<ApiResponse> onComplete, string bearerToken = null, bool unescape = true)
+        public static IEnumerator PostFormWithErrorHandlingAsync(string url, Dictionary<string, string> formValues, System.Action<ApiResponse> onComplete, string bearerToken = null, bool unescape = false)
         {
             return CoroutineHelpers.RunAsync<ApiResponse>(
                 async () =>

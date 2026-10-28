@@ -363,7 +363,7 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 | File                   | Role                                                                                       |
 |------------------------|--------------------------------------------------------------------------------------------|
 | `HttpHelper.cs`        | Shared static `HttpClient`, proxy disabled.                                                |
-| `ApiService.cs`        | `PostFormAsync`, `PostFormWithErrorHandlingAsync` (optional `bearerToken` → `Authorization: Bearer`; `unescape: false` keeps a JSON body intact), `GetWithErrorHandlingAsync`, `ApiResponse` type. |
+| `ApiService.cs`        | `PostFormAsync`, `PostFormWithErrorHandlingAsync` (optional `bearerToken` → `Authorization: Bearer`; response bodies are returned as sent, never `Regex.Unescape`d by default: it corrupts JSON escapes), `GetWithErrorHandlingAsync`, `ApiResponse` type. |
 | `SteamSessionTicket.cs` | `TryCreate` / `Cancel` — Steam session ticket (hex) of the Steam ticket login (§3.1). Main thread only. |
 | `LoginResponse.cs`     | Pure login helpers: ticket bytes → hex, ticket login answer (`GLLoginResponse`), ban reason, account name of a legacy token, token reuse. |
 | `ApiEndpointResolver.cs` | Resolves the API base URL: `API_ENDPOINT`, or the `GLMOD_API_ENDPOINT` environment variable when it is a valid http(s) URL. `ToSiteUrl(api)` / `GameRecapUrl(api, gameId)` give the matching site and recap URLs. |
@@ -472,7 +472,7 @@ Base: `https://goodloss.fr/api` (production). It can be overridden at startup wi
 
 ### 11.4 Testing
 - Test framework: xUnit ([GLMod.Tests/GLMod.Tests.csproj](GLMod.Tests/GLMod.Tests.csproj)).
-- Scope: pure logic — entities (`GLGame`, `GLPlayer`, `GLPosition`), enums (`SabotageType`, `GameMapType`), `ServiceManager`, `GameConstants` invariants, `ApiEndpointResolver` (incl. site / recap URLs), `ServerClock`, `MenuService`, `GameHistoryList`, `PlayerApiResponse` (on captured preprod responses), `LoginResponse`, `StatFormat`, `PositionSimplifier`, `BackgroundEvents.SabotageForTask` (sabotage task → `SabotageType`, e.g. `RestoreOxy` → O2), and the E2E harness `ScenarioPlan` / `ScenarioVerifier` / `NavGrid` / `PositionAccuracy`. Anything that touches IL2CPP / Among Us types stays untestable until further decoupling.
+- Scope: pure logic — entities (`GLGame`, `GLPlayer`, `GLPosition`), enums (`SabotageType`, `GameMapType`), `ServiceManager`, `GameConstants` invariants, `ApiEndpointResolver` (incl. site / recap URLs), `ServerClock`, `ApiService` response bodies (against a local TCP stub server), `MenuService`, `GameHistoryList`, `PlayerApiResponse` (on captured preprod responses), `LoginResponse`, `StatFormat`, `PositionSimplifier`, `BackgroundEvents.SabotageForTask` (sabotage task → `SabotageType`, e.g. `RestoreOxy` → O2), and the E2E harness `ScenarioPlan` / `ScenarioVerifier` / `NavGrid` / `PositionAccuracy`. Anything that touches IL2CPP / Among Us types stays untestable until further decoupling.
 - Add new tests for any new pure-logic surface. Refactor toward injectable abstractions before adding tests that would otherwise require IL2CPP mocking.
 
 ### 11.5 End-to-end test (4 Among Us instances, online lobby: 2-game session or movement game)
@@ -531,6 +531,7 @@ GLMod/                                # Repo root
 │   └── BepInEx/                      # Core + interop DLLs (referenced by csproj).
 ├── GLMod.Tests/                      # xUnit test project for pure-logic types.
 │   ├── GLMod.Tests.csproj
+│   ├── ApiServiceTests.cs            # ApiService response bodies (local TCP stub server).
 │   ├── EntityTests.cs
 │   ├── EnumTests.cs
 │   ├── GameConstantsTests.cs         # + ApiEndpointResolver.
