@@ -171,18 +171,31 @@ namespace GLMod.Class
         {
             foreach (PlayerTask playerTask in PlayerControl.LocalPlayer.myTasks)
             {
-                switch (playerTask.TaskType)
-                {
-                    case TaskTypes.ResetSeismic:
-                    case TaskTypes.ResetReactor:
-                        return SabotageType.Reactor;
-                    case TaskTypes.FixComms:
-                        return SabotageType.Coms;
-                    case TaskTypes.FixLights:
-                        return SabotageType.Lights;
-                    case TaskTypes.CleanO2Filter:
-                        return SabotageType.O2;
-                }
+                SabotageType? sabotage = SabotageForTask(playerTask.TaskType);
+                if (sabotage.HasValue)
+                    return sabotage;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Maps a task created by a sabotage to its sabotage type
+        /// </summary>
+        /// <returns>Sabotage type or null if the task is not a sabotage task</returns>
+        public static SabotageType? SabotageForTask(TaskTypes taskType)
+        {
+            switch (taskType)
+            {
+                case TaskTypes.ResetSeismic:
+                case TaskTypes.ResetReactor:
+                    return SabotageType.Reactor;
+                case TaskTypes.FixComms:
+                    return SabotageType.Coms;
+                case TaskTypes.FixLights:
+                    return SabotageType.Lights;
+                case TaskTypes.RestoreOxy:
+                    return SabotageType.O2;
             }
 
             return null;

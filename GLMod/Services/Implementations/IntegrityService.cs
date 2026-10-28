@@ -85,7 +85,7 @@ namespace GLMod.Services.Implementations
             }
         }
 
-        private string CalculateFileSHA512(string filePath)
+        private static string CalculateFileSHA512(string filePath)
         {
             using (var sha512 = SHA512.Create())
             using (var fileStream = File.OpenRead(filePath))
@@ -95,9 +95,33 @@ namespace GLMod.Services.Implementations
             }
         }
 
+        /// <summary>
+        /// Hashes a file without throwing: returns null and sets error when the file
+        /// cannot be read (missing file or folder, access denied...)
+        /// </summary>
+        public static string TryCalculateFileSHA512(string filePath, out string error)
+        {
+            error = null;
+            try
+            {
+                return CalculateFileSHA512(filePath);
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return null;
+            }
+        }
+
         public IEnumerator VerifyDll(string checksumId, string dllPath, System.Action<bool> onComplete)
         {
-            string localChecksum = CalculateFileSHA512(dllPath);
+            string localChecksum = TryCalculateFileSHA512(dllPath, out string hashError);
+            if (localChecksum == null)
+            {
+                Log($"VerifyDll failed to hash {dllPath}: {hashError}");
+                onComplete?.Invoke(false);
+                yield break;
+            }
             Log("Local checksum: " + localChecksum);
 
             string remoteChecksum = null;

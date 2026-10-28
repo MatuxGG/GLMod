@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using AmongUs.GameOptions;
+using HarmonyLib;
 using InnerNet;
 using System;
 using System.Collections.Generic;
@@ -279,8 +280,8 @@ namespace GLMod
                     return;
                 }
 
-                int nbImp = GameOptionsManager.Instance.CurrentGameOptions.NumImpostors;
-                if (PlayerControl.AllPlayerControls.Count < 6) nbImp = 1;
+                // The game caps the impostor setting by player count (1 up to 6 players, 2 for 7-8, 3 above)
+                int nbImp = GameOptionsManager.Instance.CurrentGameOptions.GetAdjustedNumImpostors(PlayerControl.AllPlayerControls.Count);
                 int realImp = 0;
                 foreach (PlayerControl p in PlayerControl.AllPlayerControls)
                 {

@@ -155,7 +155,7 @@ Every service is exposed statically via the main `GLMod` class and has a dedicat
   - `AddPlayer(name, role, team, color)` — adds a player to the current match.
   - `SendGame(onComplete)` — uploads the match to the API (coroutine).
   - `SyncGameId(onComplete)` — broadcasts the match ID to non-hosts via RPC.
-  - `AddMyPlayer(onComplete)` — registers the local player on the server (`gameId`, `playerName`; the site takes the account from the Bearer game token).
+  - `AddMyPlayer(onComplete)` — registers the local player on the server (`gameId`, `playerName`; the site takes the account from the Bearer game token). Calls `onComplete(false)` when the host's game id has not arrived after `GAME_ID_WAIT_TIMEOUT`, when the game is reset meanwhile, or when `/game/addMyPlayer` fails (HTTP error or network failure).
   - `GetShieldPlayer(onComplete, onError)` — returns the player who would have benefited from a T1 shield (retries on HTTP 400).
   - `SetWinnerTeams(winners)` / `AddWinnerPlayer(name)` — sets the outcome.
   - `EndGame()` — closes the match server-side.
@@ -296,6 +296,7 @@ Reactor, Coms, Lights, O2
 | `POSITION_SIMPLIFY_TOLERANCE` | `0.1f` map units — a sample is dropped when the recap would still draw the player within this distance of it |
 | `POSITION_MAX_GAP_MS`         | `5000` — at least one sent position per player in this time, even standing still |
 | `RPC_POLLING_INTERVAL`        | `0.1f` seconds                               |
+| `GAME_ID_WAIT_TIMEOUT`        | `30f` seconds — `AddMyPlayer` gives up (`onComplete(false)`) when the host's game id has not arrived |
 | `DEFAULT_GAME_CODE`           | `XXXXXX`                                     |
 | `DEFAULT_MAP_NAME`            | `Unknown`                                    |
 | `ACTION_PREFIX_DC_PROCESS`    | `DC_PROCESS_` (background-detected DC)       |
@@ -351,6 +352,7 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
   - `2`: `DisconnectInternal` → builds reason `DC_INTERNAL_<value>`.
   - `3`: `HandleDisconnect` → builds reason `DC_HANDLE_<value>`.
   - `4`: `OnDisconnect` → builds reason `DC_ON_<value>`.
+  - Cases `2`–`4` carry `[reason, playerName]` and are sent by the matching `InnerNetClientPatch` patch (`OnDisconnect` sends `["On Disconnect", playerName]`). The sender records the same `DC_*` action locally: both sides build it with `InnerNetClientPatch.BuildDisconnectAction(rpcId, reason)`.
   - (additional cases must be documented as they are added — **update this table**).
 
 > Any new RPC ID must be **reserved here** before implementation to prevent collisions.
@@ -362,7 +364,7 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 | File                   | Role                                                                                       |
 |------------------------|--------------------------------------------------------------------------------------------|
 | `HttpHelper.cs`        | Shared static `HttpClient`, proxy disabled.                                                |
-| `ApiService.cs`        | `PostFormAsync`, `PostFormWithErrorHandlingAsync` (optional `bearerToken` → `Authorization: Bearer`; `unescape: false` keeps a JSON body intact), `GetWithErrorHandlingAsync`, `ApiResponse` type. |
+| `ApiService.cs`        | `PostFormAsync`, `PostFormWithErrorHandlingAsync` (optional `bearerToken` → `Authorization: Bearer`; response bodies are returned as sent, never `Regex.Unescape`d by default: it corrupts JSON escapes), `GetWithErrorHandlingAsync`, `ApiResponse` type. |
 | `SteamSessionTicket.cs` | `TryCreate` / `Cancel` — Steam session ticket (hex) of the Steam ticket login (§3.1). Main thread only. |
 | `LoginResponse.cs`     | Pure login helpers: ticket bytes → hex, ticket login answer (`GLLoginResponse`), ban reason, account name of a legacy token, token reuse. |
 | `ApiEndpointResolver.cs` | Resolves the API base URL: `API_ENDPOINT`, or the `GLMOD_API_ENDPOINT` environment variable when it is a valid http(s) URL. `ToSiteUrl(api)` / `GameRecapUrl(api, gameId)` give the matching site and recap URLs. |
@@ -471,7 +473,7 @@ Base: `https://goodloss.fr/api` (production). It can be overridden at startup wi
 
 ### 11.4 Testing
 - Test framework: xUnit ([GLMod.Tests/GLMod.Tests.csproj](GLMod.Tests/GLMod.Tests.csproj)).
-- Scope: pure logic — entities (`GLGame`, `GLPlayer`, `GLPosition`), enums (`SabotageType`, `GameMapType`), `ServiceManager`, `GameConstants` invariants, `ApiEndpointResolver` (incl. site / recap URLs), `ServerClock`, `MenuService`, `GameHistoryList`, `PlayerApiResponse` (on captured preprod responses), `LoginResponse`, `StatFormat`, `PositionSimplifier`, and the E2E harness `ScenarioPlan` / `ScenarioVerifier` / `NavGrid` / `PositionAccuracy`. Anything that touches IL2CPP / Among Us types stays untestable until further decoupling.
+- Scope: pure logic — entities (`GLGame`, `GLPlayer`, `GLPosition`), enums (`SabotageType`, `GameMapType`), `ServiceManager`, `GameConstants` invariants, `ApiEndpointResolver` (incl. site / recap URLs), `ServerClock`, `ApiService` response bodies (against a local TCP stub server), `MenuService`, `GameHistoryList`, `PlayerApiResponse` (on captured preprod responses), `LoginResponse`, `StatFormat`, `PositionSimplifier`, `BackgroundEvents.SabotageForTask` (sabotage task → `SabotageType`, e.g. `RestoreOxy` → O2), and the E2E harness `ScenarioPlan` / `ScenarioVerifier` / `NavGrid` / `PositionAccuracy`. Anything that touches IL2CPP / Among Us types stays untestable until further decoupling.
 - Add new tests for any new pure-logic surface. Refactor toward injectable abstractions before adding tests that would otherwise require IL2CPP mocking.
 
 ### 11.5 End-to-end test (4 Among Us instances, online lobby: 2-game session or movement game)
@@ -530,7 +532,9 @@ GLMod/                                # Repo root
 │   └── BepInEx/                      # Core + interop DLLs (referenced by csproj).
 ├── GLMod.Tests/                      # xUnit test project for pure-logic types.
 │   ├── GLMod.Tests.csproj
+│   ├── ApiServiceTests.cs            # ApiService response bodies (local TCP stub server).
 │   ├── EntityTests.cs
+│   ├── AddMyPlayerTests.cs           # AddMyPlayer result on HTTP / network errors (local TCP stub server).
 │   ├── EnumTests.cs
 │   ├── GameConstantsTests.cs         # + ApiEndpointResolver.
 │   ├── GameHistoryTests.cs           # GameHistoryList.
