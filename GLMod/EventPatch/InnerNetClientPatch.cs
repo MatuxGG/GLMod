@@ -11,6 +11,15 @@ namespace GLMod
 {
     public class InnerNetClientPatch
     {
+        // RPC 4 (OnDisconnect) payload: [reason, playerName], read by GLRPCProcedure.handleRpc
+        public const int ON_DISCONNECT_RPC_ID = 4;
+        public const string ON_DISCONNECT_REASON = "On Disconnect";
+
+        public static List<string> BuildOnDisconnectRpcValues(string playerName)
+        {
+            return new List<string> { ON_DISCONNECT_REASON, playerName ?? "" };
+        }
+
         [HarmonyPatch(typeof(InnerNetClient), nameof(InnerNetClient.DisconnectInternal))]
         public static class DisconnectInternalPatch
         {
@@ -42,9 +51,9 @@ namespace GLMod
             static void Postfix(InnerNetClient __instance)
             {
                 string playerName = PlayerControl.LocalPlayer?.Data?.PlayerName;
-                List<string> values = new List<string> { playerName ?? "" };
-                GLRPCProcedure.makeRpcCall(3, values);
-                BackgroundEvents.handleDc("On Disconnect", playerName);
+                List<string> values = BuildOnDisconnectRpcValues(playerName);
+                GLRPCProcedure.makeRpcCall(ON_DISCONNECT_RPC_ID, values);
+                BackgroundEvents.handleDc(ON_DISCONNECT_REASON, playerName);
                 GLMod.GameStateManager.Step = GameStep.Initial;
             }
 
