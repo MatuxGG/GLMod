@@ -350,16 +350,26 @@ namespace GLMod.Services.Implementations
                 Log("[AddMyPlayer] My name null or empty");
             }
 
-            // Wait for the game ID to become available
-            while (string.IsNullOrEmpty(CurrentGame.id))
+            // Wait for the game ID to become available (never sent if the host has no GLMod or its SendGame failed)
+            GLGame game = CurrentGame;
+            float waited = 0f;
+            while (ShouldWaitForGameId(game, CurrentGame, waited))
             {
                 yield return new WaitForSeconds(0.1f);
+                waited += 0.1f;
+            }
+
+            if (!ReferenceEquals(game, CurrentGame) || string.IsNullOrEmpty(game.id))
+            {
+                Log("[AddMyPlayer] Game id unavailable");
+                onComplete?.Invoke(false);
+                yield break;
             }
 
             // Prepare the form. The API takes the account from the game token (Bearer).
             var form = new Dictionary<string, string>
             {
-                { "gameId", CurrentGame.id },
+                { "gameId", game.id },
                 { "playerName", me.Data.PlayerName }
             };
 
@@ -383,6 +393,18 @@ namespace GLMod.Services.Implementations
                 Log("[AddMyPlayer] Add my player fail, error: " + error);
             }
             onComplete?.Invoke(true);
+        }
+
+        /// <summary>
+        /// Whether AddMyPlayer keeps waiting for the game id: the game is still the current one,
+        /// has no id yet, and the wait is shorter than GAME_ID_WAIT_TIMEOUT.
+        /// </summary>
+        public static bool ShouldWaitForGameId(GLGame game, GLGame currentGame, float waited)
+        {
+            return game != null
+                && ReferenceEquals(game, currentGame)
+                && string.IsNullOrEmpty(game.id)
+                && waited < GameConstants.GAME_ID_WAIT_TIMEOUT;
         }
 
         public IEnumerator GetShieldPlayer(System.Action<string> onComplete = null, System.Action<string> onError = null)

@@ -155,7 +155,7 @@ Every service is exposed statically via the main `GLMod` class and has a dedicat
   - `AddPlayer(name, role, team, color)` — adds a player to the current match.
   - `SendGame(onComplete)` — uploads the match to the API (coroutine).
   - `SyncGameId(onComplete)` — broadcasts the match ID to non-hosts via RPC.
-  - `AddMyPlayer(onComplete)` — registers the local player on the server (`gameId`, `playerName`; the site takes the account from the Bearer game token).
+  - `AddMyPlayer(onComplete)` — registers the local player on the server (`gameId`, `playerName`; the site takes the account from the Bearer game token). Calls `onComplete(false)` when the host's game id has not arrived after `GAME_ID_WAIT_TIMEOUT`, or when the game is reset meanwhile.
   - `GetShieldPlayer(onComplete, onError)` — returns the player who would have benefited from a T1 shield (retries on HTTP 400).
   - `SetWinnerTeams(winners)` / `AddWinnerPlayer(name)` — sets the outcome.
   - `EndGame()` — closes the match server-side.
@@ -296,6 +296,7 @@ Reactor, Coms, Lights, O2
 | `POSITION_SIMPLIFY_TOLERANCE` | `0.1f` map units — a sample is dropped when the recap would still draw the player within this distance of it |
 | `POSITION_MAX_GAP_MS`         | `5000` — at least one sent position per player in this time, even standing still |
 | `RPC_POLLING_INTERVAL`        | `0.1f` seconds                               |
+| `GAME_ID_WAIT_TIMEOUT`        | `30f` seconds — `AddMyPlayer` gives up (`onComplete(false)`) when the host's game id has not arrived |
 | `DEFAULT_GAME_CODE`           | `XXXXXX`                                     |
 | `DEFAULT_MAP_NAME`            | `Unknown`                                    |
 | `ACTION_PREFIX_DC_PROCESS`    | `DC_PROCESS_` (background-detected DC)       |

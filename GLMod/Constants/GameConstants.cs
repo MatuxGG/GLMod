@@ -62,6 +62,11 @@ namespace GLMod.Constants
         public const float RPC_POLLING_INTERVAL = 0.1f;
 
         /// <summary>
+        /// Longest time AddMyPlayer waits for the game id sent by the host, in seconds
+        /// </summary>
+        public const float GAME_ID_WAIT_TIMEOUT = 30f;
+
+        /// <summary>
         /// Default game code when unknown
         /// </summary>
         public const string DEFAULT_GAME_CODE = "XXXXXX";
