@@ -28,5 +28,23 @@ namespace GLMod.Tests
 
             Assert.Equal(new[] { "On Disconnect", "" }, values);
         }
+
+        [Theory]
+        [InlineData(InnerNetClientPatch.DISCONNECT_INTERNAL_RPC_ID, "ExitGame", "DC_INTERNAL_ExitGame")]
+        [InlineData(InnerNetClientPatch.HANDLE_DISCONNECT_RPC_ID, "ExitGame", "DC_HANDLE_ExitGame")]
+        [InlineData(InnerNetClientPatch.ON_DISCONNECT_RPC_ID, InnerNetClientPatch.ON_DISCONNECT_REASON, "DC_ON_On Disconnect")]
+        public void LocalDisconnect_UsesSamePrefixAsRemote(int rpcId, string reason, string expected)
+        {
+            // Bughunt k0008: the local patches recorded the raw reason ("ExitGame") while the
+            // other clients recorded the same disconnect with its DC_* prefix ("DC_INTERNAL_ExitGame").
+            Assert.Equal(expected, InnerNetClientPatch.BuildDisconnectAction(rpcId, reason));
+        }
+
+        [Fact]
+        public void DisconnectAction_NullReasonBecomesUnknown()
+        {
+            Assert.Equal("DC_HANDLE_unknown",
+                InnerNetClientPatch.BuildDisconnectAction(InnerNetClientPatch.HANDLE_DISCONNECT_RPC_ID, null));
+        }
     }
 }

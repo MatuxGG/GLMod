@@ -351,7 +351,7 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
   - `2`: `DisconnectInternal` → builds reason `DC_INTERNAL_<value>`.
   - `3`: `HandleDisconnect` → builds reason `DC_HANDLE_<value>`.
   - `4`: `OnDisconnect` → builds reason `DC_ON_<value>`.
-  - Cases `2`–`4` carry `[reason, playerName]` and are sent by the matching `InnerNetClientPatch` patch (`OnDisconnect` sends `["On Disconnect", playerName]`).
+  - Cases `2`–`4` carry `[reason, playerName]` and are sent by the matching `InnerNetClientPatch` patch (`OnDisconnect` sends `["On Disconnect", playerName]`). The sender records the same `DC_*` action locally: both sides build it with `InnerNetClientPatch.BuildDisconnectAction(rpcId, reason)`.
   - (additional cases must be documented as they are added — **update this table**).
 
 > Any new RPC ID must be **reserved here** before implementation to prevent collisions.
