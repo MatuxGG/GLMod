@@ -472,7 +472,7 @@ Base: `https://goodloss.fr/api` (production). It can be overridden at startup wi
 
 ### 11.4 Testing
 - Test framework: xUnit ([GLMod.Tests/GLMod.Tests.csproj](GLMod.Tests/GLMod.Tests.csproj)).
-- Scope: pure logic — entities (`GLGame`, `GLPlayer`, `GLPosition`), enums (`SabotageType`, `GameMapType`), `ServiceManager`, `GameConstants` invariants, `ApiEndpointResolver` (incl. site / recap URLs), `ServerClock`, `MenuService`, `GameHistoryList`, `PlayerApiResponse` (on captured preprod responses), `LoginResponse`, `StatFormat`, `PositionSimplifier`, and the E2E harness `ScenarioPlan` / `ScenarioVerifier` / `NavGrid` / `PositionAccuracy`. Anything that touches IL2CPP / Among Us types stays untestable until further decoupling.
+- Scope: pure logic — entities (`GLGame`, `GLPlayer`, `GLPosition`), enums (`SabotageType`, `GameMapType`), `ServiceManager`, `GameConstants` invariants, `ApiEndpointResolver` (incl. site / recap URLs), `ServerClock`, `MenuService`, `GameHistoryList`, `PlayerApiResponse` (on captured preprod responses), `LoginResponse`, `StatFormat`, `PositionSimplifier`, `BackgroundEvents.SabotageForTask` (sabotage task → `SabotageType`, e.g. `RestoreOxy` → O2), and the E2E harness `ScenarioPlan` / `ScenarioVerifier` / `NavGrid` / `PositionAccuracy`. Anything that touches IL2CPP / Among Us types stays untestable until further decoupling.
 - Add new tests for any new pure-logic surface. Refactor toward injectable abstractions before adding tests that would otherwise require IL2CPP mocking.
 
 ### 11.5 End-to-end test (4 Among Us instances, online lobby: 2-game session or movement game)
