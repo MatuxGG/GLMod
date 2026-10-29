@@ -576,33 +576,44 @@ namespace GLMod.Services.Implementations
             if (Step != GameStep.WinnerSet)
             {
                 Log("[EndGame] Call when in step " + Step);
+                // The game cannot be sent anymore: start the next one from scratch
+                Step = GameStep.Initial;
                 yield break;
             }
 
             if (CurrentGame == null)
             {
                 Log("[EndGame] Current Game null");
+                Step = GameStep.Initial;
                 yield break;
             }
 
             BackgroundEvents.endBackgroundProcess();
 
+            yield return PostEndGame(_apiEndpoint + "/game/end", CurrentGame, Log, step => Step = step);
+        }
+
+        /// <summary>
+        /// Sends the finished game to /game/end, then sets the step back to Initial whatever the result:
+        /// after an HTTP or network error the next game must still be started and sent.
+        /// </summary>
+        public static IEnumerator PostEndGame(string url, GLGame game, System.Action<string> log,
+            System.Action<GameStep> setStep)
+        {
             yield return CoroutineHelpers.RunAsync(
                 async () =>
                 {
-                    string json = GLJson.Serialize<GLGame>(CurrentGame);
+                    string json = GLJson.Serialize<GLGame>(game);
                     var content = new StringContent(json, Encoding.UTF8, "application/json");
-                    var response = await HttpHelper.Client.PostAsync(_apiEndpoint + "/game/end", content).ConfigureAwait(false);
+                    var response = await HttpHelper.Client.PostAsync(url, content).ConfigureAwait(false);
                     response.EnsureSuccessStatusCode();
                     await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 },
-                onCompleted: () =>
-                {
-                    Step = GameStep.Initial;
-                    Log("Game ended.");
-                },
-                onError: ex => Log("[EndGame] End Game fail, error: " + ex.Message)
+                onCompleted: () => log?.Invoke("Game ended."),
+                onError: ex => log?.Invoke("[EndGame] End Game fail, error: " + ex.Message)
             );
+
+            setStep?.Invoke(GameStep.Initial);
         }
 
         public void AddAction(string source, string target, string action)
