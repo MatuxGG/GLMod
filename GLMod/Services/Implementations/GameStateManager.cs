@@ -278,8 +278,17 @@ namespace GLMod.Services.Implementations
                 yield break;
             }
 
+            GLGame game = CurrentGame;
             _stepRpcConfig.Value = "NO";
             yield return new WaitForSeconds(GameConstants.RPC_SYNC_TIMEOUT);
+
+            // A disconnect during the wait resets Step: do not bring the old game back
+            if (!IsGameIdSyncCurrent(game, CurrentGame, Step))
+            {
+                Log("[SyncGameId] Game changed during wait");
+                onComplete?.Invoke(false);
+                yield break;
+            }
 
             // The RPC goes through IL2CPP (AmongUsClient, PlayerControl): it must run on the Unity
             // main thread, which this coroutine already is. Sending it from Task.Run crashed the game.
@@ -295,6 +304,17 @@ namespace GLMod.Services.Implementations
 
             Step = GameStep.PlayersRecorded;
             onComplete?.Invoke(true);
+        }
+
+        /// <summary>
+        /// Whether SyncGameId may still send the game id after its wait: the game is still the
+        /// current one and Step is still GameIdSynced (a disconnect resets it to Initial).
+        /// </summary>
+        public static bool IsGameIdSyncCurrent(GLGame game, GLGame currentGame, GameStep step)
+        {
+            return game != null
+                && ReferenceEquals(game, currentGame)
+                && step == GameStep.GameIdSynced;
         }
 
         public IEnumerator AddMyPlayer(System.Action<bool> onComplete = null)
