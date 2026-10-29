@@ -18,7 +18,8 @@ namespace GLMod.Menu
         string Title { get; }
 
         /// <summary>
-        /// Called when the tab becomes visible (menu opened on it, or tab selected). Refresh data here.
+        /// Called when the tab becomes visible (menu opened on it, or tab selected), and again when the connected
+        /// account changes while it is visible (login, logout). Refresh data here.
         /// </summary>
         void OnShown();
 

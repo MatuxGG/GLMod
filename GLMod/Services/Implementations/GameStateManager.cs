@@ -278,8 +278,17 @@ namespace GLMod.Services.Implementations
                 yield break;
             }
 
+            GLGame game = CurrentGame;
             _stepRpcConfig.Value = "NO";
             yield return new WaitForSeconds(GameConstants.RPC_SYNC_TIMEOUT);
+
+            // A disconnect during the wait resets Step: do not bring the old game back
+            if (!IsGameIdSyncCurrent(game, CurrentGame, Step))
+            {
+                Log("[SyncGameId] Game changed during wait");
+                onComplete?.Invoke(false);
+                yield break;
+            }
 
             // The RPC goes through IL2CPP (AmongUsClient, PlayerControl): it must run on the Unity
             // main thread, which this coroutine already is. Sending it from Task.Run crashed the game.
@@ -295,6 +304,17 @@ namespace GLMod.Services.Implementations
 
             Step = GameStep.PlayersRecorded;
             onComplete?.Invoke(true);
+        }
+
+        /// <summary>
+        /// Whether SyncGameId may still send the game id after its wait: the game is still the
+        /// current one and Step is still GameIdSynced (a disconnect resets it to Initial).
+        /// </summary>
+        public static bool IsGameIdSyncCurrent(GLGame game, GLGame currentGame, GameStep step)
+        {
+            return game != null
+                && ReferenceEquals(game, currentGame)
+                && step == GameStep.GameIdSynced;
         }
 
         public IEnumerator AddMyPlayer(System.Action<bool> onComplete = null)
@@ -556,33 +576,44 @@ namespace GLMod.Services.Implementations
             if (Step != GameStep.WinnerSet)
             {
                 Log("[EndGame] Call when in step " + Step);
+                // The game cannot be sent anymore: start the next one from scratch
+                Step = GameStep.Initial;
                 yield break;
             }
 
             if (CurrentGame == null)
             {
                 Log("[EndGame] Current Game null");
+                Step = GameStep.Initial;
                 yield break;
             }
 
             BackgroundEvents.endBackgroundProcess();
 
+            yield return PostEndGame(_apiEndpoint + "/game/end", CurrentGame, Log, step => Step = step);
+        }
+
+        /// <summary>
+        /// Sends the finished game to /game/end, then sets the step back to Initial whatever the result:
+        /// after an HTTP or network error the next game must still be started and sent.
+        /// </summary>
+        public static IEnumerator PostEndGame(string url, GLGame game, System.Action<string> log,
+            System.Action<GameStep> setStep)
+        {
             yield return CoroutineHelpers.RunAsync(
                 async () =>
                 {
-                    string json = GLJson.Serialize<GLGame>(CurrentGame);
+                    string json = GLJson.Serialize<GLGame>(game);
                     var content = new StringContent(json, Encoding.UTF8, "application/json");
-                    var response = await HttpHelper.Client.PostAsync(_apiEndpoint + "/game/end", content).ConfigureAwait(false);
+                    var response = await HttpHelper.Client.PostAsync(url, content).ConfigureAwait(false);
                     response.EnsureSuccessStatusCode();
                     await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 },
-                onCompleted: () =>
-                {
-                    Step = GameStep.Initial;
-                    Log("Game ended.");
-                },
-                onError: ex => Log("[EndGame] End Game fail, error: " + ex.Message)
+                onCompleted: () => log?.Invoke("Game ended."),
+                onError: ex => log?.Invoke("[EndGame] End Game fail, error: " + ex.Message)
             );
+
+            setStep?.Invoke(GameStep.Initial);
         }
 
         public void AddAction(string source, string target, string action)
