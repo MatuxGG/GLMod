@@ -29,14 +29,23 @@ namespace GLMod.Class
 
         /// <summary>
         /// Updates the offset from a response Date header. Thread-safe: called from HTTP tasks.
+        /// A measurement within the Date header resolution (1s) of the current offset is noise and is
+        /// ignored: replacing the offset would make NowMs go back in the middle of a game.
         /// </summary>
         public static void Update(DateTimeOffset? serverDate, DateTimeOffset requestSentAt, DateTimeOffset responseReceivedAt)
         {
             long? offset = ComputeOffsetMs(serverDate, requestSentAt, responseReceivedAt);
-            if (offset.HasValue)
+            if (!offset.HasValue)
             {
-                Interlocked.Exchange(ref _offsetMs, offset.Value);
+                return;
             }
+
+            if (Math.Abs(RawOffsetMs(serverDate.Value, requestSentAt, responseReceivedAt) - OffsetMs) <= GameConstants.CLOCK_DATE_RESOLUTION_MS)
+            {
+                return;
+            }
+
+            Interlocked.Exchange(ref _offsetMs, offset.Value);
         }
 
         /// <summary>
@@ -51,11 +60,16 @@ namespace GLMod.Class
                 return null;
             }
 
-            long localMidpoint = (requestSentAt.ToUnixTimeMilliseconds() + responseReceivedAt.ToUnixTimeMilliseconds()) / 2;
-            long serverMidpoint = serverDate.Value.ToUnixTimeMilliseconds() + 500;
-            long offset = serverMidpoint - localMidpoint;
+            long offset = RawOffsetMs(serverDate.Value, requestSentAt, responseReceivedAt);
 
             return Math.Abs(offset) <= GameConstants.CLOCK_SKEW_TOLERANCE_MS ? 0 : offset;
+        }
+
+        private static long RawOffsetMs(DateTimeOffset serverDate, DateTimeOffset requestSentAt, DateTimeOffset responseReceivedAt)
+        {
+            long localMidpoint = (requestSentAt.ToUnixTimeMilliseconds() + responseReceivedAt.ToUnixTimeMilliseconds()) / 2;
+            long serverMidpoint = serverDate.ToUnixTimeMilliseconds() + 500;
+            return serverMidpoint - localMidpoint;
         }
 
         /// <summary>

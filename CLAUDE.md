@@ -288,6 +288,7 @@ Reactor, Coms, Lights, O2
 | `API_ENDPOINT`                | `https://goodloss.fr/api`                    |
 | `API_ENDPOINT_ENV_VAR`        | `GLMOD_API_ENDPOINT` (overrides `API_ENDPOINT`, see §10) |
 | `CLOCK_SKEW_TOLERANCE_MS`     | `2000` — clock difference with the API ignored by `ServerClock` |
+| `CLOCK_DATE_RESOLUTION_MS`    | `1000` — `ServerClock` keeps its offset when a new measurement is within this of it (Date header noise; `NowMs()` must not go back mid-game) |
 | `SUPPORT_ID_CHARS`            | `A-Za-z1-9` (no `0`)                         |
 | `SUPPORT_ID_LENGTH`           | `10`                                         |
 | `RPC_SYNC_TIMEOUT`            | `5.0f` seconds                               |
@@ -376,7 +377,7 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 | `PlayModeHelper.cs`    | `IsFreePlay()` — free play games are never recorded nor sent (§3.3). |
 | `RankedMod.cs`         | `Matches(modName)` — "Among Us Ranked" and its variants ("Among Us Ranked Roles"…), case-insensitive. Pure. |
 | `StatFormat.cs`        | Pure formatting of menu stats: durations ("1 min 05 s", "2 h 05"), ratios, win percentages (`WinPercent`, rounded like the site), Yes/No, numbers, local dates, vanilla role names. |
-| `ServerClock.cs`       | `NowMs()` — Unix ms aligned on the API server clock. The offset is refreshed from the `Date` header of every `ApiService` response. **Every timestamp sent to the API (actions, positions) must use `ServerClock.NowMs()`**, never `DateTimeOffset.UtcNow`. |
+| `ServerClock.cs`       | `NowMs()` — Unix ms aligned on the API server clock. The offset is refreshed from the `Date` header of every `ApiService` response, unless the new measurement is within `CLOCK_DATE_RESOLUTION_MS` of the current offset (so `NowMs()` does not go back mid-game). **Every timestamp sent to the API (actions, positions) must use `ServerClock.NowMs()`**, never `DateTimeOffset.UtcNow`. |
 | `CoroutineHelpers.cs`  | `RunAsync` / `RunAsync<T>` — async-task ↔ coroutine bridge. Use these instead of re-implementing the `Task.Run` + volatile `done` flag pattern. |
 | `CoroutineRunner.cs`   | `MonoBehaviour` IL2CPP singleton used to run coroutines from static classes.               |
 | `ServiceLogger.cs`     | `Log(logger, serviceName, message)` — shared log formatter producing `[GLMod][Service] PlayerName: message`. Every service must delegate to it. |

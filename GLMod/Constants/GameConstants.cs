@@ -21,6 +21,11 @@ namespace GLMod.Constants
         public const long CLOCK_SKEW_TOLERANCE_MS = 2000;
 
         /// <summary>
+        /// Resolution of the HTTP Date header: ServerClock keeps its offset when a new measurement is within it
+        /// </summary>
+        public const long CLOCK_DATE_RESOLUTION_MS = 1000;
+
+        /// <summary>
         /// Characters used for generating support IDs
         /// </summary>
         public const string SUPPORT_ID_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz123456789";
