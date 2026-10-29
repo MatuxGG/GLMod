@@ -398,7 +398,7 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 - **Look** (esport style): vertical gradient panel with a violet halo and an accent line on the top edge; header with the Good Loss logo (embedded `GLMod/Resources/goodloss-logo.png`, 110×128, decoded with `ImageConversion.LoadImage`; a gradient "GL" badge if it cannot be loaded), "GOOD LOSS" and the GLMod version; uppercase tabs with a glowing gradient indicator that glides to the selected tab; tab content fades and slides in from the side of the newly selected tab (0.22 s); keycap hints in the footer (`← →` tabs, `↑ ↓` scroll, `F2` close).
 - **Fonts**: OS fonts through `Font.CreateDynamicFontFromOSFont`: display text (titles, tabs, buttons, captions) in Bahnschrift SemiBold (condensed DIN-like face of Windows 10+), body text in Segoe UI; Arial / the IMGUI default font elsewhere (Linux / Proton).
 - **Navigation**: left / right arrows (or the ‹ › buttons, or a click on a tab) switch tabs; up / down arrows and the mouse wheel scroll the current tab. The game does not see these inputs while the menu uses them (§7 patches).
-- **Rendering**: IMGUI from `MenuBehaviour` (`Update` = keys, scrolling, slide and content animations; `OnGUI` = drawing). Layout values are 1080p reference units converted to **screen pixels** with `MenuUI.U` (scale = screen height / 1080, never below `0.85`); styles (font sizes) are rebuilt when the scale changes, so text is rendered at its real size and stays sharp (no `GUI.matrix` scaling). Palette based on the Good Loss site (`--accent #A78BFA`, deeper `#7C3AED` for gradients, dark navy surfaces). `MenuBehaviour` notifies `IMenuTab.OnShown()` when a tab becomes visible; tab exceptions are logged once and replaced by an error message.
+- **Rendering**: IMGUI from `MenuBehaviour` (`Update` = keys, scrolling, slide and content animations; `OnGUI` = drawing). Layout values are 1080p reference units converted to **screen pixels** with `MenuUI.U` (scale = screen height / 1080, never below `0.85`); styles (font sizes) are rebuilt when the scale changes, so text is rendered at its real size and stays sharp (no `GUI.matrix` scaling). Palette based on the Good Loss site (`--accent #A78BFA`, deeper `#7C3AED` for gradients, dark navy surfaces). `MenuBehaviour` notifies `IMenuTab.OnShown()` when a tab becomes visible, and again when the connected account (`AuthService.GetAccountName()`) changes while it stays visible, so a tab shown during the login loads its data once connected ([ShownTabTracker.cs](GLMod/Menu/ShownTabTracker.cs), pure, unit-tested); tab exceptions are logged once and replaced by an error message.
 - **Widgets**: [MenuUI.cs](GLMod/Menu/MenuUI.cs) — public, used by built-in and third-party tabs: `Heading`, `Highlight`, `Label`, `Muted`, `Field`, `Button`, `Row`, `ProgressBar`, `Tiles`, `StatGrid` (compact 3-column stat tiles, null values skipped), `Tags` (colored pills, wrapping), `WinRate` (label, counts, colored bar and percentage), `Space`, `Separator`, colors. Internal helpers for the built-in tabs: `Reserve`, `DrawRect`, `DrawGlow`, `DrawCircle`, `DrawRemoteImage` (image downloaded from a URL through `HttpHelper`, decoded on the main thread, cached by URL), `DrawAccentGradient`, `DrawPill`, `DrawSecondaryButton`, `EmptyState`.
 - **Textures**: generated once with `Texture2D.SetPixel` (white, tinted through `GUI.backgroundColor` and drawn with `GUI.Box` + 9-slice borders): rounded rectangles (4 / 7 / 12 px), circle, soft halos (large and small), accent and panel gradients (colors baked in). A halo whose 9-slice border is larger than the drawn rectangle turns into a block: `DrawGlow` switches to the small halo for elements under 24 px.
 - **Built-in tabs** (class names end with `MenuTab`: Among Us already has a global `AccountTab` type, which would win name resolution):
@@ -474,7 +474,7 @@ Base: `https://goodloss.fr/api` (production). It can be overridden at startup wi
 
 ### 11.4 Testing
 - Test framework: xUnit ([GLMod.Tests/GLMod.Tests.csproj](GLMod.Tests/GLMod.Tests.csproj)).
-- Scope: pure logic — entities (`GLGame`, `GLPlayer`, `GLPosition`), enums (`SabotageType`, `GameMapType`), `ServiceManager`, `GameConstants` invariants, `ApiEndpointResolver` (incl. site / recap URLs), `ServerClock`, `ApiService` response bodies (against a local TCP stub server), `MenuService`, `GameHistoryList`, `PlayerApiResponse` (on captured preprod responses), `LoginResponse`, `StatFormat`, `PositionSimplifier`, `BackgroundEvents.SabotageForTask` (sabotage task → `SabotageType`, e.g. `RestoreOxy` → O2), and the E2E harness `ScenarioPlan` / `ScenarioVerifier` / `NavGrid` / `PositionAccuracy`. Anything that touches IL2CPP / Among Us types stays untestable until further decoupling.
+- Scope: pure logic — entities (`GLGame`, `GLPlayer`, `GLPosition`), enums (`SabotageType`, `GameMapType`), `ServiceManager`, `GameConstants` invariants, `ApiEndpointResolver` (incl. site / recap URLs), `ServerClock`, `ApiService` response bodies (against a local TCP stub server), `MenuService`, `ShownTabTracker`, `GameHistoryList`, `PlayerApiResponse` (on captured preprod responses), `LoginResponse`, `StatFormat`, `PositionSimplifier`, `BackgroundEvents.SabotageForTask` (sabotage task → `SabotageType`, e.g. `RestoreOxy` → O2), and the E2E harness `ScenarioPlan` / `ScenarioVerifier` / `NavGrid` / `PositionAccuracy`. Anything that touches IL2CPP / Among Us types stays untestable until further decoupling.
 - Add new tests for any new pure-logic surface. Refactor toward injectable abstractions before adding tests that would otherwise require IL2CPP mocking.
 
 ### 11.5 End-to-end test (4 Among Us instances, online lobby: 2-game session or movement game)
@@ -548,7 +548,8 @@ GLMod/                                # Repo root
 │   ├── TranslationTests.cs           # TranslationTable, GameLanguage, embedded translation files.
 │   ├── ScenarioTests.cs              # ScenarioPlan / ScenarioVerifier (E2E harness logic).
 │   ├── ServerClockTests.cs
-│   └── ServiceManagerTests.cs
+│   ├── ServiceManagerTests.cs
+│   └── ShownTabTrackerTests.cs       # ShownTabTracker (menu OnShown notifications).
 ├── GLMod.TestHarness/                # E2E test plugin, see §11.5. Never shipped.
 │   ├── GLMod.TestHarness.csproj
 │   ├── run-e2e.ps1                   # Launches 4 instances and prints the summary.
@@ -639,6 +640,7 @@ GLMod/                                # Repo root
     │   ├── StatsMenuTab.cs
     │   ├── LastGameMenuTab.cs
     │   ├── SessionsMenuTab.cs
+    │   ├── ShownTabTracker.cs        # Pure: when to notify OnShown (tab or account change).
     │   └── RemoteData.cs             # Cached API data of a tab.
     ├── Resources/
     │   ├── goodloss-logo.png         # Good Loss logo (EmbeddedResource, menu header).
