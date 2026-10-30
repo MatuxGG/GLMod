@@ -33,6 +33,15 @@ namespace GLMod.TestHarness
                 return;
             }
 
+            if (context == null && BetaPlay.IsRequested)
+            {
+                // Only this patch: the others are for the scenarios (one even skips a call of the game).
+                BetaPlay.Init(Log);
+                Harmony.PatchAll(typeof(BetaPlayMainMenuPatch));
+                Log.LogInfo("[GLModTest] Playing on the beta server");
+                return;
+            }
+
             if (context == null)
             {
                 Log.LogInfo($"[GLModTest] Inactive ({HarnessConstants.ENV_INSTANCE} not set)");

@@ -264,6 +264,7 @@ namespace GLMod.TestHarness
             if (_finished) yield break;
 
             SetPhase("plugin:ban-rejoin");
+            if (!Try($"select the server region '{_context.Region}'", SelectRegion)) yield break;
             if (!Try("try to join after the ban", () => JoinOnlineGame(lobby.GameId))) yield break;
             yield return WaitForQuiet(IsInLobby, HarnessConstants.PLUGIN_SILENCE_DELAY * 3);
             Check(!IsInLobby(), "joined again after #ban");
@@ -276,6 +277,8 @@ namespace GLMod.TestHarness
             yield return new WaitForSeconds(HarnessConstants.CLIENT_JOIN_STAGGER);
             for (int attempt = 1; attempt <= HarnessConstants.JOIN_MAX_ATTEMPTS; attempt++)
             {
+                // Among Us Ranked imposes its prod region each time the main menu loads.
+                if (!Try($"select the server region '{_context.Region}'", SelectRegion)) yield break;
                 HarnessLog.Info($"Joining {lobby.Code} (attempt {attempt}/{HarnessConstants.JOIN_MAX_ATTEMPTS})");
                 if (!Try("join the online game", () => JoinOnlineGame(lobby.GameId))) yield break;
                 yield return WaitFor("joined lobby", IsInLobby, HarnessConstants.CONNECT_TIMEOUT, required: false);

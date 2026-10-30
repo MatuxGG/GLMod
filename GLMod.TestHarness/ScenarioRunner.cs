@@ -717,10 +717,7 @@ namespace GLMod.TestHarness
             if (_context.Region == HarnessConstants.BETA_REGION)
             {
                 // Not in the regions of the game. Set directly: AddOrUpdateRegion would save it in the regionInfo.json of the player.
-                var serverInfos = new Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray<ServerInfo>(1);
-                serverInfos[0] = new ServerInfo(HarnessConstants.BETA_REGION, HarnessConstants.BETA_HOST, HarnessConstants.BETA_PORT, false);
-                var beta = new StaticHttpRegionInfo(HarnessConstants.BETA_REGION, StringNames.NoTranslation, HarnessConstants.BETA_HOST, serverInfos);
-                servers.CurrentRegion = beta.Cast<IRegionInfo>();
+                servers.CurrentRegion = BetaPlay.BuildRegion();
                 servers.ReselectServer();
                 HarnessLog.Info($"Region {HarnessConstants.BETA_REGION} built and selected");
                 return;

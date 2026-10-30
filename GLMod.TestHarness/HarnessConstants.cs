@@ -13,6 +13,7 @@ namespace GLMod.TestHarness
         public const string ENV_MAP_ID = "GLMOD_TEST_MAP_ID";
         public const string ENV_SCENARIO = "GLMOD_TEST_SCENARIO";
         public const string ENV_REGION = "GLMOD_TEST_REGION";
+        public const string ENV_PLAY_BETA = "GLMOD_PLAY_BETA";
 
         // Server region selected by every instance (a custom one: official servers are refused)
         public const string DEFAULT_REGION = "Ranked EU";
@@ -21,6 +22,7 @@ namespace GLMod.TestHarness
         public const string BETA_REGION = "Beta Ranked EU";
         public const string BETA_HOST = "betaranked.goodloss.fr";
         public const ushort BETA_PORT = 443;
+        public const float PLAY_BETA_CHECK_DELAY = 5f;
 
         // Scenarios (ENV_SCENARIO): the 2-game session, the movement game, or the checks of GLPlugin in a lobby
         public const string SCENARIO_SESSION = "session";
