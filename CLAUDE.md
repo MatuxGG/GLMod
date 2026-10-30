@@ -179,7 +179,7 @@ Every service is exposed statically via the main `GLMod` class and has a dedicat
 - **Methods**:
   - Coroutines: `GetApiData`, `GetChecksum`, `VerifyDll`, `VerifyGLMod`.
   - Async: `GetApiDataAsync`, `GetChecksumAsync`, `VerifyDllAsync`, `VerifyGLModAsync`.
-- **Third-party use**: Among Us Ranked calls `VerifyDllAsync("glmod", "BepInEx\plugins\GLMod.dll")` at startup and **quits the game** (integrity error, `Application.Quit`) when the hash differs, which is always the case for a locally built GLMod.
+- **Third-party use**: older Among Us Ranked clients call `VerifyDllAsync("glmod", "BepInEx\plugins\GLMod.dll")` at startup and **quit the game** (integrity error, `Application.Quit`) when the hash differs, which is always the case for a locally built GLMod. Client 2.2.3 still contains this `DllHashVerifier` but nothing calls it: no checksum is needed.
 
 ### 3.7 `IConfigurationService` — [Interfaces/IConfigurationService.cs](GLMod/Services/Interfaces/IConfigurationService.cs)
 - **Role**: determine the host mod name.
