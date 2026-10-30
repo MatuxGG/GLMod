@@ -54,6 +54,8 @@ GLMod automatically collects and synchronizes (free play games are never collect
 - Custom role actions and events
 - Player ranks and achievements
 
+When you are logged in, GLMod also tells Good Loss where you are, about every 15 seconds, for the friends list: in the menu, in a lobby or in a game, the server and its region, the mod, your in-game name and your client identifier. The code of your game is only sent on the servers run by Good Loss. Your friends see your status, and the players of your room who use GLMod see your Good Loss account name. See the [privacy policy](https://goodloss.fr/privacy).
+
 # Downloads
 
 | Among Us - Version | Link |

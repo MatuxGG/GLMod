@@ -440,6 +440,17 @@ GLMod does collect the following data:
 - Tasks completed dead
 - Total tasks to complete
 
+### <ins>Presence data</ins>
+
+Sent about every 15 seconds when the player is logged in, for the friends list. Nothing is sent if your mod hides the menu or removes the Friends tab.
+
+- State : menu / lobby / game
+- Server and its region
+- Mod used
+- Name
+- Client identifier in the game
+- Code of the game (only on the servers run by Good Loss)
+
 ### <ins>Actions data</ins>
 
 - Source
