@@ -25,6 +25,7 @@ namespace GLMod.Menu
         public static Color MutedText => Theme.MutedText;
         public static readonly Color Success = Rgb(0x22C55E);
         public static readonly Color Danger = Rgb(0xEF4444);
+        public static readonly Color Warning = Rgb(0xF59E0B);
 
         internal static Color AccentLight => Theme.AccentLight;
         internal static Color OnAccent => Theme.OnAccent;

@@ -42,7 +42,7 @@ Any code review MUST reject contributions that introduce non-English identifiers
 
 ### 1.1 Identity
 - **Name**: GLMod (Good Loss Mod)
-- **Current version**: `5.8.0` (see [GLMod/GLMod.csproj](GLMod/GLMod.csproj) and [GLMod/GLMod.cs](GLMod/GLMod.cs))
+- **Current version**: `5.9.0` (see [GLMod/GLMod.csproj](GLMod/GLMod.csproj) and [GLMod/GLMod.cs](GLMod/GLMod.cs))
 - **BepInEx plugin Id**: `glmod`
 - **Author**: Matux
 - **License**: GNU GPLv3
@@ -95,7 +95,7 @@ GLMod follows a **service-oriented architecture** with:
 4. `VerifyStartupServices()` — logs the status of each service.
 5. `ConfigureDefaultSettings()` — enables the default services (see §3.3).
 6. `CoroutineRunner.Init()` — creates a persistent `DontDestroyOnLoad` GameObject to run coroutines from outside `MonoBehaviour`s.
-7. `InitializeMenu()` — registers the built-in menu tabs (Account, Stats, Last game, Sessions) and attaches `MenuBehaviour` through `BasePlugin.AddComponent` (see §8.1).
+7. `InitializeMenu()` — registers the built-in menu tabs (Account, Friends, Stats, Last game, Sessions) and attaches `MenuBehaviour` through `BasePlugin.AddComponent` (see §8.1).
 8. `Harmony.PatchAll()` — applies all Harmony patches from the `GLMod.EventPatch` namespace.
 
 ### 2.3 Service dependency graph
@@ -113,6 +113,7 @@ MenuService               ← (none)
 PlayerService             ← Logger, apiEndpoint
 TranslationService        ← Logger, language provider (GameLanguage.CurrentCode)
 RoomTicketService         ← Logger, AuthService, apiEndpoint
+FriendsService            ← Logger, AuthService, MenuService, apiEndpoint
 ```
 
 ### 2.4 Coroutines & async
@@ -240,6 +241,16 @@ Every service is exposed statically via the main `GLMod` class and has a dedicat
 - **Members**: `RoomCode`, `Ticket` (null when there is no valid one; never log it), `Reload()`, `KeepFresh()`.
 - **Deployment order**: a GLMod without the endpoint just logs `HTTP 404` and connects without ticket; a player without ticket plays normally with a code from the word lists.
 
+### 3.14 `IFriendsService` — [Interfaces/IFriendsService.cs](GLMod/Services/Interfaces/IFriendsService.cs)
+- **Role**: friends list of the Good Loss account, in the F2 menu (§8.1). One list per account, stored on the site (`/account` manages it too); the TCG will read it later.
+- **Identity in a room**: the game only knows declared names. Each GLMod declares `POST {API}/friends/sync` with its Bearer game token (state `menu` / `lobby` / `game`, region, server, mod, `gameCode`, `clientId`, `playerName`, [GamePresence.cs](GLMod/Class/GamePresence.cs)); the site answers the accounts of the room, matched by the tab with `PlayerControl.OwnerId`. A player can only declare themselves, unlike with an RPC. A player without GLMod shows as "no account".
+- **Game codes** only leave for `GOOD_LOSS_PRESENCE_SERVERS` (also enforced by the site): elsewhere there is no room list and no Join, friends only see the status and the name of the server.
+- **Sync**: `KeepInSync()` every `FRIENDS_SYNC_SECONDS` (started by the first login on the main menu), so requests and statuses take 10 to 15 s to arrive: the site has no WebSocket. Nothing is declared while the menu is hidden by a mod or the tab removed. An API without the endpoints answers 404: asked again every `FRIENDS_UNAVAILABLE_RETRY_SECONDS`.
+- **Rules** (on the site, `FriendService`): a request needs the same room or a game in common among the last 20; acceptance required; silent refusal, 24 h before a new request; blocked and "refuse every request" both answer `unavailable`; requests expire after 30 days; 100 friends max.
+- **Join**: `Join(friend)` needs `friend.canJoin` (friend in a lobby, same server and mod, the site gives the code only then; it is never displayed). Leaves the current game like the Leave button, waits for the main menu, checks the region, joins.
+- **During a game**: only the count on the chip of the menu changes. Request notifications wait for the lobby ([FriendNotificationQueue.cs](GLMod/Class/FriendNotificationQueue.cs)), connection alerts are dropped.
+- **Members**: `State`, `PendingRequestCount`, `IsAvailable`, `RecentPlayers`, `Notifications`, `Sync()`, `KeepInSync()`, `ReloadRecentPlayers()`, `SendRequest`, `Answer`, `Remove`, `SetBlocked`, `UpdateSettings`, `Join`. Errors of the actions are API codes, shown through `friends.error.<code>`.
+
 ## 4. Domain entities (`GLMod/GLEntities/`)
 
 | Class           | Role                                                          |
@@ -259,6 +270,10 @@ Every service is exposed statically via the main `GLMod` class and has a dedicat
 | `GLPlayerRanks` / `GLPlayerRank` | `GET /player/ranks`: username + ranks (mod, season, name, image URL, elo, rp, position, leaderboardUrl; numbers nullable). |
 | `GLPlayerStats` / `GLWinStats` / `GLWinCount` | `GET /player/stats`: username, mod / season filters, wins and games in total (`games`) and per team (`crewmate`, `impostor`, `neutral`). |
 | `GLRoomTicket` | `POST /user/room-ticket`: ticket (signed by the site, never logged), roomCode (nullable), expiresAt (Unix s). |
+| `GLFriendsState` | `POST /friends/sync`: friends, incoming, outgoing, room, blocked, settings. |
+| `GLFriend` | A friend: userId, username, playerName, status (`FRIEND_STATUS_*`), region, canJoin, gameCode (only when canJoin, never displayed), lastSeen (nullable). |
+| `GLFriendRequest` / `GLRoomAccount` / `GLBlockedPlayer` / `GLFriendSettings` | Request (requestId, userId, username, playerName), account in the room (clientId, userId, username, playerName, isFriend, requested), blocked player, settings (refuseRequests, appearOffline, onlineAlert). |
+| `GLRecentPlayers` / `GLRecentPlayer` | `POST /friends/recent`: accounts met in the last games (userId, username, playerName, isFriend). |
 
 > **Note**: every numeric property transiting through the API is **encoded as `string`** (`tasks = "0"`, `ranked = "1"`, etc.). This convention matches the Good Loss API protocol and **must not be changed** without coordination with the API team. `GLGameHistoryEntry` is local-only and uses plain `long` / `bool`. The `/player/sessions` and `/player/last-game` responses are real JSON numbers / booleans / nulls: their entities mirror them (`long`, `int?`, `double?`, `bool?`) and their property names match the JSON keys exactly (camelCase, System.Text.Json is case-sensitive).
 
@@ -334,6 +349,15 @@ Reactor, Coms, Lights, O2
 | `ROOM_TICKET_REFRESH_SECONDS` | `120f` — between two reloads of the ticket, outside of a game |
 | `ROOM_TICKET_POLL_SECONDS`    | `2f` — between two checks of whether it must be reloaded |
 | `ROOM_TICKET_EXPIRY_MARGIN_SECONDS` | `30` — a ticket closer than this to its expiry is not sent |
+| `MENU_TAB_FRIENDS`            | `glmod.friends` — id of the built-in Friends tab |
+| `API_PATH_FRIENDS_*`          | `/friends/sync`, `/friends/recent`, `/friends/request`, `/friends/answer`, `/friends/remove`, `/friends/block`, `/friends/settings` |
+| `GOOD_LOSS_PRESENCE_SERVERS`  | `impranked.goodloss.fr`, `betaranked.goodloss.fr`, `imp.goodloss.fr` — servers whose game codes may reach the site (same list as the site) |
+| `PRESENCE_STATE_*` / `FRIEND_STATUS_*` | `menu`, `lobby`, `game` / `offline`, `online`, `lobby`, `game`, `room` |
+| `FRIENDS_SYNC_SECONDS`        | `15f` — between two syncs of the friends list |
+| `FRIENDS_UNAVAILABLE_RETRY_SECONDS` | `300f` — before asking again an API without the friends endpoints |
+| `FRIEND_NOTIFICATION_SECONDS` | `6f` — a friend notification on screen |
+| `FRIEND_JOIN_LEAVE_TIMEOUT`   | `20f` — wait to be back at the main menu before joining a friend |
+| `SCENE_MAIN_MENU` / `SCENE_ONLINE_GAME` | `MainMenu` / `OnlineGame` — scenes of the game, to join an online game by code |
 | `MENU_TAB_ACCOUNT` / `MENU_TAB_STATS` / `MENU_TAB_LAST_GAME` / `MENU_TAB_SESSIONS` | `glmod.account` / `glmod.stats` / `glmod.lastgame` / `glmod.sessions` — ids of the built-in menu tabs (public, for mods) |
 | `MENU_REFRESH_SECONDS`        | `60` — a tab reloads its API data when shown after this delay |
 | `MENU_RETRY_SECONDS`          | `10` — delay before retrying a failed API load |
@@ -399,6 +423,9 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 | `PositionSimplifier.cs` | Pure, unit-tested: online trajectory simplification (opening window). A sample is dropped when the linear interpolation **in time** between the sent positions (how the site draws a player) stays within `POSITION_SIMPLIFY_TOLERANCE` of every dropped sample; at most `POSITION_MAX_GAP_MS` between two sent positions. Turns, stops and teleports keep their samples. |
 | `GoodLossServers.cs`   | `IsGoodLossServer(pingServer)` (pure) and `IsCurrentRegion()`: the servers that receive the room ticket. |
 | `RoomTicketFooter.cs`  | Pure, unit-tested: `Append(data, ticket)` = data + ticket + length (2 bytes LE) + `GLMT`. GLPlugin reads it from the end. |
+| `FriendsLogic.cs`      | Pure, unit-tested: `DisplayName` ("Account (in-game name)", the account alone when the name is unknown or the same), order of the list, friends just online, new requests, "seen X ago". |
+| `FriendNotificationQueue.cs` | Pure, unit-tested: notifications shown one at a time, none during a game. |
+| `GamePresence.cs`      | What is declared to the site: state, region, server, game code (Good Loss servers only), client id, in-game name. Main thread only. |
 | `VanillaEvents.cs`     | Default implementations (`startGameVanilla`, `endGameVanilla`…) used when the matching `ServiceType` is enabled. |
 
 ### 8.1 Good Loss menu (`GLMod/Menu/`, namespace `GLMod.Menu`)
@@ -428,6 +455,8 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 
 API tabs load through `RemoteData<T>` (internal): cache per account **and API theme** (the current `MenuUI.Theme.ApiTheme` is sent with every request), reload when shown after `MENU_REFRESH_SECONDS` (`MENU_RETRY_SECONDS` after an error), Loading / Offline / Unavailable states; the Unavailable state has a **Retry** button (forced reload). A live session (no end) shows its duration up to now.
 
+- **Friends tab** (`FriendsMenuTab`, second tab, title with the number of pending requests): requests received (Accept / Refuse), friends (in my room, in a lobby + server + **Join**, online, in a game + server, offline + "seen X ago"; Remove, Block), players of the room (Add, or their state: friend, request sent, request received, no account), players of the last games not in the room (Add), blocked players (Unblock), settings (refuse requests, appear offline, connection alert). Names are `Account (in-game name)`. Rows with 3 buttons put them on a line of their own, so the name is never cut.
+- **Chip and notifications**: the chip shows the number of pending requests in a small pill, also during a game. Above it, outside of a game and when the menu is closed, a 6 s notification for a request received or a friend coming online.
 - **Translations**: every text of the menu comes from `ITranslationService` (§3.12) and follows the game language, English otherwise.
 - **Mods built on GLMod**: from their `Load()` (GLMod is loaded first, its built-in tabs already registered) or later, they can hide the menu, remove built-in tabs by id and add / insert their own tabs (§3.10); documented in `docs/dev.MD`. The Last game tab does not poll after a game when the menu is disabled or the tab was removed.
 
@@ -458,6 +487,13 @@ Base: `https://goodloss.fr/api` (production). It can be overridden at startup wi
 | `/user/login`                  | POST   | AuthService       | Steam login: `steamTicket` → JSON game token (§3.1). |
 | `/user/steamownerships`        | POST   | ItemService       | Steam DLC ownerships of the account (Bearer game token). |
 | `/user/room-ticket`            | POST   | RoomTicketService | Signed ticket of the player for the Good Loss game servers, and the room code of the account (Bearer game token). |
+| `/friends/sync`                | POST   | FriendsService    | Declares the presence, answers the friends, requests, room, blocked players and settings (Bearer game token). |
+| `/friends/recent`              | POST   | FriendsService    | Accounts met in the last games. |
+| `/friends/request`             | POST   | FriendsService    | Sends a friend request (`userId`). |
+| `/friends/answer`              | POST   | FriendsService    | Accepts or refuses a request (`requestId`, `accept`). |
+| `/friends/remove`              | POST   | FriendsService    | Removes a friend (`userId`). |
+| `/friends/block`               | POST   | FriendsService    | Blocks or unblocks a player (`userId`, `blocked`). |
+| `/friends/settings`            | POST   | FriendsService    | Changes the settings (`refuseRequests`, `appearOffline`, `onlineAlert`). |
 | `/data`                        | POST   | IntegrityService  | Generic data lookup by id; `checksum_*` ids hold DLL checksums (§3.6). |
 | `/game/start`                  | POST   | GameStateManager  | Sends a new match.                     |
 | `/game/addMyPlayer`            | POST   | GameStateManager  | Registers the local player (Bearer game token). |
@@ -523,6 +559,7 @@ Base: `https://goodloss.fr/api` (production). It can be overridden at startup wi
 - Local history: the script moves the player's `BepInEx/config/glmod-history.json` aside for the run (`glmod-history.before-run.json` in the output folder) and puts it back at the end; the run's history is kept as `glmod-history.json` in the output folder.
 - Multi-instance workarounds: 4 Unity instances on one machine stall for seconds on heavy frames (map load, meeting open) and vanilla Hazel timeouts then drop the client (`ReliablePacketWithoutResponse`): the harness raises `DisconnectTimeoutMs` / `MissingPingsUntilDisconnect` on the client connection. Clients must load the map within a hard-coded 10s (`AmongUsClient.MAX_CLIENT_WAIT_SECONDS` is a native constant: **writing it crashes the game**), so each instance caps its frame rate (20 fps) and sets `Application.backgroundLoadingPriority = High`. It also skips `CosmeticsCache.ClearUnusedCosmetics`, which intermittently throws inside `AmongUsClient.CoStartGame` in multi-instance runs (the client then never becomes ready and is kicked).
 - Output: `GLMod.TestHarness/output/<date>-<runId>/` (gitignored) — `lobby-N.json`, `plan-N.json`, `result-N.json` (per-game results), `instance-N.log`, `player-N.log` (Unity log of each instance, via `-logFile`), copied BepInEx logs.
+- Beta server: `SPAWN_TIMEOUT=10000` in its `deploy/.env`. Impostor kicks a host that has not spawned after this delay (`spawn timed out` in the server log). 4 instances on one PC easily exceed the 2.5 s of prod, more so with Among Us Ranked, which removes the frame rate cap at each main menu (the harness caps it again before creating a game).
 - Plugin scenario (`-Scenario Plugin`, no game, region `Beta Ranked EU` by default, `signal-*.txt` for the coordination) — checks [GLPlugin](https://gitlab.goodloss.fr/good-loss/among-us/GLPlugin) on the beta server. The harness builds the region itself (`CurrentRegion` set directly: `AddOrUpdateRegion` would save it in the `regionInfo.json` of the player) and the local account needs a room code on `/account` of the preprod site:
   - instance 0 (host): its game has the room code of the account; welcome message (contains the region name); `#help` lists `#kick` and `#ban`; `#kick` of the victim and of an unknown player; `#ban` of the victim;
   - instance 1: creates a game while the code is taken (it must get another one), leaves, joins the host; `#help` without the host commands, `#code` gives the code, `#room` no longer answers, `#kick` is refused;
@@ -531,6 +568,7 @@ Base: `https://goodloss.fr/api` (production). It can be overridden at startup wi
   - `panel-host.png` / `panel-second-creator.png` in the output: the header of the F2 panel (room code, code of the account), to check by eye (IMGUI text cannot be read back);
   - answers are read in `ChatController.AddChat` and compared on what is not translated (command names, codes): [PluginChecks.cs](GLMod.TestHarness/PluginChecks.cs).
 - Playing by hand on the beta server: `powershell -ExecutionPolicy Bypass -File GLMod.TestHarness/play-beta.ps1` (preprod API, other plugins kept, harness installed for the time of the game, [BetaPlay.cs](GLMod.TestHarness/BetaPlay.cs)). The region is only set in memory, `regionInfo.json` does not change. A game launched from Steam stays on the prod API and on the region of the mod: **every player of a beta game must use this script**, otherwise joining gives `GameNotFound` (the code is looked up on Ranked EU). `run-e2e.ps1 -Scenario Plugin -KeepOtherPlugins` runs the scenario with the real Among Us Ranked client.
+- Friends scenario (`-Scenario Friends`, no played game, region `Beta Ranked EU` by default) — the instances share one Steam account and one cannot be friend with oneself, so the script gets 4 accounts of **preprod** from `app:e2e:friend-accounts` (over SSH through the bastion, the command resets them and only exists in the dev environment; `friend-accounts.json` in the output is deleted at the end of the run), and each instance logs in with its token. A (host) asks B, who accepts; asks C, who refuses (silent, then `recently_refused`); asks D, who refuses everything then blocks (`unavailable` both times). B leaves (A sees it online), opens its own lobby (A sees it in a lobby, can join), appears offline (A sees nothing more), then comes back with the real `Join` action, from its lobby. A starts a game: C sends a request during it (count updated, no notification, `chip-badge-in-game.png`), and B, gone to the menu, sees A in a game without Join. A removes B. Screenshots `friends-room.png`, `friends-request.png`, `notification-request.png`, `friends-join.png` to check by eye. With `-KeepOtherPlugins`, runs with the real Among Us Ranked client.
 - Not covered: disconnections (relaunching clients is too slow), roles, impostor wins by sabotage, shield T1.
 
 ### 11.3 Release
@@ -568,6 +606,7 @@ GLMod/                                # Repo root
 │   ├── MovementTests.cs              # NavGrid, PositionAccuracy, ScenarioVerifier.VerifyPositions.
 │   ├── PositionSimplifierTests.cs    # PositionSimplifier.
 │   ├── RoomTicketTests.cs            # RoomTicketFooter, GoodLossServers, ticket answer, PluginChecks.
+│   ├── FriendsTests.cs               # FriendsLogic, FriendNotificationQueue, friends answers, presence servers.
 │   ├── RankedModTests.cs             # RankedMod (theme selection).
 │   ├── TranslationTests.cs           # TranslationTable, GameLanguage, embedded translation files.
 │   ├── ScenarioTests.cs              # ScenarioPlan / ScenarioVerifier (E2E harness logic).
@@ -590,6 +629,7 @@ GLMod/                                # Repo root
 │   ├── ScenarioPlan.cs               # Pure logic.
 │   ├── ScenarioRunner.cs             # In-game coroutine driving the scenario.
 │   ├── ScenarioRunner.Plugin.cs      # Plugin scenario (checks of GLPlugin in a lobby).
+│   ├── ScenarioRunner.Friends.cs     # Friends scenario (4 preprod accounts).
 │   ├── PluginChecks.cs               # Pure logic: answers of GLPlugin.
 │   └── ScenarioVerifier.cs           # Pure logic.
 └── GLMod/                            # C# project.
@@ -605,6 +645,9 @@ GLMod/                                # Repo root
     │   ├── LoginResponse.cs          # Pure login helpers (ticket hex, login answers).
     │   ├── GoodLossServers.cs        # The Good Loss game servers (room ticket).
     │   ├── RoomTicketFooter.cs       # Pure: room ticket at the end of the connection data.
+    │   ├── FriendsLogic.cs           # Pure logic of the friends list.
+    │   ├── FriendNotificationQueue.cs # Pure: friend notifications.
+    │   ├── GamePresence.cs           # Presence declared to the site (IL2CPP).
     │   ├── PlayerApiResponse.cs      # Pure parsing of the /player/* GET responses.
     │   ├── PlayerApiQuery.cs         # Pure URL builder of the /player/* GET requests.
     │   ├── HttpHelper.cs
@@ -645,6 +688,14 @@ GLMod/                                # Repo root
     │   ├── GLGameHistoryEntry.cs     # Local history entry (not an API DTO).
     │   ├── GLLoginResponse.cs        # POST /user/login answer to a Steam ticket.
     │   ├── GLRoomTicket.cs           # POST /user/room-ticket answer.
+    │   ├── GLFriendsState.cs         # POST /friends/sync answer…
+    │   ├── GLFriend.cs               # …a friend…
+    │   ├── GLFriendRequest.cs        # …a request…
+    │   ├── GLRoomAccount.cs          # …an account in the room…
+    │   ├── GLBlockedPlayer.cs        # …a blocked player…
+    │   ├── GLFriendSettings.cs       # …the settings.
+    │   ├── GLRecentPlayers.cs        # POST /friends/recent answer…
+    │   ├── GLRecentPlayer.cs         # …an account met recently.
     │   ├── GLLastGame.cs             # GET /player/last-game response…
     │   ├── GLLastGameInfo.cs         # …its game part…
     │   ├── GLLastGamePlayer.cs       # …and its player stats.
@@ -667,6 +718,7 @@ GLMod/                                # Repo root
     │   ├── MenuUI.cs                 # Public IMGUI widgets + palette.
     │   ├── MenuBehaviour.cs          # IL2CPP MonoBehaviour: input, animation, drawing.
     │   ├── AccountMenuTab.cs
+    │   ├── FriendsMenuTab.cs
     │   ├── StatsMenuTab.cs
     │   ├── LastGameMenuTab.cs
     │   ├── SessionsMenuTab.cs
@@ -695,6 +747,7 @@ GLMod/                                # Repo root
         │   ├── IServiceManager.cs
         │   └── ITranslationService.cs
         │   ├── IRoomTicketService.cs
+        │   ├── IFriendsService.cs
         └── Implementations/          # ONE file per implementation, same name without "I".
             ├── AuthenticationService.cs
             ├── ConfigurationService.cs
@@ -709,6 +762,7 @@ GLMod/                                # Repo root
             ├── ServiceManager.cs
             └── TranslationService.cs
             ├── RoomTicketService.cs
+            ├── FriendsService.cs
 ```
 
 ### 12.1 Structure rules (NON-NEGOTIABLE)
@@ -779,6 +833,9 @@ A third-party mod consumes GLMod by:
 - Name (PseudoInGame), Good Loss account (if connected), Role, Team (`Crewmate` / `Impostor` / `Neutral` / other), Tasks alive, Tasks dead, Tasks max, Win (0/1), Color, Positions.
 - **Positions** (`x`, `y` rounded to 0.01, `triggerTime` from `ServerClock`, `turn`): alive players are sampled every `POSITION_SAMPLING_INTERVAL` (0.1 s; 0.5 s before 5.7.1) outside meetings, and only the samples needed to redraw the path within `POSITION_SIMPLIFY_TOLERANCE` are sent (`PositionSimplifier`), plus one at least every `POSITION_MAX_GAP_MS`. Positions at a kill (killer and victim), a report / emergency (caller) and the start of a meeting (alive players) are always sent. The site interpolates linearly in time between two positions: that is the contract the simplification relies on.
 
+### 14.2b Friends
+- Friendships, requests, blocks and settings of the Good Loss account, on the site. Presence: state (menu, lobby, game), selected region and its server, mod, client id, in-game name, time of the last sync; one row per account, replaced at each sync. **The game code is only sent for the Good Loss servers.** Part of the data export of `/account`. Friends see the status, the server, and the last connection unless the player appears offline.
+
 ### 14.3 Actions
 - `source`, `target`, `action`, `turn`, `triggerTimeMs`.
 - Default vanilla actions: **kills, exiles, reports, emergencies, votes, shapeshifts, unshapeshifts, tracks, untracks, shields**.
@@ -796,6 +853,7 @@ A third-party mod consumes GLMod by:
 - **Local history**: `glmod-history.json` stays on the player's computer; it is never uploaded.
 - **Menu**: never shows information that would help during a game (roles, teams, shield T1, other players' positions). The history only shows the local player's role once the game is over. The token is never displayed.
 - **Room ticket**: sent only to the Good Loss game servers (`GOOD_LOSS_GAME_SERVERS`, checked on the ping server of the selected region), never to the official servers nor to the servers of other mods. It travels unencrypted (no DTLS on these servers): it proves an account to them for 15 minutes and gives no access to anything else. The game token never leaves the API. Never log the ticket.
+- **Friends**: a friend only receives a game code when they can join with it, and it is never displayed. Identity in a room comes from the game token of each player, never from what another client says. The menu shows no information helping during a game: a friend "in a game" only tells that.
 
 ---
 
@@ -845,5 +903,5 @@ For every change to the project:
 
 ---
 
-*Last updated: 2026-10-30 — GLMod version 5.8.0.*
+*Last updated: 2026-10-30 — GLMod version 5.9.0.*
 *Every change to the project must be accompanied by an update of this file.*

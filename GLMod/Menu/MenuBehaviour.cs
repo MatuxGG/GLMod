@@ -166,6 +166,7 @@ namespace GLMod.Menu
                 MenuUI.EnsureStyles(Mathf.Max(MinScale, Screen.height / ReferenceHeight));
                 MenuUI.ApplyTheme(MenuTheme.ForMod(GLMod.ConfigService?.ModName));
                 DrawChip(menu);
+                DrawFriendNotification();
                 if (_slide > 0f)
                 {
                     DrawPanel(menu);
@@ -242,7 +243,11 @@ namespace GLMod.Menu
             float keyWidth = MenuUI.KeycapStyle.CalcSize(new GUIContent(key)).x + MenuUI.U(8f);
             float height = MenuUI.U(ChipHeight);
             float textX = MenuUI.U(16f);
-            float baseWidth = textX + textWidth + MenuUI.U(9f);
+            // Discreet count of the friend requests waiting, also during a game
+            int pending = GLMod.FriendsService?.PendingRequestCount ?? 0;
+            string badge = pending > 0 ? pending.ToString() : null;
+            float badgeWidth = badge == null ? 0f : MenuUI.KeycapStyle.CalcSize(new GUIContent(badge)).x + MenuUI.U(10f);
+            float baseWidth = textX + textWidth + MenuUI.U(9f) + (badge == null ? 0f : badgeWidth + MenuUI.U(5f));
 
             // Hover: the chip lights up and widens to reveal the key
             bool hover = _chipRect.Contains(Event.current.mousePosition);
@@ -271,9 +276,17 @@ namespace GLMod.Menu
             MenuUI.DrawRect(bar, MenuUI.WithAlpha(MenuUI.Accent, 0.6f + 0.4f * breath), MenuUI.Corner.None);
 
             MenuUI.DrawText(new Rect(rect.x + textX, rect.y, textWidth + u, rect.height), text, MenuUI.ChipStyle, MenuUI.Text);
+            float afterText = textX + textWidth + MenuUI.U(6f);
+            if (badge != null)
+            {
+                var pill = new Rect(rect.x + afterText, rect.y + MenuUI.U(4f), badgeWidth, rect.height - MenuUI.U(8f));
+                MenuUI.DrawRect(pill, MenuUI.Accent, MenuUI.Corner.Small);
+                MenuUI.DrawText(pill, badge, MenuUI.KeycapStyle, MenuUI.OnAccent, TextAnchor.MiddleCenter);
+                afterText += badgeWidth + MenuUI.U(5f);
+            }
             if (_chipHover > 0.3f)
             {
-                var keycap = new Rect(rect.x + textX + textWidth + MenuUI.U(6f), rect.y + MenuUI.U(4f), keyWidth, rect.height - MenuUI.U(8f));
+                var keycap = new Rect(rect.x + afterText, rect.y + MenuUI.U(4f), keyWidth, rect.height - MenuUI.U(8f));
                 DrawKeycap(keycap, key);
             }
 
@@ -281,6 +294,34 @@ namespace GLMod.Menu
             {
                 menu.Open();
             }
+        }
+
+        /// <summary>
+        /// Friend request received or friend online, above the chip. Nothing during a game: the requests wait for the lobby.
+        /// </summary>
+        private static void DrawFriendNotification()
+        {
+            if (GLMod.FriendsService == null || _slide > 0f)
+            {
+                return;
+            }
+
+            (string key, string name)? notification = GLMod.FriendsService.Notifications.Current(
+                Time.realtimeSinceStartup, GameConstants.FRIEND_NOTIFICATION_SECONDS, GamePresence.IsInGame());
+            if (!notification.HasValue)
+            {
+                return;
+            }
+
+            string text = GLMod.TranslationService.Get(notification.Value.key, notification.Value.name);
+            float width = MenuUI.RowStyle.CalcSize(new GUIContent(text)).x + MenuUI.U(28f);
+            float height = MenuUI.U(34f);
+            var rect = new Rect(MenuUI.U(ChipLeft), Screen.height - MenuUI.U(ChipHeight) - height - MenuUI.U(8f), width, height);
+
+            GUI.color = new Color { r = 1f, g = 1f, b = 1f, a = 1f };
+            MenuUI.DrawGlow(rect, MenuUI.WithAlpha(MenuUI.Accent, 0.3f));
+            MenuUI.DrawOutline(rect, MenuUI.WithAlpha(MenuUI.Accent, 0.6f), MenuUI.PanelBottom, MenuUI.Corner.Small);
+            MenuUI.DrawText(new Rect(rect.x + MenuUI.U(14f), rect.y, width - MenuUI.U(14f), height), text, MenuUI.RowStyle, MenuUI.Text);
         }
 
         // ------------------------------------------------------------------ panel

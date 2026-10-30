@@ -19,6 +19,15 @@ namespace GLMod.Class
         }
 
         /// <summary>
+        /// True for a server whose game codes may reach the site (friends: the room list and Join). Pure.
+        /// </summary>
+        public static bool IsPresenceServer(string pingServer)
+        {
+            return pingServer != null
+                && GameConstants.GOOD_LOSS_PRESENCE_SERVERS.Contains(pingServer.Trim(), StringComparer.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
         /// True when the region selected in the game is a Good Loss one. Must be called from the
         /// Unity main thread.
         /// </summary>

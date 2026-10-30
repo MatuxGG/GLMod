@@ -114,6 +114,15 @@ namespace GLMod.TestHarness
                 yield break;
             }
 
+            if (_context.Scenario == HarnessConstants.SCENARIO_FRIENDS)
+            {
+                yield return PlayFriendsScenario();
+                if (_finished) yield break;
+                SetPhase("done");
+                Finish();
+                yield break;
+            }
+
             SetPhase("connect");
             yield return ConnectToLobby();
             if (_finished) yield break;

@@ -175,6 +175,7 @@ namespace GLMod
                                 {
                                     _roomTicketLoopStarted = true;
                                     CoroutineRunner.Run(GLMod.RoomTicketService.KeepFresh());
+                                    CoroutineRunner.Run(GLMod.FriendsService.KeepInSync());
                                 }
 
                                 if (!GLMod.withUnityExplorer)

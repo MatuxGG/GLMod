@@ -13,6 +13,8 @@
        twice with a wait in between; the host compares the positions GLMod sent with the real ones.
        Plugin scenario: no game; checks GLPlugin on the beta server (room code of the account, a taken
        code, #help, #code, #kick, #ban, the code in the menu) in a lobby. Screenshots of the menu in the output.
+       Friends scenario: 4 test accounts of preprod in a lobby of the beta server: requests, refusals, blocks,
+       statuses, the Join action, requests during a game. Screenshots of the menu in the output.
     5. Waits for every instance to write result-N.json, then prints a summary.
     6. Stops the instances it launched and uninstalls the harness.
 
@@ -24,13 +26,15 @@
     ./GLMod.TestHarness/run-e2e.ps1 -Scenario Movement
 .EXAMPLE
     ./GLMod.TestHarness/run-e2e.ps1 -Scenario Plugin
+.EXAMPLE
+    ./GLMod.TestHarness/run-e2e.ps1 -Scenario Friends
 #>
 param(
-    [ValidateSet('Session', 'Movement', 'Plugin')]
+    [ValidateSet('Session', 'Movement', 'Plugin', 'Friends')]
     [string]$Scenario = 'Session',
     [int]$TimeoutSeconds = 960,
     # Server region every instance selects for the run (a custom one: official servers are refused).
-    # Default: 'Ranked EU', 'Beta Ranked EU' for the Plugin scenario.
+    # Default: 'Ranked EU', 'Beta Ranked EU' for the Plugin and Friends scenarios.
     [string]$Region = '',
     [string]$ApiEndpoint = 'https://preprod.goodloss.fr/api',
     # Mod name the games are recorded under (GLMod.ConfigService.SetModName); empty keeps GLMod's own (Vanilla)
@@ -47,7 +51,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-if (-not $Region) { $Region = if ($Scenario -eq 'Plugin') { 'Beta Ranked EU' } else { 'Ranked EU' } }
+if (-not $Region) { $Region = if ($Scenario -in 'Plugin', 'Friends') { 'Beta Ranked EU' } else { 'Ranked EU' } }
 
 $repo = Split-Path $PSScriptRoot -Parent
 $gameDir = Join-Path $repo 'Among Us'
@@ -127,6 +131,14 @@ $runId = [guid]::NewGuid().ToString('N').Substring(0, 8)
 $outputDir = Join-Path $PSScriptRoot ("output\{0}-{1}" -f (Get-Date -Format 'yyyyMMdd-HHmmss'), $runId)
 New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 
+# Friends scenario: game tokens of the preprod test accounts (reset by the command). Deleted at the end of the run.
+$accountsFile = Join-Path $outputDir 'friend-accounts.json'
+if ($Scenario -eq 'Friends') {
+    $accounts = ssh -o BatchMode=yes matux@bastion 'ssh -o BatchMode=yes preprod docker exec symfony_php php bin/console app:e2e:friend-accounts'
+    if ($LASTEXITCODE -ne 0 -or -not $accounts) { throw 'Could not get the test accounts from preprod' }
+    Set-Content -Path $accountsFile -Value ($accounts | Select-Object -Last 1) -Encoding Ascii
+}
+
 Copy-Item $harnessDll $installedHarness -Force
 Write-Host "==> Run $runId, scenario $Scenario, region '$Region', API $ApiEndpoint, mod '$ModName', map $Map, output: $outputDir"
 
@@ -173,6 +185,7 @@ try {
     $env:GLMOD_TEST_MAP_ID = $mapId
     $env:GLMOD_TEST_SCENARIO = $Scenario.ToLowerInvariant()
     $env:GLMOD_TEST_REGION = $Region
+    if ($Scenario -eq 'Friends') { $env:GLMOD_TEST_ACCOUNTS = $accountsFile }
     for ($i = 0; $i -lt $playerCount; $i++) {
         $env:GLMOD_TEST_INSTANCE = "$i"
         # Unity only writes the shared Player.log for one process: give each instance its own log
@@ -210,7 +223,7 @@ catch {
     throw
 }
 finally {
-    Remove-Item Env:GLMOD_TEST_INSTANCE, Env:GLMOD_TEST_RUN_ID, Env:GLMOD_TEST_OUTPUT, Env:GLMOD_API_ENDPOINT, Env:GLMOD_TEST_MOD_NAME, Env:GLMOD_TEST_MAP_ID, Env:GLMOD_TEST_SCENARIO, Env:GLMOD_TEST_REGION -ErrorAction SilentlyContinue
+    Remove-Item Env:GLMOD_TEST_INSTANCE, Env:GLMOD_TEST_RUN_ID, Env:GLMOD_TEST_OUTPUT, Env:GLMOD_API_ENDPOINT, Env:GLMOD_TEST_MOD_NAME, Env:GLMOD_TEST_MAP_ID, Env:GLMOD_TEST_SCENARIO, Env:GLMOD_TEST_REGION, Env:GLMOD_TEST_ACCOUNTS -ErrorAction SilentlyContinue
 }
 
 # Window tiling: a window is re-placed until it sits in its cell (Unity may resize it while loading),
@@ -255,6 +268,7 @@ finally {
     Restore-UnityScreenPrefs $savedScreenPrefs
     Restore-GameHistory
     Get-ChildItem $bepInExDir -Filter 'LogOutput*.log' | Copy-Item -Destination $outputDir -ErrorAction SilentlyContinue
+    Remove-Item $accountsFile -Force -ErrorAction SilentlyContinue
 }
 
 Write-Host ''

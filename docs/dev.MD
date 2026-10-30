@@ -231,6 +231,16 @@ string code = GLMod.RoomTicketService.RoomCode;
 
 The ticket behind it is only sent to the Good Loss game servers: your mod has no reason to read `Ticket`, and must never log it.
 
+### Friends Service (IFriendsService)
+Friends list of the Good Loss account, shown in the Friends tab of the menu (`GameConstants.MENU_TAB_FRIENDS`).
+
+```csharp
+GLFriendsState state = GLMod.FriendsService.State; // null before the first sync
+int waiting = GLMod.FriendsService.PendingRequestCount;
+```
+
+If your mod hides the menu (`MenuService.Enabled = false`) or removes this tab, GLMod declares nothing to Good Loss: no presence, no friends list.
+
 ## Service Architecture
 
 GLMod follows a clean architecture pattern with dependency injection and interface-based services. All services are accessible through static properties in the main `GLMod` class:

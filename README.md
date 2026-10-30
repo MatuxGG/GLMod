@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://github.com/MatuxGG/GLMod">
-    <img src="https://img.shields.io/badge/GLMod-v5.8.0-blue" alt="GLMod Version">
+    <img src="https://img.shields.io/badge/GLMod-v5.9.0-blue" alt="GLMod Version">
   </a>
   <a href="https://goodloss.fr/discord">
     <img src="https://img.shields.io/badge/Good%20Loss%20Discord%20Server-Join-7289DA?logo=discord&logoColor=white" alt="Good Loss Discord Server">
@@ -36,6 +36,7 @@ At rest, GLMod only shows a small "GOOD LOSS" tab at the bottom edge of the scre
 - **Left / right arrows** switch tabs, **up / down arrows** (or the mouse wheel) scroll the current tab.
 - **Header**: the code of the room you are in and, below it, your own room code on the Among Us Ranked servers. You choose it on your Good Loss account page: your games get it when it is free (whoever creates a game first gets a shared code).
 - **Account**: Good Loss connection status (connected account, not connected, banned with the reason) and your ranks: one badge per leaderboard with its points, your position and a link to the leaderboard.
+- **Friends**: your friends and where they are (in your room, in a lobby with a **Join** button, in a game, offline), the requests you received, and the players of your room and of your last games, to add them. They must accept. A small count on the tab at the bottom of the screen shows the requests waiting; nothing pops up during a game. Block a player, refuse every request, appear offline or choose to be told when a friend comes online. You can also manage your friends on your Good Loss account page.
 - **Stats**: your win rates, in total and as crewmate, impostor and neutral, like on your profile page.
 - **Last game**: your last finished game on Good Loss (victory or defeat, map, role) with a button to open its recap, and every stat Good Loss computed for you in it (kills, tasks, votes, reports, survival...). After a game, it updates by itself once Good Loss has processed the game.
 - **Sessions**: your last 10 sessions (date, number of games, duration, live session) with a link to each session page.

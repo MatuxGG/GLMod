@@ -27,7 +27,7 @@ namespace GLMod.TestHarness
         public bool IsHost => Instance == HarnessConstants.HOST_INSTANCE;
 
         /// <summary>The games played by the scenario, in order (ScenarioPlan game numbers).</summary>
-        public int[] GameNumbers => Scenario == HarnessConstants.SCENARIO_PLUGIN
+        public int[] GameNumbers => Scenario == HarnessConstants.SCENARIO_PLUGIN || Scenario == HarnessConstants.SCENARIO_FRIENDS
             ? new int[0]
             : Scenario == HarnessConstants.SCENARIO_MOVEMENT
                 ? new[] { ScenarioPlan.GAME_MOVEMENT }
@@ -104,9 +104,10 @@ namespace GLMod.TestHarness
             if (string.IsNullOrWhiteSpace(value)) return HarnessConstants.SCENARIO_SESSION;
 
             string scenario = value.Trim().ToLowerInvariant();
-            if (scenario != HarnessConstants.SCENARIO_SESSION && scenario != HarnessConstants.SCENARIO_MOVEMENT && scenario != HarnessConstants.SCENARIO_PLUGIN)
+            if (scenario != HarnessConstants.SCENARIO_SESSION && scenario != HarnessConstants.SCENARIO_MOVEMENT
+                && scenario != HarnessConstants.SCENARIO_PLUGIN && scenario != HarnessConstants.SCENARIO_FRIENDS)
             {
-                throw new InvalidOperationException($"{HarnessConstants.ENV_SCENARIO} must be '{HarnessConstants.SCENARIO_SESSION}', '{HarnessConstants.SCENARIO_MOVEMENT}' or '{HarnessConstants.SCENARIO_PLUGIN}', got '{value}'");
+                throw new InvalidOperationException($"{HarnessConstants.ENV_SCENARIO} must be '{HarnessConstants.SCENARIO_SESSION}', '{HarnessConstants.SCENARIO_MOVEMENT}', '{HarnessConstants.SCENARIO_PLUGIN}' or '{HarnessConstants.SCENARIO_FRIENDS}', got '{value}'");
             }
             return scenario;
         }

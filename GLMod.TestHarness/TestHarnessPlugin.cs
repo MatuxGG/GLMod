@@ -1,7 +1,12 @@
 using BepInEx;
 using BepInEx.Unity.IL2CPP;
+using GLMod.GLEntities;
+using GLMod.Services.Implementations;
 using HarmonyLib;
 using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Reflection;
 using GLModPlugin = global::GLMod.GLMod;
 
 namespace GLMod.TestHarness
@@ -58,8 +63,37 @@ namespace GLMod.TestHarness
                 HarnessLog.Info($"Mod name set to '{GLModPlugin.ConfigService.ModName}'");
             }
 
+            if (context.Scenario == HarnessConstants.SCENARIO_FRIENDS)
+            {
+                UseTestAccount(context);
+            }
+
+            // With Among Us Ranked (-KeepOtherPlugins), which imposes its prod region at each main menu
+            if (context.Region == HarnessConstants.BETA_REGION)
+            {
+                BetaPlay.Init(Log);
+            }
+
             ScenarioRunner.Init(context);
             Harmony.PatchAll();
+        }
+
+        /// <summary>
+        /// Friends scenario: the instances share one Steam account, and one cannot be friend with oneself.
+        /// Each one logs in with the token of a preprod test account: the login reuses a valid token
+        /// without asking Steam for a ticket.
+        /// </summary>
+        private static void UseTestAccount(HarnessContext context)
+        {
+            string path = Environment.GetEnvironmentVariable(HarnessConstants.ENV_ACCOUNTS);
+            HarnessAccount account = System.Text.Json.JsonSerializer.Deserialize<List<HarnessAccount>>(File.ReadAllText(path))[context.Instance];
+            typeof(AuthenticationService)
+                .GetMethod("SetGameTokenLogin", BindingFlags.NonPublic | BindingFlags.Instance)
+                .Invoke(GLModPlugin.AuthService, new object[]
+                {
+                    new GLLoginResponse { token = account.token, username = account.username, expiresAt = account.expiresAt },
+                });
+            HarnessLog.Info("Logged in as " + account.username);
         }
     }
 }

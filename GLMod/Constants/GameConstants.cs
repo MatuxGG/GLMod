@@ -243,5 +243,69 @@ namespace GLMod.Constants
         /// A room ticket closer than this to its expiry is not sent anymore.
         /// </summary>
         public const long ROOM_TICKET_EXPIRY_MARGIN_SECONDS = 30;
+
+        /// <summary>
+        /// Id of the built-in Friends tab of the menu.
+        /// </summary>
+        public const string MENU_TAB_FRIENDS = "glmod.friends";
+
+        /// <summary>
+        /// Friends endpoints.
+        /// </summary>
+        public const string API_PATH_FRIENDS_SYNC = "/friends/sync";
+        public const string API_PATH_FRIENDS_RECENT = "/friends/recent";
+        public const string API_PATH_FRIENDS_REQUEST = "/friends/request";
+        public const string API_PATH_FRIENDS_ANSWER = "/friends/answer";
+        public const string API_PATH_FRIENDS_REMOVE = "/friends/remove";
+        public const string API_PATH_FRIENDS_BLOCK = "/friends/block";
+        public const string API_PATH_FRIENDS_SETTINGS = "/friends/settings";
+
+        /// <summary>
+        /// Servers whose game codes may reach the site (ping server of their region). Same list as
+        /// FriendService::GOOD_LOSS_SERVERS on the site.
+        /// </summary>
+        public static readonly string[] GOOD_LOSS_PRESENCE_SERVERS = { "impranked.goodloss.fr", "betaranked.goodloss.fr", "imp.goodloss.fr" };
+
+        /// <summary>
+        /// Presence states declared to the site.
+        /// </summary>
+        public const string PRESENCE_STATE_MENU = "menu";
+        public const string PRESENCE_STATE_LOBBY = "lobby";
+        public const string PRESENCE_STATE_GAME = "game";
+
+        /// <summary>
+        /// Status of a friend, as answered by the site.
+        /// </summary>
+        public const string FRIEND_STATUS_OFFLINE = "offline";
+        public const string FRIEND_STATUS_ONLINE = "online";
+        public const string FRIEND_STATUS_LOBBY = "lobby";
+        public const string FRIEND_STATUS_GAME = "game";
+        public const string FRIEND_STATUS_ROOM = "room";
+
+        /// <summary>
+        /// Seconds between two syncs of the friends list (the site shows a player offline after 60 s).
+        /// </summary>
+        public const float FRIENDS_SYNC_SECONDS = 15f;
+
+        /// <summary>
+        /// Seconds before asking again an API without the friends endpoints.
+        /// </summary>
+        public const float FRIENDS_UNAVAILABLE_RETRY_SECONDS = 300f;
+
+        /// <summary>
+        /// Seconds a friend notification stays on screen.
+        /// </summary>
+        public const float FRIEND_NOTIFICATION_SECONDS = 6f;
+
+        /// <summary>
+        /// Maximum wait to be back at the main menu before joining a friend.
+        /// </summary>
+        public const float FRIEND_JOIN_LEAVE_TIMEOUT = 20f;
+
+        /// <summary>
+        /// Scenes of the game, needed to join an online game by code.
+        /// </summary>
+        public const string SCENE_MAIN_MENU = "MainMenu";
+        public const string SCENE_ONLINE_GAME = "OnlineGame";
     }
 }

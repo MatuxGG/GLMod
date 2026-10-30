@@ -28,6 +28,11 @@ namespace GLMod.TestHarness
         public const string SCENARIO_SESSION = "session";
         public const string SCENARIO_MOVEMENT = "movement";
         public const string SCENARIO_PLUGIN = "plugin";
+        public const string SCENARIO_FRIENDS = "friends";
+
+        // Friends scenario
+        public const string ENV_ACCOUNTS = "GLMOD_TEST_ACCOUNTS";
+        public const float FRIENDS_STEP_TIMEOUT = 45f;
 
         // Plugin scenario
         public const string SIGNAL_FILE_FORMAT = "signal-{0}.txt";

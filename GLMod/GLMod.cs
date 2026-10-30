@@ -23,7 +23,7 @@ namespace GLMod
     public class GLMod : BasePlugin
     {
         public const string Id = "glmod";
-        public const string Version = "5.8.0";
+        public const string Version = "5.9.0";
 
         public Harmony Harmony { get; } = new Harmony(Id);
 
@@ -41,6 +41,7 @@ namespace GLMod
         public static IPlayerService PlayerService { get; private set; }
         public static ITranslationService TranslationService { get; private set; }
         public static IRoomTicketService RoomTicketService { get; private set; }
+        public static IFriendsService FriendsService { get; private set; }
 
         public static ConfigEntry<string> connectionState { get; private set; }
         public static ConfigEntry<string> stepConf { get; private set; }
@@ -112,12 +113,14 @@ namespace GLMod
             PlayerService = new PlayerService(Logger, api);
             TranslationService = new TranslationService(Logger, GameLanguage.CurrentCode);
             RoomTicketService = new RoomTicketService(Logger, AuthService, api);
+            FriendsService = new FriendsService(Logger, AuthService, MenuService, api);
         }
 
         private void InitializeMenu()
         {
             // Built-in tabs first; third-party mods add theirs from their own Load() (see docs/dev.MD)
             MenuService.RegisterTab(new AccountMenuTab(AuthService, PlayerService, GameHistoryService, api, TranslationService));
+            MenuService.RegisterTab(new FriendsMenuTab(FriendsService, AuthService, TranslationService));
             MenuService.RegisterTab(new StatsMenuTab(PlayerService, AuthService, GameHistoryService, TranslationService));
             MenuService.RegisterTab(new LastGameMenuTab(PlayerService, AuthService, GameHistoryService, MenuService, TranslationService));
             MenuService.RegisterTab(new SessionsMenuTab(PlayerService, AuthService, GameHistoryService, TranslationService));
