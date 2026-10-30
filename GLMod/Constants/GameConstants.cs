@@ -212,5 +212,36 @@ namespace GLMod.Constants
         /// A game token is reused by the next login while it stays valid at least this long.
         /// </summary>
         public const long GAME_TOKEN_REUSE_MARGIN_SECONDS = 86400;
+
+        /// <summary>
+        /// Endpoint giving the signed ticket of the player for the Good Loss game servers.
+        /// </summary>
+        public const string API_PATH_ROOM_TICKET = "/user/room-ticket";
+
+        /// <summary>
+        /// Game servers run by Good Loss (ping server of their region): the only ones that receive the room ticket.
+        /// </summary>
+        public static readonly string[] GOOD_LOSS_GAME_SERVERS = { "impranked.goodloss.fr", "betaranked.goodloss.fr" };
+
+        /// <summary>
+        /// End of the room ticket in the connection data (GLPlugin looks for it).
+        /// </summary>
+        public const string ROOM_TICKET_MARKER = "GLMT";
+
+        /// <summary>
+        /// Seconds between two reloads of the room ticket (it lasts 15 minutes; a shorter delay also
+        /// brings a code just changed on the site).
+        /// </summary>
+        public const float ROOM_TICKET_REFRESH_SECONDS = 120f;
+
+        /// <summary>
+        /// Seconds between two checks of whether the room ticket must be reloaded.
+        /// </summary>
+        public const float ROOM_TICKET_POLL_SECONDS = 2f;
+
+        /// <summary>
+        /// A room ticket closer than this to its expiry is not sent anymore.
+        /// </summary>
+        public const long ROOM_TICKET_EXPIRY_MARGIN_SECONDS = 30;
     }
 }

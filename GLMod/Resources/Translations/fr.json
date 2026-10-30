@@ -6,6 +6,9 @@
   "menu.hint.tabs": "ONGLETS",
   "menu.hint.scroll": "DÉFILER",
   "menu.hint.close": "FERMER",
+  "menu.room.current": "ROOM",
+  "menu.room.mine": "MON CODE",
+  "menu.room.none": "AUCUN",
   "menu.noTab": "Aucun onglet.",
   "menu.tabError": "Cet onglet n'a pas pu être affiché (voir le log BepInEx).",
 

@@ -67,6 +67,25 @@ namespace GLMod.TestHarness
     }
 
     /// <summary>
+    /// Plugin scenario: the answers of GLPlugin arrive as chat lines.
+    /// </summary>
+    [HarmonyPatch(typeof(ChatController), nameof(ChatController.AddChat))]
+    public static class HarnessAddChatPatch
+    {
+        public static void Postfix([HarmonyArgument(0)] PlayerControl sourcePlayer, [HarmonyArgument(1)] string chatText)
+        {
+            try
+            {
+                ScenarioRunner.OnChat(sourcePlayer?.Data?.PlayerName, chatText);
+            }
+            catch (Exception e)
+            {
+                HarnessLog.Error("[AddChat] " + e);
+            }
+        }
+    }
+
+    /// <summary>
     /// Runs after GLMod's own OnGameEnd postfix so the snapshot contains the winners GLMod just set.
     /// </summary>
     [HarmonyPatch(typeof(AmongUsClient), nameof(AmongUsClient.OnGameEnd))]

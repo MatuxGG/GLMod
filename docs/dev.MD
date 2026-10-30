@@ -222,6 +222,15 @@ GLGameHistoryEntry last = GLMod.GameHistoryService.Latest; // null when empty
 GLMod.GameHistoryService.EntryRecorded += entry => { /* a game just ended */ };
 ```
 
+### Room Ticket Service (IRoomTicketService)
+Room code configured on the Good Loss account of the player (`/account` on the site), null when there is none. On the Among Us Ranked servers, a game takes the code of its creator when it is free.
+
+```csharp
+string code = GLMod.RoomTicketService.RoomCode;
+```
+
+The ticket behind it is only sent to the Good Loss game servers: your mod has no reason to read `Ticket`, and must never log it.
+
 ## Service Architecture
 
 GLMod follows a clean architecture pattern with dependency injection and interface-based services. All services are accessible through static properties in the main `GLMod` class:

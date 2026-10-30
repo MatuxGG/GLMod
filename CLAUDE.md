@@ -42,7 +42,7 @@ Any code review MUST reject contributions that introduce non-English identifiers
 
 ### 1.1 Identity
 - **Name**: GLMod (Good Loss Mod)
-- **Current version**: `5.7.1` (see [GLMod/GLMod.csproj](GLMod/GLMod.csproj) and [GLMod/GLMod.cs](GLMod/GLMod.cs))
+- **Current version**: `5.8.0` (see [GLMod/GLMod.csproj](GLMod/GLMod.csproj) and [GLMod/GLMod.cs](GLMod/GLMod.cs))
 - **BepInEx plugin Id**: `glmod`
 - **Author**: Matux
 - **License**: GNU GPLv3
@@ -112,6 +112,7 @@ GameHistoryService        ← Logger, history file path (config folder), max ent
 MenuService               ← (none)
 PlayerService             ← Logger, apiEndpoint
 TranslationService        ← Logger, language provider (GameLanguage.CurrentCode)
+RoomTicketService         ← Logger, AuthService, apiEndpoint
 ```
 
 ### 2.4 Coroutines & async
@@ -231,6 +232,14 @@ Every service is exposed statically via the main `GLMod` class and has a dedicat
 - **Mods**: `AddTranslations(language, texts)` adds their own keys (or a new language for GLMod's keys); `Has(key)`, `Language`.
 - **Not translated**: data from the API (map names, mod names, non-vanilla role names, API error messages), the "GOOD LOSS" brand. Vanilla role names use the `role.<Name>` keys. Dates use the system culture.
 
+### 3.13 `IRoomTicketService` — [Interfaces/IRoomTicketService.cs](GLMod/Services/Interfaces/IRoomTicketService.cs)
+- **Role**: identify the player on the Good Loss game servers (Ranked EU, Beta Ranked EU), which run Impostor + GLPlugin. **Impostor only knows the name a player declares**: its handshake carries no friend code nor PUID, and `IClient` of the deployed version has neither.
+- **Ticket**: `POST {API}/user/room-ticket` (Bearer game token) answers `{"ticket", "roomCode", "expiresAt"}` (`GLRoomTicket`). `v1.<userId>.<room code or ->.<expiry>.<base64url HMAC-SHA256>`, 15 minutes, signed by the site with `ROOM_TICKET_SECRET`; GLPlugin checks it offline with the same secret. Opaque for GLMod.
+- **Sending**: the connection data is built synchronously (`InnerNetClient.GetConnectionData`, §7), so the ticket is loaded after each login on the main menu and `KeepFresh()` (started by the first one) reloads the ticket every `ROOM_TICKET_REFRESH_SECONDS` while the player is logged in and not connected. The postfix appends it (`RoomTicketFooter`) only when the selected region is a Good Loss one (`GoodLossServers`): an official server must never receive it.
+- **Room code**: configured on `/account` of the site (6 letters, **shared between accounts**): a game created on a Good Loss server takes the code of the creator when it is free, otherwise a code from the word lists of the plugin. `RoomCode` is shown in the header of the F2 panel (§8.1). Nothing protects a code from being chosen by someone else (user decision, 2026-10-30).
+- **Members**: `RoomCode`, `Ticket` (null when there is no valid one; never log it), `Reload()`, `KeepFresh()`.
+- **Deployment order**: a GLMod without the endpoint just logs `HTTP 404` and connects without ticket; a player without ticket plays normally with a code from the word lists.
+
 ## 4. Domain entities (`GLMod/GLEntities/`)
 
 | Class           | Role                                                          |
@@ -249,6 +258,7 @@ Every service is exposed statically via the main `GLMod` class and has a dedicat
 | `GLLastGame` / `GLLastGameInfo` / `GLLastGamePlayer` | `GET /player/last-game`: game (id, url, mod, season, ranked, map, start, end, duration, turns, meetings, players, winners) and player stats (role, team, win, rp, kills, votes, reports, survival… nullable when not applicable). |
 | `GLPlayerRanks` / `GLPlayerRank` | `GET /player/ranks`: username + ranks (mod, season, name, image URL, elo, rp, position, leaderboardUrl; numbers nullable). |
 | `GLPlayerStats` / `GLWinStats` / `GLWinCount` | `GET /player/stats`: username, mod / season filters, wins and games in total (`games`) and per team (`crewmate`, `impostor`, `neutral`). |
+| `GLRoomTicket` | `POST /user/room-ticket`: ticket (signed by the site, never logged), roomCode (nullable), expiresAt (Unix s). |
 
 > **Note**: every numeric property transiting through the API is **encoded as `string`** (`tasks = "0"`, `ranked = "1"`, etc.). This convention matches the Good Loss API protocol and **must not be changed** without coordination with the API team. `GLGameHistoryEntry` is local-only and uses plain `long` / `bool`. The `/player/sessions` and `/player/last-game` responses are real JSON numbers / booleans / nulls: their entities mirror them (`long`, `int?`, `double?`, `bool?`) and their property names match the JSON keys exactly (camelCase, System.Text.Json is case-sensitive).
 
@@ -318,6 +328,12 @@ Reactor, Coms, Lights, O2
 | `STEAM_TICKET_RETRY_DELAY`    | `2f` seconds — before sending a ticket again after "Invalid ticket" |
 | `GAME_TOKEN_PREFIX`           | `glm_` — prefix of the secret game token of the Steam ticket login |
 | `GAME_TOKEN_REUSE_MARGIN_SECONDS` | `86400` — a game token is reused by the next login while it stays valid this long |
+| `API_PATH_ROOM_TICKET`        | `/user/room-ticket`                          |
+| `GOOD_LOSS_GAME_SERVERS`      | `impranked.goodloss.fr`, `betaranked.goodloss.fr` — the only servers that receive the room ticket |
+| `ROOM_TICKET_MARKER`          | `GLMT` — end of the room ticket in the connection data |
+| `ROOM_TICKET_REFRESH_SECONDS` | `120f` — between two reloads of the ticket, outside of a game |
+| `ROOM_TICKET_POLL_SECONDS`    | `2f` — between two checks of whether it must be reloaded |
+| `ROOM_TICKET_EXPIRY_MARGIN_SECONDS` | `30` — a ticket closer than this to its expiry is not sent |
 | `MENU_TAB_ACCOUNT` / `MENU_TAB_STATS` / `MENU_TAB_LAST_GAME` / `MENU_TAB_SESSIONS` | `glmod.account` / `glmod.stats` / `glmod.lastgame` / `glmod.sessions` — ids of the built-in menu tabs (public, for mods) |
 | `MENU_REFRESH_SECONDS`        | `60` — a tab reloads its API data when shown after this delay |
 | `MENU_RETRY_SECONDS`          | `10` — delay before retrying a failed API load |
@@ -333,7 +349,7 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 | File                          | Main targets                                           |
 |-------------------------------|--------------------------------------------------------|
 | `AmongUsClientPatch.cs`       | Hooks on the Among Us network client (host/non-host).  |
-| `InnerNetClientPatch.cs`      | RPC reception.                                         |
+| `InnerNetClientPatch.cs`      | RPC reception; `GetConnectionData` postfix: appends the room ticket on the Good Loss servers (§3.13). |
 | `MainMenuManagerPatch.cs`     | Post-main-menu initialization.                         |
 | `PlayerControlPatch.cs`       | Player actions (kill, report, vote, tasks…).           |
 | `MeetingHudPatch.cs`          | Meeting cycle (vote, exile).                           |
@@ -371,7 +387,7 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 | `PlayerApiQuery.cs`    | Pure URL builder of the `/player/*` GET requests: `?username=` plus `&theme=` when a theme is given. |
 | `TranslationTable.cs`  | Pure translation lookup: texts by language and key, fallbacks (base language, English, key), `{0}` formatting, JSON loading. |
 | `GameLanguage.cs`      | `SupportedLangs` name → language code (pure `ToCode`) and `CurrentCode()` (reads the game settings). |
-| `PlayModeHelper.cs`    | `IsFreePlay()` — free play games are never recorded nor sent (§3.3). |
+| `PlayModeHelper.cs`    | `IsFreePlay()` — free play games are never recorded nor sent (§3.3). `CurrentOnlineGameCode()` — code of the online game the player is in, null otherwise. |
 | `RankedMod.cs`         | `Matches(modName)` — "Among Us Ranked" and its variants ("Among Us Ranked Roles"…), case-insensitive. Pure. |
 | `StatFormat.cs`        | Pure formatting of menu stats: durations ("1 min 05 s", "2 h 05"), ratios, win percentages (`WinPercent`, rounded like the site), Yes/No, numbers, local dates, vanilla role names. |
 | `ServerClock.cs`       | `NowMs()` — Unix ms aligned on the API server clock. The offset is refreshed from the `Date` header of every `ApiService` response. **Every timestamp sent to the API (actions, positions) must use `ServerClock.NowMs()`**, never `DateTimeOffset.UtcNow`. |
@@ -381,6 +397,8 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 | `BackgroundEvents.cs`  | Background loops of a game: DCs and hidden sabotages every 0.5 s, player positions every 0.1 s (through `PositionRecorder`). Each start increments a generation, so loops of a previous game stop. `endBackgroundProcess` flushes the pending positions. |
 | `PositionRecorder.cs`  | Records positions through one `PositionSimplifier` per player. `AddKeyPosition` (kill, report / emergency, meeting start) always records the position, after the player's pending samples; meetings and the end of the game flush the pending samples. Main thread only. |
 | `PositionSimplifier.cs` | Pure, unit-tested: online trajectory simplification (opening window). A sample is dropped when the linear interpolation **in time** between the sent positions (how the site draws a player) stays within `POSITION_SIMPLIFY_TOLERANCE` of every dropped sample; at most `POSITION_MAX_GAP_MS` between two sent positions. Turns, stops and teleports keep their samples. |
+| `GoodLossServers.cs`   | `IsGoodLossServer(pingServer)` (pure) and `IsCurrentRegion()`: the servers that receive the room ticket. |
+| `RoomTicketFooter.cs`  | Pure, unit-tested: `Append(data, ticket)` = data + ticket + length (2 bytes LE) + `GLMT`. GLPlugin reads it from the end. |
 | `VanillaEvents.cs`     | Default implementations (`startGameVanilla`, `endGameVanilla`…) used when the matching `ServiceType` is enabled. |
 
 ### 8.1 Good Loss menu (`GLMod/Menu/`, namespace `GLMod.Menu`)
@@ -393,6 +411,7 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
   - Each theme also gives the `theme` sent to the `/player/*` endpoints (`MenuTheme.ApiTheme`: none for Good Loss, `ranked` for Among Us Ranked), so the Account, Stats, Last game and Sessions tabs show Among Us Ranked data only with that theme.
   - `MenuUI` colors (`Accent`, `Text`, `MutedText`…) are properties of the current theme; textures baked with theme colors (panel and accent gradients, logo) are built once per theme.
 - **Look** (esport style): vertical gradient panel with a violet halo and an accent line on the top edge; header with the Good Loss logo (embedded `GLMod/Resources/goodloss-logo.png`, 110×128, decoded with `ImageConversion.LoadImage`; a gradient "GL" badge if it cannot be loaded), "GOOD LOSS" and the GLMod version; uppercase tabs with a glowing gradient indicator that glides to the selected tab; tab content fades and slides in from the side of the newly selected tab (0.22 s); keycap hints in the footer (`← →` tabs, `↑ ↓` scroll, `F2` close).
+- **Room codes** in the header, right-aligned next to the × button: `ROOM <code>` (the online game the player is in, `PlayModeHelper.CurrentOnlineGameCode`) and below it `MY CODE <code>` (room code of the account, `NONE` without one; only on a Good Loss server and logged in). Example: `ORIANA` then `GVOVVF` for a player whose code is GVOVVF in the game ORIANA.
 - **Fonts**: OS fonts through `Font.CreateDynamicFontFromOSFont`: display text (titles, tabs, buttons, captions) in Bahnschrift SemiBold (condensed DIN-like face of Windows 10+), body text in Segoe UI; Arial / the IMGUI default font elsewhere (Linux / Proton).
 - **Navigation**: left / right arrows (or the ‹ › buttons, or a click on a tab) switch tabs; up / down arrows and the mouse wheel scroll the current tab. The game does not see these inputs while the menu uses them (§7 patches).
 - **Rendering**: IMGUI from `MenuBehaviour` (`Update` = keys, scrolling, slide and content animations; `OnGUI` = drawing). Layout values are 1080p reference units converted to **screen pixels** with `MenuUI.U` (scale = screen height / 1080, never below `0.85`); styles (font sizes) are rebuilt when the scale changes, so text is rendered at its real size and stays sharp (no `GUI.matrix` scaling). Palette based on the Good Loss site (`--accent #A78BFA`, deeper `#7C3AED` for gradients, dark navy surfaces). `MenuBehaviour` notifies `IMenuTab.OnShown()` when a tab becomes visible; tab exceptions are logged once and replaced by an error message.
@@ -438,6 +457,7 @@ Base: `https://goodloss.fr/api` (production). It can be overridden at startup wi
 |--------------------------------|--------|-------------------|----------------------------------------|
 | `/user/login`                  | POST   | AuthService       | Steam login: `steamTicket` → JSON game token (§3.1). |
 | `/user/steamownerships`        | POST   | ItemService       | Steam DLC ownerships of the account (Bearer game token). |
+| `/user/room-ticket`            | POST   | RoomTicketService | Signed ticket of the player for the Good Loss game servers, and the room code of the account (Bearer game token). |
 | `/data`                        | POST   | IntegrityService  | Generic data lookup by id; `checksum_*` ids hold DLL checksums (§3.6). |
 | `/game/start`                  | POST   | GameStateManager  | Sends a new match.                     |
 | `/game/addMyPlayer`            | POST   | GameStateManager  | Registers the local player (Bearer game token). |
@@ -476,7 +496,7 @@ Base: `https://goodloss.fr/api` (production). It can be overridden at startup wi
 
 ### 11.5 End-to-end test (4 Among Us instances, online lobby: 2-game session or movement game)
 - Project: [GLMod.TestHarness/](GLMod.TestHarness/) — a separate BepInEx plugin (`glmod.testharness`, depends on `glmod`). **Inert** unless the `GLMOD_TEST_INSTANCE` environment variable is set; it has no AfterBuild copy and is only installed in `Among Us/BepInEx/plugins/` for the duration of a run.
-- Entry point: `powershell -ExecutionPolicy Bypass -File GLMod.TestHarness/run-e2e.ps1` (options: `-Scenario` (`Session` by default, or `Movement`, passed as `GLMOD_TEST_SCENARIO`), `-Region` (default `Ranked EU`, passed as `GLMOD_TEST_REGION`), `-ApiEndpoint` (default `https://preprod.goodloss.fr/api`), `-ModName`, `-Map`, `-NoTile`, `-NoBuild`, `-KeepPlugin`, `-KeepOtherPlugins`, `-TimeoutSeconds`). Refuses to start if Among Us is already running.
+- Entry point: `powershell -ExecutionPolicy Bypass -File GLMod.TestHarness/run-e2e.ps1` (options: `-Scenario` (`Session` by default, `Movement` or `Plugin`, passed as `GLMOD_TEST_SCENARIO`), `-Region` (default `Ranked EU`, `Beta Ranked EU` for the `Plugin` scenario, passed as `GLMOD_TEST_REGION`), `-ApiEndpoint` (default `https://preprod.goodloss.fr/api`), `-ModName`, `-Map`, `-NoTile`, `-NoBuild`, `-KeepPlugin`, `-KeepOtherPlugins`, `-TimeoutSeconds`). Refuses to start if Among Us is already running.
 - Plugin isolation: other mods change GLMod's mod name (e.g. ChallengerLevel sets "Challenger Maps", which the site records without a season). Unless `-KeepOtherPlugins`, the script moves every plugin except `GLMod.dll`, `GLMod.TestHarness.dll` and `Mini.RegionInstall.dll` (custom server region) to `BepInEx/plugins-disabled-by-e2e/` for the run and moves them back at the end, so the session runs as **Vanilla**.
 - Mod and map: `-ModName` (default `Among Us Ranked`, applied by the harness through `GLMod.ConfigService.SetModName`, like a third-party mod; empty keeps GLMod's own name) and `-Map` (default `Polus`; `Keep` leaves the lobby setting). The host switches the lobby map (`IGameOptions.SetByte(MapId)` + `LogicOptions.SyncOptions`) and restores its saved map setting at the end. The site only draws the map visualization for maps it has an image for (`/images/maps/polusmap.png`, Challenger maps, Submerged…): **not for The Skeld**.
 - Startup: the instances share `BepInEx/config/glmod.cfg`, and GLMod fails to load (`IOException: ... being used by another process`) when two instances write it at once. The script therefore starts instance N+1 only once instance N has loaded GLMod and the harness (`instance-N.log` exists, 90 s max), and restarts an instance whose GLMod did not load (3 attempts).
@@ -503,6 +523,13 @@ Base: `https://goodloss.fr/api` (production). It can be overridden at startup wi
 - Local history: the script moves the player's `BepInEx/config/glmod-history.json` aside for the run (`glmod-history.before-run.json` in the output folder) and puts it back at the end; the run's history is kept as `glmod-history.json` in the output folder.
 - Multi-instance workarounds: 4 Unity instances on one machine stall for seconds on heavy frames (map load, meeting open) and vanilla Hazel timeouts then drop the client (`ReliablePacketWithoutResponse`): the harness raises `DisconnectTimeoutMs` / `MissingPingsUntilDisconnect` on the client connection. Clients must load the map within a hard-coded 10s (`AmongUsClient.MAX_CLIENT_WAIT_SECONDS` is a native constant: **writing it crashes the game**), so each instance caps its frame rate (20 fps) and sets `Application.backgroundLoadingPriority = High`. It also skips `CosmeticsCache.ClearUnusedCosmetics`, which intermittently throws inside `AmongUsClient.CoStartGame` in multi-instance runs (the client then never becomes ready and is kicked).
 - Output: `GLMod.TestHarness/output/<date>-<runId>/` (gitignored) — `lobby-N.json`, `plan-N.json`, `result-N.json` (per-game results), `instance-N.log`, `player-N.log` (Unity log of each instance, via `-logFile`), copied BepInEx logs.
+- Plugin scenario (`-Scenario Plugin`, no game, region `Beta Ranked EU` by default, `signal-*.txt` for the coordination) — checks [GLPlugin](https://gitlab.goodloss.fr/good-loss/among-us/GLPlugin) on the beta server. The harness builds the region itself (`CurrentRegion` set directly: `AddOrUpdateRegion` would save it in the `regionInfo.json` of the player) and the local account needs a room code on `/account` of the preprod site:
+  - instance 0 (host): its game has the room code of the account; welcome message (contains the region name); `#help` lists `#kick` and `#ban`; `#kick` of the victim and of an unknown player; `#ban` of the victim;
+  - instance 1: creates a game while the code is taken (it must get another one), leaves, joins the host; `#help` without the host commands, `#code` gives the code, `#room` no longer answers, `#kick` is refused;
+  - instance 2: joins and stays connected until the end;
+  - instance 3: kicked (reason `Kicked`), comes back, banned (reason `Banned`), cannot join again. All instances share the IP: a ban only stops those who join afterwards, so it comes last;
+  - `panel-host.png` / `panel-second-creator.png` in the output: the header of the F2 panel (room code, code of the account), to check by eye (IMGUI text cannot be read back);
+  - answers are read in `ChatController.AddChat` and compared on what is not translated (command names, codes): [PluginChecks.cs](GLMod.TestHarness/PluginChecks.cs).
 - Not covered: disconnections (relaunching clients is too slow), roles, impostor wins by sabotage, shield T1.
 
 ### 11.3 Release
@@ -539,6 +566,7 @@ GLMod/                                # Repo root
 │   ├── PlayerApiTests.cs             # PlayerApiResponse (captured preprod responses), StatFormat.
 │   ├── MovementTests.cs              # NavGrid, PositionAccuracy, ScenarioVerifier.VerifyPositions.
 │   ├── PositionSimplifierTests.cs    # PositionSimplifier.
+│   ├── RoomTicketTests.cs            # RoomTicketFooter, GoodLossServers, ticket answer, PluginChecks.
 │   ├── RankedModTests.cs             # RankedMod (theme selection).
 │   ├── TranslationTests.cs           # TranslationTable, GameLanguage, embedded translation files.
 │   ├── ScenarioTests.cs              # ScenarioPlan / ScenarioVerifier (E2E harness logic).
@@ -558,6 +586,8 @@ GLMod/                                # Repo root
 │   ├── PositionAccuracy.cs           # Pure logic: sent positions vs real trajectory.
 │   ├── ScenarioPlan.cs               # Pure logic.
 │   ├── ScenarioRunner.cs             # In-game coroutine driving the scenario.
+│   ├── ScenarioRunner.Plugin.cs      # Plugin scenario (checks of GLPlugin in a lobby).
+│   ├── PluginChecks.cs               # Pure logic: answers of GLPlugin.
 │   └── ScenarioVerifier.cs           # Pure logic.
 └── GLMod/                            # C# project.
     ├── GLMod.csproj                  # Project definition, mod version, targeted Among Us version.
@@ -570,6 +600,8 @@ GLMod/                                # Repo root
     │   ├── CoroutineRunner.cs
     │   ├── GameHistoryList.cs        # Pure local-history list logic.
     │   ├── LoginResponse.cs          # Pure login helpers (ticket hex, login answers).
+    │   ├── GoodLossServers.cs        # The Good Loss game servers (room ticket).
+    │   ├── RoomTicketFooter.cs       # Pure: room ticket at the end of the connection data.
     │   ├── PlayerApiResponse.cs      # Pure parsing of the /player/* GET responses.
     │   ├── PlayerApiQuery.cs         # Pure URL builder of the /player/* GET requests.
     │   ├── HttpHelper.cs
@@ -609,6 +641,7 @@ GLMod/                                # Repo root
     │   ├── GLGame.cs
     │   ├── GLGameHistoryEntry.cs     # Local history entry (not an API DTO).
     │   ├── GLLoginResponse.cs        # POST /user/login answer to a Steam ticket.
+    │   ├── GLRoomTicket.cs           # POST /user/room-ticket answer.
     │   ├── GLLastGame.cs             # GET /player/last-game response…
     │   ├── GLLastGameInfo.cs         # …its game part…
     │   ├── GLLastGamePlayer.cs       # …and its player stats.
@@ -658,6 +691,7 @@ GLMod/                                # Repo root
         │   ├── IRankService.cs
         │   ├── IServiceManager.cs
         │   └── ITranslationService.cs
+        │   ├── IRoomTicketService.cs
         └── Implementations/          # ONE file per implementation, same name without "I".
             ├── AuthenticationService.cs
             ├── ConfigurationService.cs
@@ -671,6 +705,7 @@ GLMod/                                # Repo root
             ├── RankService.cs
             ├── ServiceManager.cs
             └── TranslationService.cs
+            ├── RoomTicketService.cs
 ```
 
 ### 12.1 Structure rules (NON-NEGOTIABLE)
@@ -757,6 +792,7 @@ A third-party mod consumes GLMod by:
 - **Integrity**: `IntegrityService` can verify a DLL's SHA against a remote checksum to detect mod tampering.
 - **Local history**: `glmod-history.json` stays on the player's computer; it is never uploaded.
 - **Menu**: never shows information that would help during a game (roles, teams, shield T1, other players' positions). The history only shows the local player's role once the game is over. The token is never displayed.
+- **Room ticket**: sent only to the Good Loss game servers (`GOOD_LOSS_GAME_SERVERS`, checked on the ping server of the selected region), never to the official servers nor to the servers of other mods. It travels unencrypted (no DTLS on these servers): it proves an account to them for 15 minutes and gives no access to anything else. The game token never leaves the API. Never log the ticket.
 
 ---
 
@@ -805,5 +841,5 @@ For every change to the project:
 
 ---
 
-*Last updated: 2026-10-21 — GLMod version 5.7.1.*
+*Last updated: 2026-10-30 — GLMod version 5.8.0.*
 *Every change to the project must be accompanied by an update of this file.*

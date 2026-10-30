@@ -1,0 +1,38 @@
+using GLMod.Constants;
+using System;
+using System.Linq;
+
+namespace GLMod.Class
+{
+    /// <summary>
+    /// The game servers run by Good Loss: the only ones that receive the room ticket.
+    /// </summary>
+    public static class GoodLossServers
+    {
+        /// <summary>
+        /// True for the ping server of a Good Loss region. Pure.
+        /// </summary>
+        public static bool IsGoodLossServer(string pingServer)
+        {
+            return pingServer != null
+                && GameConstants.GOOD_LOSS_GAME_SERVERS.Contains(pingServer.Trim(), StringComparer.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// True when the region selected in the game is a Good Loss one. Must be called from the
+        /// Unity main thread.
+        /// </summary>
+        public static bool IsCurrentRegion()
+        {
+            try
+            {
+                return DestroyableSingleton<ServerManager>.InstanceExists
+                    && IsGoodLossServer(DestroyableSingleton<ServerManager>.Instance.CurrentRegion?.PingServer);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+    }
+}

@@ -23,7 +23,7 @@ namespace GLMod
     public class GLMod : BasePlugin
     {
         public const string Id = "glmod";
-        public const string Version = "5.7.1";
+        public const string Version = "5.8.0";
 
         public Harmony Harmony { get; } = new Harmony(Id);
 
@@ -40,6 +40,7 @@ namespace GLMod
         public static IMenuService MenuService { get; private set; }
         public static IPlayerService PlayerService { get; private set; }
         public static ITranslationService TranslationService { get; private set; }
+        public static IRoomTicketService RoomTicketService { get; private set; }
 
         public static ConfigEntry<string> connectionState { get; private set; }
         public static ConfigEntry<string> stepConf { get; private set; }
@@ -110,6 +111,7 @@ namespace GLMod
             MenuService = new MenuService();
             PlayerService = new PlayerService(Logger, api);
             TranslationService = new TranslationService(Logger, GameLanguage.CurrentCode);
+            RoomTicketService = new RoomTicketService(Logger, AuthService, api);
         }
 
         private void InitializeMenu()

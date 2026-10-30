@@ -6,6 +6,9 @@
   "menu.hint.tabs": "TABS",
   "menu.hint.scroll": "SCROLL",
   "menu.hint.close": "CLOSE",
+  "menu.room.current": "ROOM",
+  "menu.room.mine": "MY CODE",
+  "menu.room.none": "NONE",
   "menu.noTab": "No tab.",
   "menu.tabError": "This tab could not be displayed (see the BepInEx log).",
 

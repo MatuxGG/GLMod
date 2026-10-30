@@ -1,4 +1,5 @@
 using BepInEx.Unity.IL2CPP;
+using GLMod.Class;
 using GLMod.Constants;
 using GLMod.Services.Interfaces;
 using System;
@@ -337,6 +338,7 @@ namespace GLMod.Menu
             MenuUI.DrawText(new Rect(textX, logo.y + MenuUI.U(20f), MenuUI.U(220f), MenuUI.U(18f)), "GLMOD  v" + GLMod.Version, MenuUI.CaptionStyle, MenuUI.DimText);
 
             float closeSize = MenuUI.U(30f);
+            DrawRoomCodes(panel.xMax - pad - closeSize - MenuUI.U(14f), logo.y);
             var close = new Rect(panel.xMax - pad - closeSize, panel.y + MenuUI.U(21f), closeSize, closeSize);
             bool hover = MenuUI.IsHover(close);
             MenuUI.DrawRect(close, hover ? MenuUI.WithAlpha(MenuUI.Danger, 0.85f) : MenuUI.Surface, MenuUI.Corner.Small);
@@ -345,6 +347,36 @@ namespace GLMod.Menu
             {
                 menu.Close();
             }
+        }
+
+        /// <summary>
+        /// Code of the room the player is in and, below it, the code of their account (the one their
+        /// games get on the Good Loss servers when it is free): both differ when they join someone else.
+        /// </summary>
+        private static void DrawRoomCodes(float right, float top)
+        {
+            ITranslationService texts = GLMod.TranslationService;
+            string room = PlayModeHelper.CurrentOnlineGameCode();
+            if (room != null)
+            {
+                DrawRoomCodeLine(right, top, texts.Get("menu.room.current"), room);
+            }
+
+            if (GoodLossServers.IsCurrentRegion() && GLMod.AuthService.IsLoggedIn)
+            {
+                string mine = GLMod.RoomTicketService.RoomCode ?? texts.Get("menu.room.none");
+                DrawRoomCodeLine(right, top + MenuUI.U(20f), texts.Get("menu.room.mine"), mine);
+            }
+        }
+
+        private static void DrawRoomCodeLine(float right, float y, string label, string code)
+        {
+            float height = MenuUI.U(18f);
+            float codeWidth = MenuUI.CaptionStyle.CalcSize(new GUIContent(code)).x;
+            float labelWidth = MenuUI.CaptionStyle.CalcSize(new GUIContent(label)).x;
+            float gap = MenuUI.U(8f);
+            MenuUI.DrawText(new Rect(right - codeWidth, y, codeWidth, height), code, MenuUI.CaptionStyle, MenuUI.Accent);
+            MenuUI.DrawText(new Rect(right - codeWidth - gap - labelWidth, y, labelWidth, height), label, MenuUI.CaptionStyle, MenuUI.DimText);
         }
 
         private static void DrawTabBar(IMenuService menu, Rect bar)

@@ -11,6 +11,8 @@
        plays game 2 (impostor wins by vote).
        Movement scenario: one game where every player walks around the map and the impostor kills
        twice with a wait in between; the host compares the positions GLMod sent with the real ones.
+       Plugin scenario: no game; checks GLPlugin on the beta server (room code of the account, a taken
+       code, #help, #code, #kick, #ban, the code in the menu) in a lobby. Screenshots of the menu in the output.
     5. Waits for every instance to write result-N.json, then prints a summary.
     6. Stops the instances it launched and uninstalls the harness.
 
@@ -20,13 +22,16 @@
     ./GLMod.TestHarness/run-e2e.ps1
 .EXAMPLE
     ./GLMod.TestHarness/run-e2e.ps1 -Scenario Movement
+.EXAMPLE
+    ./GLMod.TestHarness/run-e2e.ps1 -Scenario Plugin
 #>
 param(
-    [ValidateSet('Session', 'Movement')]
+    [ValidateSet('Session', 'Movement', 'Plugin')]
     [string]$Scenario = 'Session',
     [int]$TimeoutSeconds = 960,
-    # Server region every instance selects for the run (a custom one: official servers are refused)
-    [string]$Region = 'Ranked EU',
+    # Server region every instance selects for the run (a custom one: official servers are refused).
+    # Default: 'Ranked EU', 'Beta Ranked EU' for the Plugin scenario.
+    [string]$Region = '',
     [string]$ApiEndpoint = 'https://preprod.goodloss.fr/api',
     # Mod name the games are recorded under (GLMod.ConfigService.SetModName); empty keeps GLMod's own (Vanilla)
     [string]$ModName = 'Among Us Ranked',
@@ -41,6 +46,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+if (-not $Region) { $Region = if ($Scenario -eq 'Plugin') { 'Beta Ranked EU' } else { 'Ranked EU' } }
 
 $repo = Split-Path $PSScriptRoot -Parent
 $gameDir = Join-Path $repo 'Among Us'

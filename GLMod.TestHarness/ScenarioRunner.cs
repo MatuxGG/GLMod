@@ -20,7 +20,7 @@ namespace GLMod.TestHarness
     /// Every instance runs the same coroutine; each one only performs the actions it owns.
     /// Instances coordinate through files in the run output folder (lobby code, plans).
     /// </summary>
-    public static class ScenarioRunner
+    public static partial class ScenarioRunner
     {
         private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions { WriteIndented = true };
 
@@ -104,6 +104,15 @@ namespace GLMod.TestHarness
             if (!Try($"select the server region '{_context.Region}'", SelectRegion)) yield break;
             if (!Try("check the server region", () => _region = CheckRegion())) yield break;
             HarnessLog.Info("Region: " + _region);
+
+            if (_context.Scenario == HarnessConstants.SCENARIO_PLUGIN)
+            {
+                yield return PlayPluginScenario();
+                if (_finished) yield break;
+                SetPhase("done");
+                Finish();
+                yield break;
+            }
 
             SetPhase("connect");
             yield return ConnectToLobby();
@@ -704,6 +713,18 @@ namespace GLMod.TestHarness
         {
             ServerManager servers = DestroyableSingleton<ServerManager>.Instance;
             if (servers.CurrentRegion?.Name == _context.Region) return;
+
+            if (_context.Region == HarnessConstants.BETA_REGION)
+            {
+                // Not in the regions of the game. Set directly: AddOrUpdateRegion would save it in the regionInfo.json of the player.
+                var serverInfos = new Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray<ServerInfo>(1);
+                serverInfos[0] = new ServerInfo(HarnessConstants.BETA_REGION, HarnessConstants.BETA_HOST, HarnessConstants.BETA_PORT, false);
+                var beta = new StaticHttpRegionInfo(HarnessConstants.BETA_REGION, StringNames.NoTranslation, HarnessConstants.BETA_HOST, serverInfos);
+                servers.CurrentRegion = beta.Cast<IRegionInfo>();
+                servers.ReselectServer();
+                HarnessLog.Info($"Region {HarnessConstants.BETA_REGION} built and selected");
+                return;
+            }
 
             var names = new List<string>();
             foreach (IRegionInfo region in servers.AvailableRegions)

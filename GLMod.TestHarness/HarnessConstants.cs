@@ -17,9 +17,27 @@ namespace GLMod.TestHarness
         // Server region selected by every instance (a custom one: official servers are refused)
         public const string DEFAULT_REGION = "Ranked EU";
 
-        // Scenarios (ENV_SCENARIO): the 2-game session, or the movement game
+        // Beta server of GLPlugin, not in the regions of the game: the harness builds its region
+        public const string BETA_REGION = "Beta Ranked EU";
+        public const string BETA_HOST = "betaranked.goodloss.fr";
+        public const ushort BETA_PORT = 443;
+
+        // Scenarios (ENV_SCENARIO): the 2-game session, the movement game, or the checks of GLPlugin in a lobby
         public const string SCENARIO_SESSION = "session";
         public const string SCENARIO_MOVEMENT = "movement";
+        public const string SCENARIO_PLUGIN = "plugin";
+
+        // Plugin scenario
+        public const string SIGNAL_FILE_FORMAT = "signal-{0}.txt";
+        public const string PLUGIN_UNKNOWN_PLAYER = "NoSuchPlayer";
+        public const string PLUGIN_UNKNOWN_ROOM = "ZZZZZZ";
+        public const int PLUGIN_ROOM_CODE_LENGTH = 6;
+        public const float PLUGIN_STEP_TIMEOUT = 30f;
+        public const float PLUGIN_SIGNAL_TIMEOUT = 180f;
+        public const float PLUGIN_KICK_TIMEOUT = 180f;
+        public const float PLUGIN_SILENCE_DELAY = 5f;
+        public const float PLUGIN_CHAT_DELAY = 3f;
+        public const float PLUGIN_PANEL_DELAY = 1.5f;
 
         // Scenario shape
         public const int PLAYER_COUNT = 4;

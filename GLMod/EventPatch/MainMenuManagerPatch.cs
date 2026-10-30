@@ -14,6 +14,8 @@ namespace GLMod
     [HarmonyPatch(typeof(MainMenuManager), nameof(MainMenuManager.Start))]
     public class MainMenuManagerStartPatch
     {
+        private static bool _roomTicketLoopStarted;
+
         private static IEnumerator TestIntegrityService()
         {
             GLMod.log("=== Testing IntegrityService ===");
@@ -168,6 +170,13 @@ namespace GLMod
 
                             if (GLMod.AuthService.IsLoggedIn)
                             {
+                                CoroutineRunner.Run(GLMod.RoomTicketService.Reload());
+                                if (!_roomTicketLoopStarted)
+                                {
+                                    _roomTicketLoopStarted = true;
+                                    CoroutineRunner.Run(GLMod.RoomTicketService.KeepFresh());
+                                }
+
                                 if (!GLMod.withUnityExplorer)
                                 {
                                     CoroutineRunner.Run(TestAuthenticationServices());
