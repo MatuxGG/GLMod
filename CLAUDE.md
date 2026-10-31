@@ -160,7 +160,7 @@ Every service is exposed statically via the main `GLMod` class and has a dedicat
   - `AddMyPlayer(onComplete)` — registers the local player on the server (`gameId`, `playerName`; the site takes the account from the Bearer game token). Calls `onComplete(false)` when the host's game id has not arrived after `GAME_ID_WAIT_TIMEOUT`, when the game is reset meanwhile, or when `/game/addMyPlayer` fails (HTTP error or network failure).
   - `GetShieldPlayer(onComplete, onError)` — returns the player who would have benefited from a T1 shield (retries on HTTP 400).
   - `SetWinnerTeams(winners)` / `AddWinnerPlayer(name)` — sets the outcome.
-  - `EndGame()` — closes the match server-side (`PostEndGame`). On the host, `Step` goes back to `Initial` even when `/game/end` fails or the game cannot be sent (wrong step, no game), so the next game is started and sent normally.
+  - `EndGame()` — closes the match server-side (`PostEndGame`). On the host, `Step` goes back to `Initial` even when `/game/end` fails or the game cannot be sent (wrong step, no game), so the next game is started and sent normally. If a new game was started (or the game reset) while `/game/end` was pending, its `Step` is left untouched.
   - `AddAction(source, target, action)` — records an action (kill, vote, sabotage, custom…).
   - `ResetGame()` — resets the state (`Step = Initial`).
 - **Free play is never recorded nor sent**: in free play (`PlayModeHelper.IsFreePlay()`, i.e. `AmongUsClient.NetworkMode == NetworkModes.FreePlay`) the vanilla start trigger (`PlayerControlPatch`) does nothing, `StartGame` creates no game (`CurrentGame = null`), and `SendGame` / `AddMyPlayer` / `EndGame` send nothing — also when a third-party mod calls them itself.
@@ -604,7 +604,7 @@ GLMod/                                # Repo root
 │   ├── ApiServiceTests.cs            # ApiService response bodies (local TCP stub server).
 │   ├── EntityTests.cs
 │   ├── AddMyPlayerTests.cs           # AddMyPlayer result on HTTP / network errors (local TCP stub server).
-│   ├── EndGameTests.cs               # EndGame step reset on /game/end errors (local TCP stub server).
+│   ├── EndGameTests.cs               # EndGame step reset on /game/end errors, next game's step kept (local TCP stub server).
 │   ├── EnumTests.cs
 │   ├── GameConstantsTests.cs         # + ApiEndpointResolver.
 │   ├── GameHistoryTests.cs           # GameHistoryList.
