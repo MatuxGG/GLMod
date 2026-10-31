@@ -78,17 +78,31 @@ namespace GLMod.Services.Implementations
             }
 
             // Deserialize and return the rank
+            CompleteRank(responseString, modName, Log, onComplete);
+        }
+
+        /// <summary>
+        /// Deserializes the /player/rank response and calls onComplete once: with the rank, or with
+        /// an error rank ("Parse error") when the response cannot be deserialized. An exception thrown
+        /// by onComplete itself is not caught here.
+        /// </summary>
+        public static void CompleteRank(string responseString, string modName,
+            System.Action<string> log, System.Action<GLRank> onComplete)
+        {
+            GLRank rank;
             try
             {
-                GLRank rank = GLJson.Deserialize<GLRank>(responseString);
-                onComplete?.Invoke(rank);
+                rank = GLJson.Deserialize<GLRank>(responseString);
             }
             catch (Exception ex)
             {
-                Log($"[GetRank] Error while deserializing rank for mod={modName}: {ex.Message}");
+                log?.Invoke($"[GetRank] Error while deserializing rank for mod={modName}: {ex.Message}");
+                GLRank errorRank = new GLRank();
                 errorRank.error = "Parse error";
                 onComplete?.Invoke(errorRank);
+                return;
             }
+            onComplete?.Invoke(rank);
         }
     }
 }

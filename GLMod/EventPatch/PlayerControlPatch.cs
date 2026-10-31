@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using AmongUs.GameOptions;
+using HarmonyLib;
 using InnerNet;
 using System;
 using System.Collections.Generic;
@@ -32,10 +33,20 @@ namespace GLMod
     [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.MurderPlayer))]
     public class MurderPatch
     {
-        public static void Postfix(PlayerControl __instance, PlayerControl target)
+        public const int MURDER_SUCCEEDED_FLAG = (int)MurderResultFlags.Succeeded;
+
+        // Failed murders (guardian angel protection, errors) also go through MurderPlayer: they are not kills
+        public static bool IsSuccessfulMurder(int resultFlags)
+        {
+            return (resultFlags & MURDER_SUCCEEDED_FLAG) != 0;
+        }
+
+        public static void Postfix(PlayerControl __instance, PlayerControl target, MurderResultFlags resultFlags)
         {
             try
             {
+                if (!IsSuccessfulMurder((int)resultFlags)) return;
+
                 long timestampSeconds = ServerClock.NowMs();
                 // Set positions before kill
                 PositionRecorder.AddKeyPosition(GLMod.GameStateManager.CurrentGame, __instance, timestampSeconds);
@@ -279,8 +290,8 @@ namespace GLMod
                     return;
                 }
 
-                int nbImp = GameOptionsManager.Instance.CurrentGameOptions.NumImpostors;
-                if (PlayerControl.AllPlayerControls.Count < 6) nbImp = 1;
+                // The game caps the impostor setting by player count (1 up to 6 players, 2 for 7-8, 3 above)
+                int nbImp = GameOptionsManager.Instance.CurrentGameOptions.GetAdjustedNumImpostors(PlayerControl.AllPlayerControls.Count);
                 int realImp = 0;
                 foreach (PlayerControl p in PlayerControl.AllPlayerControls)
                 {

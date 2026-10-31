@@ -278,8 +278,17 @@ namespace GLMod.Services.Implementations
                 yield break;
             }
 
+            GLGame game = CurrentGame;
             _stepRpcConfig.Value = "NO";
             yield return new WaitForSeconds(GameConstants.RPC_SYNC_TIMEOUT);
+
+            // A disconnect during the wait resets Step: do not bring the old game back
+            if (!IsGameIdSyncCurrent(game, CurrentGame, Step))
+            {
+                Log("[SyncGameId] Game changed during wait");
+                onComplete?.Invoke(false);
+                yield break;
+            }
 
             // The RPC goes through IL2CPP (AmongUsClient, PlayerControl): it must run on the Unity
             // main thread, which this coroutine already is. Sending it from Task.Run crashed the game.
@@ -295,6 +304,17 @@ namespace GLMod.Services.Implementations
 
             Step = GameStep.PlayersRecorded;
             onComplete?.Invoke(true);
+        }
+
+        /// <summary>
+        /// Whether SyncGameId may still send the game id after its wait: the game is still the
+        /// current one and Step is still GameIdSynced (a disconnect resets it to Initial).
+        /// </summary>
+        public static bool IsGameIdSyncCurrent(GLGame game, GLGame currentGame, GameStep step)
+        {
+            return game != null
+                && ReferenceEquals(game, currentGame)
+                && step == GameStep.GameIdSynced;
         }
 
         public IEnumerator AddMyPlayer(System.Action<bool> onComplete = null)
@@ -350,39 +370,70 @@ namespace GLMod.Services.Implementations
                 Log("[AddMyPlayer] My name null or empty");
             }
 
-            // Wait for the game ID to become available
-            while (string.IsNullOrEmpty(CurrentGame.id))
+            // Wait for the game ID to become available (never sent if the host has no GLMod or its SendGame failed)
+            GLGame game = CurrentGame;
+            float waited = 0f;
+            while (ShouldWaitForGameId(game, CurrentGame, waited))
             {
                 yield return new WaitForSeconds(0.1f);
+                waited += 0.1f;
+            }
+
+            if (!ReferenceEquals(game, CurrentGame) || string.IsNullOrEmpty(game.id))
+            {
+                Log("[AddMyPlayer] Game id unavailable");
+                onComplete?.Invoke(false);
+                yield break;
             }
 
             // Prepare the form. The API takes the account from the game token (Bearer).
             var form = new Dictionary<string, string>
             {
-                { "gameId", CurrentGame.id },
+                { "gameId", game.id },
                 { "playerName", me.Data.PlayerName }
             };
 
-            string responseString = null;
+            yield return PostMyPlayer(_apiEndpoint + "/game/addMyPlayer", form, _authService.BearerToken, Log, onComplete);
+        }
+
+        /// <summary>
+        /// Sends the addMyPlayer form and calls onComplete(false) on an HTTP or network error,
+        /// onComplete(true) otherwise.
+        /// </summary>
+        public static IEnumerator PostMyPlayer(string url, Dictionary<string, string> form, string bearerToken,
+            System.Action<string> log, System.Action<bool> onComplete = null)
+        {
             string error = null;
 
             // Call the ApiService coroutine
-            yield return ApiService.PostFormAsync(_apiEndpoint + "/game/addMyPlayer", form,
-                result => {
-                    responseString = result;
-                },
+            yield return ApiService.PostFormAsync(url, form,
+                result => { },
                 err => {
                     error = err;
                 },
-                _authService.BearerToken
+                bearerToken
             );
 
             // Error handling
             if (error != null)
             {
-                Log("[AddMyPlayer] Add my player fail, error: " + error);
+                log?.Invoke("[AddMyPlayer] Add my player fail, error: " + error);
+                onComplete?.Invoke(false);
+                yield break;
             }
             onComplete?.Invoke(true);
+        }
+
+        /// <summary>
+        /// Whether AddMyPlayer keeps waiting for the game id: the game is still the current one,
+        /// has no id yet, and the wait is shorter than GAME_ID_WAIT_TIMEOUT.
+        /// </summary>
+        public static bool ShouldWaitForGameId(GLGame game, GLGame currentGame, float waited)
+        {
+            return game != null
+                && ReferenceEquals(game, currentGame)
+                && string.IsNullOrEmpty(game.id)
+                && waited < GameConstants.GAME_ID_WAIT_TIMEOUT;
         }
 
         public IEnumerator GetShieldPlayer(System.Action<string> onComplete = null, System.Action<string> onError = null)
@@ -525,33 +576,44 @@ namespace GLMod.Services.Implementations
             if (Step != GameStep.WinnerSet)
             {
                 Log("[EndGame] Call when in step " + Step);
+                // The game cannot be sent anymore: start the next one from scratch
+                Step = GameStep.Initial;
                 yield break;
             }
 
             if (CurrentGame == null)
             {
                 Log("[EndGame] Current Game null");
+                Step = GameStep.Initial;
                 yield break;
             }
 
             BackgroundEvents.endBackgroundProcess();
 
+            yield return PostEndGame(_apiEndpoint + "/game/end", CurrentGame, Log, step => Step = step);
+        }
+
+        /// <summary>
+        /// Sends the finished game to /game/end, then sets the step back to Initial whatever the result:
+        /// after an HTTP or network error the next game must still be started and sent.
+        /// </summary>
+        public static IEnumerator PostEndGame(string url, GLGame game, System.Action<string> log,
+            System.Action<GameStep> setStep)
+        {
             yield return CoroutineHelpers.RunAsync(
                 async () =>
                 {
-                    string json = GLJson.Serialize<GLGame>(CurrentGame);
+                    string json = GLJson.Serialize<GLGame>(game);
                     var content = new StringContent(json, Encoding.UTF8, "application/json");
-                    var response = await HttpHelper.Client.PostAsync(_apiEndpoint + "/game/end", content).ConfigureAwait(false);
+                    var response = await HttpHelper.Client.PostAsync(url, content).ConfigureAwait(false);
                     response.EnsureSuccessStatusCode();
                     await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 },
-                onCompleted: () =>
-                {
-                    Step = GameStep.Initial;
-                    Log("Game ended.");
-                },
-                onError: ex => Log("[EndGame] End Game fail, error: " + ex.Message)
+                onCompleted: () => log?.Invoke("Game ended."),
+                onError: ex => log?.Invoke("[EndGame] End Game fail, error: " + ex.Message)
             );
+
+            setStep?.Invoke(GameStep.Initial);
         }
 
         public void AddAction(string source, string target, string action)

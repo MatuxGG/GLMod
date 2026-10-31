@@ -44,7 +44,7 @@ namespace GLMod.Menu
         private static float _indicatorX = -1f;
         private static float _indicatorWidth;
         private static int _lastSelectedIndex = -1;
-        private static IMenuTab _shownTab;
+        private static readonly ShownTabTracker _shownTab = new ShownTabTracker();
         private static Rect _chipRect;
         private static Rect _panelRect;
         private static readonly HashSet<string> _loggedErrors = new HashSet<string>();
@@ -202,19 +202,22 @@ namespace GLMod.Menu
         private static void NotifyShownTab(IMenuService menu)
         {
             IMenuTab visible = menu.IsOpen ? menu.SelectedTab : null;
-            if (visible == _shownTab)
+            // A login, logout or account change while a tab is visible notifies it again, so it loads its data
+            string account = GLMod.AuthService?.GetAccountName() ?? "";
+            bool notify = _shownTab.Update(visible, account, out bool tabChanged);
+            if (tabChanged)
+            {
+                _scroll = 0f;
+            }
+            if (!notify)
             {
                 return;
             }
 
-            _shownTab = visible;
-            _scroll = 0f;
-            if (visible == null)
+            if (tabChanged)
             {
-                return;
+                _contentProgress = 0f;
             }
-
-            _contentProgress = 0f;
             try
             {
                 visible.OnShown();

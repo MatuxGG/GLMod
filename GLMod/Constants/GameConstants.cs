@@ -21,6 +21,11 @@ namespace GLMod.Constants
         public const long CLOCK_SKEW_TOLERANCE_MS = 2000;
 
         /// <summary>
+        /// Resolution of the HTTP Date header: ServerClock keeps its offset when a new measurement is within it
+        /// </summary>
+        public const long CLOCK_DATE_RESOLUTION_MS = 1000;
+
+        /// <summary>
         /// Characters used for generating support IDs
         /// </summary>
         public const string SUPPORT_ID_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz123456789";
@@ -60,6 +65,11 @@ namespace GLMod.Constants
         /// Polling interval for RPC checks in seconds
         /// </summary>
         public const float RPC_POLLING_INTERVAL = 0.1f;
+
+        /// <summary>
+        /// Longest time AddMyPlayer waits for the game id sent by the host, in seconds
+        /// </summary>
+        public const float GAME_ID_WAIT_TIMEOUT = 30f;
 
         /// <summary>
         /// Default game code when unknown

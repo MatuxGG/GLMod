@@ -66,5 +66,27 @@ namespace GLMod.Tests
                 ServerClock.Reset();
             }
         }
+
+        [Fact]
+        public void Update_IgnoresMeasurementWithinDateResolution_k0022()
+        {
+            // Local clock ~2.2s behind: the 1s Date header resolution makes the measurement cross the
+            // tolerance, which used to reset the offset to 0 mid-game and make NowMs go back
+            try
+            {
+                ServerClock.Reset();
+                DateTimeOffset first = DateTimeOffset.FromUnixTimeMilliseconds(1_700_000_000_300);
+                ServerClock.Update(DateTimeOffset.FromUnixTimeMilliseconds(1_700_000_002_000), first, first);
+                Assert.Equal(2200, ServerClock.OffsetMs);
+
+                DateTimeOffset second = DateTimeOffset.FromUnixTimeMilliseconds(1_700_000_010_600);
+                ServerClock.Update(DateTimeOffset.FromUnixTimeMilliseconds(1_700_000_012_000), second, second);
+                Assert.Equal(2200, ServerClock.OffsetMs);
+            }
+            finally
+            {
+                ServerClock.Reset();
+            }
+        }
     }
 }

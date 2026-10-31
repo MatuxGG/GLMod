@@ -42,7 +42,7 @@ Any code review MUST reject contributions that introduce non-English identifiers
 
 ### 1.1 Identity
 - **Name**: GLMod (Good Loss Mod)
-- **Current version**: `5.9.0` (see [GLMod/GLMod.csproj](GLMod/GLMod.csproj) and [GLMod/GLMod.cs](GLMod/GLMod.cs))
+- **Current version**: `5.9.1` (see [GLMod/GLMod.csproj](GLMod/GLMod.csproj) and [GLMod/GLMod.cs](GLMod/GLMod.cs))
 - **BepInEx plugin Id**: `glmod`
 - **Author**: Matux
 - **License**: GNU GPLv3
@@ -156,11 +156,11 @@ Every service is exposed statically via the main `GLMod` class and has a dedicat
   - `SetRanked(ranked)` — updates the ranked flag on the current game (`bool` setter; stored as `"0"`/`"1"`).
   - `AddPlayer(name, role, team, color)` — adds a player to the current match.
   - `SendGame(onComplete)` — uploads the match to the API (coroutine).
-  - `SyncGameId(onComplete)` — broadcasts the match ID to non-hosts via RPC.
-  - `AddMyPlayer(onComplete)` — registers the local player on the server (`gameId`, `playerName`; the site takes the account from the Bearer game token).
+  - `SyncGameId(onComplete)` — broadcasts the match ID to non-hosts via RPC after `RPC_SYNC_TIMEOUT`; aborts without touching `Step` if a disconnect reset it (or the game changed) during the wait (`IsGameIdSyncCurrent`).
+  - `AddMyPlayer(onComplete)` — registers the local player on the server (`gameId`, `playerName`; the site takes the account from the Bearer game token). Calls `onComplete(false)` when the host's game id has not arrived after `GAME_ID_WAIT_TIMEOUT`, when the game is reset meanwhile, or when `/game/addMyPlayer` fails (HTTP error or network failure).
   - `GetShieldPlayer(onComplete, onError)` — returns the player who would have benefited from a T1 shield (retries on HTTP 400).
   - `SetWinnerTeams(winners)` / `AddWinnerPlayer(name)` — sets the outcome.
-  - `EndGame()` — closes the match server-side.
+  - `EndGame()` — closes the match server-side (`PostEndGame`). On the host, `Step` goes back to `Initial` even when `/game/end` fails or the game cannot be sent (wrong step, no game), so the next game is started and sent normally.
   - `AddAction(source, target, action)` — records an action (kill, vote, sabotage, custom…).
   - `ResetGame()` — resets the state (`Step = Initial`).
 - **Free play is never recorded nor sent**: in free play (`PlayModeHelper.IsFreePlay()`, i.e. `AmongUsClient.NetworkMode == NetworkModes.FreePlay`) the vanilla start trigger (`PlayerControlPatch`) does nothing, `StartGame` creates no game (`CurrentGame = null`), and `SendGame` / `AddMyPlayer` / `EndGame` send nothing — also when a third-party mod calls them itself.
@@ -313,6 +313,7 @@ Reactor, Coms, Lights, O2
 | `API_ENDPOINT`                | `https://goodloss.fr/api`                    |
 | `API_ENDPOINT_ENV_VAR`        | `GLMOD_API_ENDPOINT` (overrides `API_ENDPOINT`, see §10) |
 | `CLOCK_SKEW_TOLERANCE_MS`     | `2000` — clock difference with the API ignored by `ServerClock` |
+| `CLOCK_DATE_RESOLUTION_MS`    | `1000` — `ServerClock` keeps its offset when a new measurement is within this of it (Date header noise; `NowMs()` must not go back mid-game) |
 | `SUPPORT_ID_CHARS`            | `A-Za-z1-9` (no `0`)                         |
 | `SUPPORT_ID_LENGTH`           | `10`                                         |
 | `RPC_SYNC_TIMEOUT`            | `5.0f` seconds                               |
@@ -321,6 +322,7 @@ Reactor, Coms, Lights, O2
 | `POSITION_SIMPLIFY_TOLERANCE` | `0.1f` map units — a sample is dropped when the recap would still draw the player within this distance of it |
 | `POSITION_MAX_GAP_MS`         | `5000` — at least one sent position per player in this time, even standing still |
 | `RPC_POLLING_INTERVAL`        | `0.1f` seconds                               |
+| `GAME_ID_WAIT_TIMEOUT`        | `30f` seconds — `AddMyPlayer` gives up (`onComplete(false)`) when the host's game id has not arrived |
 | `DEFAULT_GAME_CODE`           | `XXXXXX`                                     |
 | `DEFAULT_MAP_NAME`            | `Unknown`                                    |
 | `ACTION_PREFIX_DC_PROCESS`    | `DC_PROCESS_` (background-detected DC)       |
@@ -391,6 +393,7 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
   - `2`: `DisconnectInternal` → builds reason `DC_INTERNAL_<value>`.
   - `3`: `HandleDisconnect` → builds reason `DC_HANDLE_<value>`.
   - `4`: `OnDisconnect` → builds reason `DC_ON_<value>`.
+  - Cases `2`–`4` carry `[reason, playerName]` and are sent by the matching `InnerNetClientPatch` patch (`OnDisconnect` sends `["On Disconnect", playerName]`). The sender records the same `DC_*` action locally: both sides build it with `InnerNetClientPatch.BuildDisconnectAction(rpcId, reason)`.
   - (additional cases must be documented as they are added — **update this table**).
 
 > Any new RPC ID must be **reserved here** before implementation to prevent collisions.
@@ -402,7 +405,7 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 | File                   | Role                                                                                       |
 |------------------------|--------------------------------------------------------------------------------------------|
 | `HttpHelper.cs`        | Shared static `HttpClient`, proxy disabled.                                                |
-| `ApiService.cs`        | `PostFormAsync`, `PostFormWithErrorHandlingAsync` (optional `bearerToken` → `Authorization: Bearer`; `unescape: false` keeps a JSON body intact), `GetWithErrorHandlingAsync`, `ApiResponse` type. |
+| `ApiService.cs`        | `PostFormAsync`, `PostFormWithErrorHandlingAsync` (optional `bearerToken` → `Authorization: Bearer`; response bodies are returned as sent, never `Regex.Unescape`d by default: it corrupts JSON escapes), `GetWithErrorHandlingAsync`, `ApiResponse` type. |
 | `SteamSessionTicket.cs` | `TryCreate` / `Cancel` — Steam session ticket (hex) of the Steam ticket login (§3.1). Main thread only. |
 | `LoginResponse.cs`     | Pure login helpers: ticket bytes → hex, ticket login answer (`GLLoginResponse`), ban reason, account name of a legacy token, token reuse. |
 | `ApiEndpointResolver.cs` | Resolves the API base URL: `API_ENDPOINT`, or the `GLMOD_API_ENDPOINT` environment variable when it is a valid http(s) URL. `ToSiteUrl(api)` / `GameRecapUrl(api, gameId)` give the matching site and recap URLs. |
@@ -414,7 +417,7 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 | `PlayModeHelper.cs`    | `IsFreePlay()` — free play games are never recorded nor sent (§3.3). `CurrentOnlineGameCode()` — code of the online game the player is in, null otherwise. |
 | `RankedMod.cs`         | `Matches(modName)` — "Among Us Ranked" and its variants ("Among Us Ranked Roles"…), case-insensitive. Pure. |
 | `StatFormat.cs`        | Pure formatting of menu stats: durations ("1 min 05 s", "2 h 05"), ratios, win percentages (`WinPercent`, rounded like the site), Yes/No, numbers, local dates, vanilla role names. |
-| `ServerClock.cs`       | `NowMs()` — Unix ms aligned on the API server clock. The offset is refreshed from the `Date` header of every `ApiService` response. **Every timestamp sent to the API (actions, positions) must use `ServerClock.NowMs()`**, never `DateTimeOffset.UtcNow`. |
+| `ServerClock.cs`       | `NowMs()` — Unix ms aligned on the API server clock. The offset is refreshed from the `Date` header of every `ApiService` response, unless the new measurement is within `CLOCK_DATE_RESOLUTION_MS` of the current offset (so `NowMs()` does not go back mid-game). **Every timestamp sent to the API (actions, positions) must use `ServerClock.NowMs()`**, never `DateTimeOffset.UtcNow`. |
 | `CoroutineHelpers.cs`  | `RunAsync` / `RunAsync<T>` — async-task ↔ coroutine bridge. Use these instead of re-implementing the `Task.Run` + volatile `done` flag pattern. |
 | `CoroutineRunner.cs`   | `MonoBehaviour` IL2CPP singleton used to run coroutines from static classes.               |
 | `ServiceLogger.cs`     | `Log(logger, serviceName, message)` — shared log formatter producing `[GLMod][Service] PlayerName: message`. Every service must delegate to it. |
@@ -441,7 +444,7 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 - **Room codes** in the header, right-aligned next to the × button: `ROOM <code>` (the online game the player is in, `PlayModeHelper.CurrentOnlineGameCode`) and below it `MY CODE <code>` (room code of the account, `NONE` without one; only on a Good Loss server and logged in). Example: `ORIANA` then `GVOVVF` for a player whose code is GVOVVF in the game ORIANA.
 - **Fonts**: OS fonts through `Font.CreateDynamicFontFromOSFont`: display text (titles, tabs, buttons, captions) in Bahnschrift SemiBold (condensed DIN-like face of Windows 10+), body text in Segoe UI; Arial / the IMGUI default font elsewhere (Linux / Proton).
 - **Navigation**: left / right arrows (or the ‹ › buttons, or a click on a tab) switch tabs; up / down arrows and the mouse wheel scroll the current tab. The game does not see these inputs while the menu uses them (§7 patches).
-- **Rendering**: IMGUI from `MenuBehaviour` (`Update` = keys, scrolling, slide and content animations; `OnGUI` = drawing). Layout values are 1080p reference units converted to **screen pixels** with `MenuUI.U` (scale = screen height / 1080, never below `0.85`); styles (font sizes) are rebuilt when the scale changes, so text is rendered at its real size and stays sharp (no `GUI.matrix` scaling). Palette based on the Good Loss site (`--accent #A78BFA`, deeper `#7C3AED` for gradients, dark navy surfaces). `MenuBehaviour` notifies `IMenuTab.OnShown()` when a tab becomes visible; tab exceptions are logged once and replaced by an error message.
+- **Rendering**: IMGUI from `MenuBehaviour` (`Update` = keys, scrolling, slide and content animations; `OnGUI` = drawing). Layout values are 1080p reference units converted to **screen pixels** with `MenuUI.U` (scale = screen height / 1080, never below `0.85`); styles (font sizes) are rebuilt when the scale changes, so text is rendered at its real size and stays sharp (no `GUI.matrix` scaling). Palette based on the Good Loss site (`--accent #A78BFA`, deeper `#7C3AED` for gradients, dark navy surfaces). `MenuBehaviour` notifies `IMenuTab.OnShown()` when a tab becomes visible, and again when the connected account (`AuthService.GetAccountName()`) changes while it stays visible, so a tab shown during the login loads its data once connected ([ShownTabTracker.cs](GLMod/Menu/ShownTabTracker.cs), pure, unit-tested); tab exceptions are logged once and replaced by an error message.
 - **Widgets**: [MenuUI.cs](GLMod/Menu/MenuUI.cs) — public, used by built-in and third-party tabs: `Heading`, `Highlight`, `Label`, `Muted`, `Field`, `Button`, `Row`, `ProgressBar`, `Tiles`, `StatGrid` (compact 3-column stat tiles, null values skipped), `Tags` (colored pills, wrapping), `WinRate` (label, counts, colored bar and percentage), `Space`, `Separator`, colors. Internal helpers for the built-in tabs: `Reserve`, `DrawRect`, `DrawGlow`, `DrawCircle`, `DrawRemoteImage` (image downloaded from a URL through `HttpHelper`, decoded on the main thread, cached by URL), `DrawAccentGradient`, `DrawPill`, `DrawSecondaryButton`, `EmptyState`.
 - **Textures**: generated once with `Texture2D.SetPixel` (white, tinted through `GUI.backgroundColor` and drawn with `GUI.Box` + 9-slice borders): rounded rectangles (4 / 7 / 12 px), circle, soft halos (large and small), accent and panel gradients (colors baked in). A halo whose 9-slice border is larger than the drawn rectangle turns into a block: `DrawGlow` switches to the small halo for elements under 24 px.
 - **Built-in tabs** (class names end with `MenuTab`: Among Us already has a global `AccountTab` type, which would win name resolution):
@@ -527,7 +530,7 @@ Base: `https://goodloss.fr/api` (production). It can be overridden at startup wi
 
 ### 11.4 Testing
 - Test framework: xUnit ([GLMod.Tests/GLMod.Tests.csproj](GLMod.Tests/GLMod.Tests.csproj)).
-- Scope: pure logic — entities (`GLGame`, `GLPlayer`, `GLPosition`), enums (`SabotageType`, `GameMapType`), `ServiceManager`, `GameConstants` invariants, `ApiEndpointResolver` (incl. site / recap URLs), `ServerClock`, `MenuService`, `GameHistoryList`, `PlayerApiResponse` (on captured preprod responses), `LoginResponse`, `StatFormat`, `PositionSimplifier`, and the E2E harness `ScenarioPlan` / `ScenarioVerifier` / `NavGrid` / `PositionAccuracy`. Anything that touches IL2CPP / Among Us types stays untestable until further decoupling.
+- Scope: pure logic — entities (`GLGame`, `GLPlayer`, `GLPosition`), enums (`SabotageType`, `GameMapType`), `ServiceManager`, `GameConstants` invariants, `ApiEndpointResolver` (incl. site / recap URLs), `ServerClock`, `ApiService` response bodies (against a local TCP stub server), `MenuService`, `ShownTabTracker`, `GameHistoryList`, `PlayerApiResponse` (on captured preprod responses), `LoginResponse`, `StatFormat`, `PositionSimplifier`, `BackgroundEvents.SabotageForTask` (sabotage task → `SabotageType`, e.g. `RestoreOxy` → O2), and the E2E harness `ScenarioPlan` / `ScenarioVerifier` / `NavGrid` / `PositionAccuracy`. The test project references the interop `Assembly-CSharp.dll` for plain Among Us enums (`TaskTypes`). Anything else that touches IL2CPP / Among Us types stays untestable until further decoupling.
 - Add new tests for any new pure-logic surface. Refactor toward injectable abstractions before adding tests that would otherwise require IL2CPP mocking.
 
 ### 11.5 End-to-end test (4 Among Us instances, online lobby: 2-game session or movement game)
@@ -597,7 +600,10 @@ GLMod/                                # Repo root
 │   └── BepInEx/                      # Core + interop DLLs (referenced by csproj).
 ├── GLMod.Tests/                      # xUnit test project for pure-logic types.
 │   ├── GLMod.Tests.csproj
+│   ├── ApiServiceTests.cs            # ApiService response bodies (local TCP stub server).
 │   ├── EntityTests.cs
+│   ├── AddMyPlayerTests.cs           # AddMyPlayer result on HTTP / network errors (local TCP stub server).
+│   ├── EndGameTests.cs               # EndGame step reset on /game/end errors (local TCP stub server).
 │   ├── EnumTests.cs
 │   ├── GameConstantsTests.cs         # + ApiEndpointResolver.
 │   ├── GameHistoryTests.cs           # GameHistoryList.
@@ -612,7 +618,16 @@ GLMod/                                # Repo root
 │   ├── TranslationTests.cs           # TranslationTable, GameLanguage, embedded translation files.
 │   ├── ScenarioTests.cs              # ScenarioPlan / ScenarioVerifier (E2E harness logic).
 │   ├── ServerClockTests.cs
-│   └── ServiceManagerTests.cs
+│   ├── ServiceManagerTests.cs
+│   ├── BackgroundEventsTests.cs      # BackgroundEvents.SabotageForTask.
+│   ├── GameIdSyncTests.cs            # SyncGameId aborted by a disconnect.
+│   ├── GameIdWaitTests.cs            # AddMyPlayer wait for the game id.
+│   ├── InnerNetClientPatchTests.cs   # RPC values and DC_* actions of the disconnects.
+│   ├── IntegrityServiceTests.cs      # VerifyDll when the dll cannot be read.
+│   ├── MainMenuManagerPatchTests.cs  # FormatInitError.
+│   ├── MurderPatchTests.cs           # Failed murders (guardian angel protection).
+│   ├── RankServiceTests.cs           # GetRank callback called once.
+│   └── ShownTabTrackerTests.cs       # ShownTabTracker (menu OnShown notifications).
 ├── GLMod.TestHarness/                # E2E test plugin, see §11.5. Never shipped.
 │   ├── GLMod.TestHarness.csproj
 │   ├── run-e2e.ps1                   # Launches 4 instances and prints the summary.
@@ -723,6 +738,7 @@ GLMod/                                # Repo root
     │   ├── StatsMenuTab.cs
     │   ├── LastGameMenuTab.cs
     │   ├── SessionsMenuTab.cs
+    │   ├── ShownTabTracker.cs        # Pure: when to notify OnShown (tab or account change).
     │   └── RemoteData.cs             # Cached API data of a tab.
     ├── Resources/
     │   ├── goodloss-logo.png         # Good Loss logo (EmbeddedResource, menu header).
@@ -904,5 +920,5 @@ For every change to the project:
 
 ---
 
-*Last updated: 2026-10-30 — GLMod version 5.9.0.*
+*Last updated: 2026-10-31 — GLMod version 5.9.1.*
 *Every change to the project must be accompanied by an update of this file.*

@@ -124,6 +124,14 @@ namespace GLMod
             GLMod.log("=== Authentication Services Test Completed ===");
         }
 
+        /// <summary>
+        /// Log line for an exception thrown while starting the services (Source and InnerException may be null)
+        /// </summary>
+        public static string FormatInitError(Exception e)
+        {
+            return e.Source + " / " + e.InnerException + " / " + e.Message;
+        }
+
         public static void Postfix(MainMenuManager __instance)
         {
             try
@@ -192,7 +200,7 @@ namespace GLMod
                     catch (Exception e)
                     {
                         GLMod.disableAllServices();
-                        GLMod.log(e.Source.ToString() + " / " + e.InnerException.ToString() + " / " + e.Message.ToString());
+                        GLMod.log(FormatInitError(e));
                     }
                 }
             }

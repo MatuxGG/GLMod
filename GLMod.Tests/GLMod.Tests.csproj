@@ -20,4 +20,8 @@
         <ProjectReference Include="..\GLMod.TestHarness\GLMod.TestHarness.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <Reference Include="..\Among Us\BepInEx\interop\Assembly-CSharp.dll" />
+    </ItemGroup>
+
 </Project>

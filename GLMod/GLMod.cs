@@ -23,7 +23,7 @@ namespace GLMod
     public class GLMod : BasePlugin
     {
         public const string Id = "glmod";
-        public const string Version = "5.9.0";
+        public const string Version = "5.9.1";
 
         public Harmony Harmony { get; } = new Harmony(Id);
 
