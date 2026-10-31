@@ -579,6 +579,7 @@ Base: `https://goodloss.fr/api` (production). It can be overridden at startup wi
 - Build driven by [build.cake](build.cake) (Cake).
 - Version is derived from the Git tag (`refs/tags/X.Y.Z`) or a CI suffix.
 - Iterates over `GamePlatform = Steam | Itch` (multi-build).
+- **Two remotes, kept synchronized**: GitHub (`origin`, public, releases) and GitLab (`gitlab`, Bughunt fixes land there). Every branch and tag must be on both: bring GitLab commits into `main` before a release and push `main` and the tags to both, never with force.
 
 ---
 
