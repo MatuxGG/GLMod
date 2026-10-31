@@ -590,15 +590,17 @@ namespace GLMod.Services.Implementations
 
             BackgroundEvents.endBackgroundProcess();
 
-            yield return PostEndGame(_apiEndpoint + "/game/end", CurrentGame, Log, step => Step = step);
+            yield return PostEndGame(_apiEndpoint + "/game/end", CurrentGame, Log, step => Step = step, () => CurrentGame);
         }
 
         /// <summary>
         /// Sends the finished game to /game/end, then sets the step back to Initial whatever the result:
         /// after an HTTP or network error the next game must still be started and sent.
+        /// The step is left alone if getCurrentGame no longer returns this game: it belongs to the
+        /// game started or reset while /game/end was pending.
         /// </summary>
         public static IEnumerator PostEndGame(string url, GLGame game, System.Action<string> log,
-            System.Action<GameStep> setStep)
+            System.Action<GameStep> setStep, System.Func<GLGame> getCurrentGame = null)
         {
             yield return CoroutineHelpers.RunAsync(
                 async () =>
@@ -613,7 +615,10 @@ namespace GLMod.Services.Implementations
                 onError: ex => log?.Invoke("[EndGame] End Game fail, error: " + ex.Message)
             );
 
-            setStep?.Invoke(GameStep.Initial);
+            if (getCurrentGame == null || ReferenceEquals(game, getCurrentGame()))
+            {
+                setStep?.Invoke(GameStep.Initial);
+            }
         }
 
         public void AddAction(string source, string target, string action)

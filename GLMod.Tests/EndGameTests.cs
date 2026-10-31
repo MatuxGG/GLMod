@@ -63,16 +63,52 @@ namespace GLMod.Tests
         }
 
         /// <summary>
-        /// Serves one HTTP response with the given status and drives the coroutine to its end.
+        /// k0027: a third-party mod starts the next game while /game/end is pending. The end of
+        /// the request must not reset the new game's step, or AddPlayer and SendGame refuse it.
         /// </summary>
-        private static void RunWithStub(string status, Func<string, IEnumerator> coroutine)
+        [Theory]
+        [InlineData("200 OK")]
+        [InlineData("503 Service Unavailable")]
+        public void PostEndGame_NewGameStartedWhilePending_KeepsItsStep_k0027(string status)
+        {
+            GLGame endedGame = Game();
+            GLGame currentGame = endedGame;
+            GameStep step = GameStep.WinnerSet;
+
+            RunWithStub(status,
+                url => GameStateManager.PostEndGame(url, endedGame, null, s => step = s, () => currentGame),
+                onRequest: () =>
+                {
+                    currentGame = Game();
+                    step = GameStep.PlayersAdded;
+                });
+
+            Assert.Equal(GameStep.PlayersAdded, step);
+        }
+
+        [Fact]
+        public void PostEndGame_GameStillCurrent_ResetsStep_k0027()
+        {
+            GLGame game = Game();
+            GameStep step = GameStep.WinnerSet;
+
+            RunWithStub("200 OK", url => GameStateManager.PostEndGame(url, game, null, s => step = s, () => game));
+
+            Assert.Equal(GameStep.Initial, step);
+        }
+
+        /// <summary>
+        /// Serves one HTTP response with the given status and drives the coroutine to its end.
+        /// onRequest runs once the request is received, before the response is sent.
+        /// </summary>
+        private static void RunWithStub(string status, Func<string, IEnumerator> coroutine, Action onRequest = null)
         {
             var listener = new TcpListener(IPAddress.Loopback, 0);
             listener.Start();
             try
             {
                 int port = ((IPEndPoint)listener.LocalEndpoint).Port;
-                Task server = Task.Run(() => ServeOnce(listener, status));
+                Task server = Task.Run(() => ServeOnce(listener, status, onRequest));
 
                 Drive(coroutine($"http://127.0.0.1:{port}/"));
                 server.Wait(TimeSpan.FromSeconds(10));
@@ -95,7 +131,7 @@ namespace GLMod.Tests
             }
         }
 
-        private static void ServeOnce(TcpListener listener, string status)
+        private static void ServeOnce(TcpListener listener, string status, Action onRequest)
         {
             using TcpClient client = listener.AcceptTcpClient();
             NetworkStream stream = client.GetStream();
@@ -123,6 +159,8 @@ namespace GLMod.Tests
                 if (read == 0) break;
                 remaining -= read;
             }
+
+            onRequest?.Invoke();
 
             byte[] payload = Encoding.UTF8.GetBytes("{}");
             byte[] head = Encoding.ASCII.GetBytes(
