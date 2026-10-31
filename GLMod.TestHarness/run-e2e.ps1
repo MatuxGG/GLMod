@@ -46,7 +46,10 @@ param(
     [switch]$NoTile,
     [switch]$NoBuild,
     [switch]$KeepPlugin,
-    [switch]$KeepOtherPlugins
+    [switch]$KeepOtherPlugins,
+    # Plugin scenario: behave like a client older than the room tickets (needs -KeepOtherPlugins: the name of the
+    # player must be a legacy room of GLPlugin, Among Us Ranked gives the Good Loss one)
+    [switch]$NoTicket
 )
 
 $ErrorActionPreference = 'Stop'
@@ -186,6 +189,7 @@ try {
     $env:GLMOD_TEST_SCENARIO = $Scenario.ToLowerInvariant()
     $env:GLMOD_TEST_REGION = $Region
     if ($Scenario -eq 'Friends') { $env:GLMOD_TEST_ACCOUNTS = $accountsFile }
+    if ($NoTicket) { $env:GLMOD_TEST_NO_TICKET = '1' }
     for ($i = 0; $i -lt $playerCount; $i++) {
         $env:GLMOD_TEST_INSTANCE = "$i"
         # Unity only writes the shared Player.log for one process: give each instance its own log
@@ -223,7 +227,7 @@ catch {
     throw
 }
 finally {
-    Remove-Item Env:GLMOD_TEST_INSTANCE, Env:GLMOD_TEST_RUN_ID, Env:GLMOD_TEST_OUTPUT, Env:GLMOD_API_ENDPOINT, Env:GLMOD_TEST_MOD_NAME, Env:GLMOD_TEST_MAP_ID, Env:GLMOD_TEST_SCENARIO, Env:GLMOD_TEST_REGION, Env:GLMOD_TEST_ACCOUNTS -ErrorAction SilentlyContinue
+    Remove-Item Env:GLMOD_TEST_INSTANCE, Env:GLMOD_TEST_RUN_ID, Env:GLMOD_TEST_OUTPUT, Env:GLMOD_API_ENDPOINT, Env:GLMOD_TEST_MOD_NAME, Env:GLMOD_TEST_MAP_ID, Env:GLMOD_TEST_SCENARIO, Env:GLMOD_TEST_REGION, Env:GLMOD_TEST_ACCOUNTS, Env:GLMOD_TEST_NO_TICKET -ErrorAction SilentlyContinue
 }
 
 # Window tiling: a window is re-placed until it sits in its cell (Unity may resize it while loading),

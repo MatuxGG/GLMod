@@ -67,6 +67,22 @@ namespace GLMod.TestHarness
     }
 
     /// <summary>
+    /// run-e2e.ps1 -NoTicket: behaves like a client older than the room tickets.
+    /// </summary>
+    [HarmonyPatch(typeof(global::GLMod.Services.Implementations.RoomTicketService), nameof(global::GLMod.Services.Implementations.RoomTicketService.Ticket), MethodType.Getter)]
+    public static class HarnessNoTicketPatch
+    {
+        public static bool IsRequested => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(HarnessConstants.ENV_NO_TICKET));
+
+        public static bool Prefix(ref string __result)
+        {
+            if (!IsRequested) return true;
+            __result = null;
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Plugin scenario: the answers of GLPlugin arrive as chat lines.
     /// </summary>
     [HarmonyPatch(typeof(ChatController), nameof(ChatController.AddChat))]

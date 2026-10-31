@@ -52,10 +52,19 @@ namespace GLMod.TestHarness
         private static IEnumerator PlayPluginScenario()
         {
             SetPhase("plugin:ticket");
-            yield return WaitFor("a room ticket from the API", () => GLModPlugin.RoomTicketService?.Ticket != null, HarnessConstants.PLUGIN_STEP_TIMEOUT);
-            if (_finished) yield break;
-
-            string roomCode = GLModPlugin.RoomTicketService.RoomCode;
+            string roomCode;
+            if (HarnessNoTicketPatch.IsRequested)
+            {
+                // A client older than the tickets: the server goes by the declared name (Matux, with Among Us Ranked)
+                roomCode = HarnessConstants.LEGACY_ROOM_CODE;
+                HarnessLog.Info("No ticket sent; expected code from the name: " + roomCode);
+            }
+            else
+            {
+                yield return WaitFor("a room ticket from the API", () => GLModPlugin.RoomTicketService?.Ticket != null, HarnessConstants.PLUGIN_STEP_TIMEOUT);
+                if (_finished) yield break;
+                roomCode = GLModPlugin.RoomTicketService.RoomCode;
+            }
             HarnessLog.Info("Room code of the account: " + (roomCode ?? "none"));
             if (roomCode == null)
             {

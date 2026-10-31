@@ -36,6 +36,8 @@ namespace GLMod.TestHarness
 
         // Plugin scenario
         public const string SIGNAL_FILE_FORMAT = "signal-{0}.txt";
+        public const string ENV_NO_TICKET = "GLMOD_TEST_NO_TICKET";
+        public const string LEGACY_ROOM_CODE = "GVOVVF";
         public const string PLUGIN_UNKNOWN_PLAYER = "NoSuchPlayer";
         public const string PLUGIN_UNKNOWN_ROOM = "ZZZZZZ";
         public const int PLUGIN_ROOM_CODE_LENGTH = 6;
