@@ -231,6 +231,11 @@ namespace GLMod.Services.Implementations
                 Log($"[{path}] failed: {error}");
             }
 
+            // A sync already running may have read the list before this action, and would write it after
+            while (_syncing)
+            {
+                yield return null;
+            }
             yield return Sync();
             onDone?.Invoke(error);
         }
@@ -242,7 +247,7 @@ namespace GLMod.Services.Implementations
 
         public IEnumerator Join(GLFriend friend, Action<string> onDone = null)
         {
-            if (friend == null || string.IsNullOrEmpty(friend.gameCode) || PlayModeHelper.IsFreePlay())
+            if (friend == null || string.IsNullOrEmpty(friend.gameCode))
             {
                 onDone?.Invoke(ErrorJoinFailed);
                 yield break;
@@ -250,6 +255,17 @@ namespace GLMod.Services.Implementations
 
             AmongUsClient client = AmongUsClient.Instance;
             bool inGame = client.GameState != InnerNetClient.GameStates.NotJoined;
+            if (FriendsLogic.FreePlayBlocksJoin(PlayModeHelper.IsFreePlay(), inGame))
+            {
+                onDone?.Invoke(ErrorJoinFailed);
+                yield break;
+            }
+            if (FriendsLogic.MustStayInGame(inGame, CurrentRegionName(), friend))
+            {
+                Log("[Join] the friend is on another region: staying in the game");
+                onDone?.Invoke(ErrorJoinFailed);
+                yield break;
+            }
             if (FriendsLogic.MustGoToMainMenu(inGame, SceneManager.GetActiveScene().name))
             {
                 string failure = null;
@@ -291,7 +307,7 @@ namespace GLMod.Services.Implementations
             string joinError = null;
             try
             {
-                if (DestroyableSingleton<ServerManager>.Instance.CurrentRegion?.Name != friend.region)
+                if (!FriendsLogic.IsOnRegionOf(DestroyableSingleton<ServerManager>.Instance.CurrentRegion?.Name, friend))
                 {
                     joinError = ErrorJoinFailed;
                 }
@@ -310,6 +326,19 @@ namespace GLMod.Services.Implementations
                 joinError = ErrorJoinFailed;
             }
             onDone?.Invoke(joinError);
+        }
+
+        private static string CurrentRegionName()
+        {
+            try
+            {
+                return DestroyableSingleton<ServerManager>.Instance.CurrentRegion?.Name;
+            }
+            catch (Exception)
+            {
+                // Without a selected region the join fails: an exception here would leave the tab busy
+                return null;
+            }
         }
 
         private static bool IsAtMainMenu()

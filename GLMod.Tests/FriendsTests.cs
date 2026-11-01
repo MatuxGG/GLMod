@@ -23,6 +23,43 @@ namespace GLMod.Tests
             Assert.Equal(expected, FriendsLogic.MustGoToMainMenu(inGame, scene));
         }
 
+        // k0046: the game was left before seeing that the friend is on another region
+        [Theory]
+        [InlineData(true, "GL Modded", "Good Loss", true)]
+        [InlineData(true, null, "Good Loss", true)]
+        [InlineData(true, "Good Loss", "Good Loss", false)]
+        [InlineData(false, "GL Modded", "Good Loss", false)]
+        public void MustStayInGame_WhenInAGameAndTheFriendIsOnAnotherRegion(bool inGame, string current, string friendRegion, bool expected)
+        {
+            Assert.Equal(expected, FriendsLogic.MustStayInGame(inGame, current, new GLFriend { region = friendRegion }));
+        }
+
+        // k0051: the network mode stays on free play at the main menu, and every join was refused there
+        [Theory]
+        [InlineData(true, false, false)]
+        [InlineData(true, true, true)]
+        [InlineData(false, true, false)]
+        [InlineData(false, false, false)]
+        public void FreePlayBlocksJoin_OnlyWhileInAFreePlayGame(bool freePlay, bool inGame, bool expected)
+        {
+            Assert.Equal(expected, FriendsLogic.FreePlayBlocksJoin(freePlay, inGame));
+        }
+
+        [Theory]
+        [InlineData("Good Loss", "Good Loss", true)]
+        [InlineData("GL Modded", "Good Loss", false)]
+        [InlineData(null, "Good Loss", false)]
+        public void IsOnRegionOf_ComparesTheRegionNames(string current, string friendRegion, bool expected)
+        {
+            Assert.Equal(expected, FriendsLogic.IsOnRegionOf(current, new GLFriend { region = friendRegion }));
+        }
+
+        [Fact]
+        public void IsOnRegionOf_IsFalseWithoutAFriend()
+        {
+            Assert.False(FriendsLogic.IsOnRegionOf("Good Loss", null));
+        }
+
         [Theory]
         [InlineData("Matux", "Shedconic", "Matux (Shedconic)")]
         [InlineData("Matux", "matux", "Matux")]
@@ -243,6 +280,63 @@ namespace GLMod.Tests
             Assert.Equal(2, queue.Count);
             Assert.Equal("1", queue.Current(0f, Duration, false)?.name);
             Assert.Equal("3", queue.Current(6f, Duration, false)?.name);
+        }
+
+        // k0058: the request on screen when the menu opened kept its timer and never came back
+        [Fact]
+        public void ARequestInterruptedByTheMenuIsShownAgainInFullWhenItCloses()
+        {
+            var queue = new FriendNotificationQueue();
+            queue.EnqueueRequest("request", "C", 7);
+
+            Assert.Equal("C", queue.Current(0f, Duration, false)?.name);
+            queue.HoldForMenu(0.5f);
+            queue.HoldForMenu(59f);
+            Assert.Equal(1, queue.Count);
+            Assert.Equal("C", queue.Current(60f, Duration, false)?.name);
+            Assert.Equal("C", queue.Current(65f, Duration, false)?.name);
+            Assert.Null(queue.Current(66f, Duration, false));
+        }
+
+        // k0058: a request already over when the menu opens stays over
+        [Fact]
+        public void ARequestAlreadyOverWhenTheMenuOpensDoesNotComeBack()
+        {
+            var queue = new FriendNotificationQueue();
+            queue.EnqueueRequest("request", "C", 7);
+
+            Assert.Equal("C", queue.Current(0f, Duration, false)?.name);
+            queue.HoldForMenu(6f);
+            Assert.Null(queue.Current(60f, Duration, false));
+        }
+
+        // k0058: an alert on screen when the menu opens keeps its timer, one still waiting is dropped
+        [Fact]
+        public void AnAlertOnScreenKeepsItsTimerWhileTheMenuIsOpen()
+        {
+            var queue = new FriendNotificationQueue();
+            queue.EnqueueAlert("online", "1");
+            queue.EnqueueAlert("online", "2");
+
+            Assert.Equal("1", queue.Current(0f, Duration, false)?.name);
+            queue.HoldForMenu(0.5f);
+            Assert.Equal("1", queue.Current(5f, Duration, false)?.name);
+            Assert.Null(queue.Current(6f, Duration, false));
+        }
+
+        // k0058: a request answered from the open menu does not come back when it closes
+        [Fact]
+        public void ARequestAnsweredInTheMenuDoesNotComeBack()
+        {
+            var queue = new FriendNotificationQueue();
+            queue.EnqueueRequest("request", "C", 7);
+
+            Assert.Equal("C", queue.Current(0f, Duration, false)?.name);
+            queue.HoldForMenu(0.5f);
+            queue.RetainRequests(new int[0]);
+
+            Assert.Equal(0, queue.Count);
+            Assert.Null(queue.Current(60f, Duration, false));
         }
 
         // k0041: a request answered while its notification waited was still announced in the lobby
