@@ -171,5 +171,17 @@ namespace GLMod.Tests
         {
             Assert.Equal(expected, GoodLossServers.IsPresenceServer(pingServer));
         }
+
+        // k0055: no room section outside the presence servers, the site has no list of the room there
+        [Theory]
+        [InlineData("ABCDEF", "matchmaker-eu.among.us", false)]
+        [InlineData("ABCDEF", "other.example", false)]
+        [InlineData("ABCDEF", null, false)]
+        [InlineData("ABCDEF", "imp.goodloss.fr", true)]
+        [InlineData(null, "imp.goodloss.fr", false)]
+        public void RoomListOnlyInAGameOnAPresenceServer(string gameCode, string pingServer, bool expected)
+        {
+            Assert.Equal(expected, GoodLossServers.HasRoomList(gameCode, pingServer));
+        }
     }
 }

@@ -237,7 +237,8 @@ namespace GLMod.Menu
         private static List<PlayerControl> OtherPlayers()
         {
             var players = new List<PlayerControl>();
-            if (PlayModeHelper.CurrentOnlineGameCode() == null || PlayerControl.LocalPlayer == null)
+            // Elsewhere the site has no room list: every player would wrongly show as "no account"
+            if (!GoodLossServers.IsInRoomWithList() || PlayerControl.LocalPlayer == null)
             {
                 return players;
             }
