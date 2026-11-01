@@ -311,7 +311,7 @@ namespace GLMod.Menu
             // The open menu hides the notifications: the alerts would come out late when it closes
             if (_slide > 0f)
             {
-                GLMod.FriendsService.Notifications.DropAlerts();
+                GLMod.FriendsService.Notifications.HoldForMenu(Time.realtimeSinceStartup);
                 return;
             }
 

@@ -77,6 +77,19 @@ namespace GLMod.Class
             }
         }
 
+        /// <summary>
+        /// The open menu hides the notifications: forgets the connection alerts still waiting, and a request
+        /// on screen starts over at the next call to Current. An alert on screen keeps its timer.
+        /// </summary>
+        public void HoldForMenu(float now)
+        {
+            DropAlerts();
+            if (_shown.HasValue && !_shownIsAlert && now < _shownUntil)
+            {
+                _shownUntil = float.PositiveInfinity;
+            }
+        }
+
         public int Count => _waiting.Count + (_shown.HasValue ? 1 : 0);
 
         /// <summary>
