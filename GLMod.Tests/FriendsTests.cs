@@ -34,6 +34,17 @@ namespace GLMod.Tests
             Assert.Equal(expected, FriendsLogic.MustStayInGame(inGame, current, new GLFriend { region = friendRegion }));
         }
 
+        // k0051: the network mode stays on free play at the main menu, and every join was refused there
+        [Theory]
+        [InlineData(true, false, false)]
+        [InlineData(true, true, true)]
+        [InlineData(false, true, false)]
+        [InlineData(false, false, false)]
+        public void FreePlayBlocksJoin_OnlyWhileInAFreePlayGame(bool freePlay, bool inGame, bool expected)
+        {
+            Assert.Equal(expected, FriendsLogic.FreePlayBlocksJoin(freePlay, inGame));
+        }
+
         [Theory]
         [InlineData("Good Loss", "Good Loss", true)]
         [InlineData("GL Modded", "Good Loss", false)]

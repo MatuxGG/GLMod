@@ -41,6 +41,15 @@ namespace GLMod.Class
         }
 
         /// <summary>
+        /// A free play game cannot be left for a friend. The network mode stays on free play after going
+        /// back to the main menu: only a game in progress blocks the join.
+        /// </summary>
+        public static bool FreePlayBlocksJoin(bool freePlay, bool inGame)
+        {
+            return freePlay && inGame;
+        }
+
+        /// <summary>
         /// "Account (in-game name)", the account alone when the name is unknown or the same.
         /// </summary>
         public static string DisplayName(string username, string playerName)

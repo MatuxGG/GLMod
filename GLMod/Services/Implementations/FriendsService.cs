@@ -247,7 +247,7 @@ namespace GLMod.Services.Implementations
 
         public IEnumerator Join(GLFriend friend, Action<string> onDone = null)
         {
-            if (friend == null || string.IsNullOrEmpty(friend.gameCode) || PlayModeHelper.IsFreePlay())
+            if (friend == null || string.IsNullOrEmpty(friend.gameCode))
             {
                 onDone?.Invoke(ErrorJoinFailed);
                 yield break;
@@ -255,6 +255,11 @@ namespace GLMod.Services.Implementations
 
             AmongUsClient client = AmongUsClient.Instance;
             bool inGame = client.GameState != InnerNetClient.GameStates.NotJoined;
+            if (FriendsLogic.FreePlayBlocksJoin(PlayModeHelper.IsFreePlay(), inGame))
+            {
+                onDone?.Invoke(ErrorJoinFailed);
+                yield break;
+            }
             if (FriendsLogic.MustStayInGame(inGame, CurrentRegionName(), friend))
             {
                 Log("[Join] the friend is on another region: staying in the game");
