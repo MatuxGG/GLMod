@@ -458,7 +458,7 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 
 API tabs load through `RemoteData<T>` (internal): cache per account **and API theme** (the current `MenuUI.Theme.ApiTheme` is sent with every request), reload when shown after `MENU_REFRESH_SECONDS` (`MENU_RETRY_SECONDS` after an error), Loading / Offline / Unavailable states; the Unavailable state has a **Retry** button (forced reload). A live session (no end) shows its duration up to now.
 
-- **Friends tab** (`FriendsMenuTab`, second tab, title with the number of pending requests): requests received (Accept / Refuse), friends (in my room, in a lobby + server + **Join**, online, in a game + server, offline + "seen X ago"; Remove, Block), players of the room, on the presence servers only (Add, or their state: friend, request sent, request received, no account), players of the last games not in the room (Add), blocked players (Unblock), settings (refuse requests, appear offline, connection alert). Names are `Account (in-game name)`. Rows with 3 buttons put them on a line of their own, so the name is never cut.
+- **Friends tab** (`FriendsMenuTab`, second tab, title with the number of pending requests): requests received (Accept / Refuse), friends (in my room, in a lobby + server + **Join**, online, in a game + server, offline + "seen X ago"; Remove, Block), players of the room, on the presence servers only (Add, or their state: friend, request sent, request received, no account), players of the last games not in the room (Add; reloaded each time the tab is shown), blocked players (Unblock), settings (refuse requests, appear offline, connection alert). Names are `Account (in-game name)`. Rows with 3 buttons put them on a line of their own, so the name is never cut.
 - **Chip and notifications**: the chip shows the number of pending requests in a small pill, also during a game. Above it, outside of a game and when the menu is closed, a 6 s notification for a request received or a friend coming online.
 - **Translations**: every text of the menu comes from `ITranslationService` (§3.12) and follows the game language, English otherwise.
 - **Mods built on GLMod**: from their `Load()` (GLMod is loaded first, its built-in tabs already registered) or later, they can hide the menu, remove built-in tabs by id and add / insert their own tabs (§3.10); documented in `docs/dev.MD`. The Last game tab does not poll after a game when the menu is disabled or the tab was removed.
@@ -615,6 +615,7 @@ GLMod/                                # Repo root
 │   ├── PositionSimplifierTests.cs    # PositionSimplifier.
 │   ├── RoomTicketTests.cs            # RoomTicketFooter, GoodLossServers, ticket answer, PluginChecks.
 │   ├── FriendsTests.cs               # FriendsLogic, FriendNotificationQueue, friends answers, presence servers.
+│   ├── FriendsMenuTabTests.cs        # Recent players reloaded each time the tab is shown.
 │   ├── RankedModTests.cs             # RankedMod (theme selection).
 │   ├── TranslationTests.cs           # TranslationTable, GameLanguage, embedded translation files.
 │   ├── ScenarioTests.cs              # ScenarioPlan / ScenarioVerifier (E2E harness logic).

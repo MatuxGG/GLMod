@@ -24,7 +24,7 @@ namespace GLMod.Menu
         private readonly IFriendsService _friends;
         private readonly IAuthenticationService _authService;
         private readonly ITranslationService _t;
-        private bool _recentRequested;
+        private readonly Action<IEnumerator> _run;
         private bool _busy;
         private string _message;
 
@@ -40,10 +40,16 @@ namespace GLMod.Menu
         }
 
         public FriendsMenuTab(IFriendsService friends, IAuthenticationService authService, ITranslationService translations)
+            : this(friends, authService, translations, routine => CoroutineRunner.Run(routine))
+        {
+        }
+
+        public FriendsMenuTab(IFriendsService friends, IAuthenticationService authService, ITranslationService translations, Action<IEnumerator> run)
         {
             _friends = friends ?? throw new ArgumentNullException(nameof(friends));
             _authService = authService ?? throw new ArgumentNullException(nameof(authService));
             _t = translations ?? throw new ArgumentNullException(nameof(translations));
+            _run = run ?? throw new ArgumentNullException(nameof(run));
         }
 
         public void OnShown()
@@ -52,17 +58,14 @@ namespace GLMod.Menu
             if (_authService.IsLoggedIn)
             {
                 Run(_friends.Sync());
-                if (!_recentRequested)
-                {
-                    _recentRequested = true;
-                    Run(_friends.ReloadRecentPlayers());
-                }
+                // Each time: the last game may have added players, and a failed call is caught up here
+                Run(_friends.ReloadRecentPlayers());
             }
         }
 
-        private static void Run(IEnumerator routine)
+        private void Run(IEnumerator routine)
         {
-            CoroutineRunner.Run(routine);
+            _run(routine);
         }
 
         private void RunAction(IEnumerator routine)
