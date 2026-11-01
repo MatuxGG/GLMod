@@ -216,6 +216,55 @@ namespace GLMod.Tests
             Assert.Equal("1", queue.Current(0f, Duration, false)?.name);
             Assert.Equal("3", queue.Current(6f, Duration, false)?.name);
         }
+
+        // k0041: a request answered while its notification waited was still announced in the lobby
+        [Fact]
+        public void ARequestAnsweredWhileWaitingIsNeverShown()
+        {
+            var queue = new FriendNotificationQueue();
+            queue.EnqueueRequest("request", "C", 7);
+
+            Assert.Null(queue.Current(0f, Duration, true));
+            queue.RetainRequests(new int[0]);
+
+            Assert.Equal(0, queue.Count);
+            Assert.Null(queue.Current(100f, Duration, false));
+        }
+
+        // k0041: same thing for the one on screen when the menu opened or a game started
+        [Fact]
+        public void ARequestAnsweredAfterBeingInterruptedDoesNotComeBack()
+        {
+            var queue = new FriendNotificationQueue();
+            queue.EnqueueRequest("request", "C", 7);
+
+            Assert.Equal("C", queue.Current(0f, Duration, false)?.name);
+            Assert.Null(queue.Current(0.5f, Duration, true));
+            queue.RetainRequests(new int[0]);
+
+            Assert.Equal(0, queue.Count);
+            Assert.Null(queue.Current(300f, Duration, false));
+        }
+
+        // k0041: only the requests no longer pending go, the rest keeps its order
+        [Fact]
+        public void RetainRequestsKeepsThePendingRequestsAndTheOtherNotifications()
+        {
+            var queue = new FriendNotificationQueue();
+            queue.EnqueueRequest("request", "1", 1);
+            queue.EnqueueAlert("online", "2");
+            queue.EnqueueRequest("request", "3", 3);
+            queue.Enqueue("other", "4");
+
+            queue.RetainRequests(new[] { 3 });
+
+            Assert.Equal(3, queue.Count);
+            Assert.Equal("2", queue.Current(0f, Duration, false)?.name);
+            Assert.Equal("3", queue.Current(6f, Duration, false)?.name);
+            queue.RetainRequests(new[] { 3 });
+            Assert.Equal("3", queue.Current(7f, Duration, false)?.name);
+            Assert.Equal("4", queue.Current(12f, Duration, false)?.name);
+        }
     }
 
     public class FriendsResponseTests

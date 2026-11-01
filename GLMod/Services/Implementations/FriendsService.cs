@@ -7,6 +7,7 @@ using InnerNet;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -100,9 +101,11 @@ namespace GLMod.Services.Implementations
 
         private void Notify(GLFriendsState previous, GLFriendsState current)
         {
+            // A request answered or expired while its notification was waiting is no longer news
+            Notifications.RetainRequests((current.incoming ?? new List<GLFriendRequest>()).Select(r => r.requestId));
             foreach (GLFriendRequest request in FriendsLogic.NewRequests(previous, current))
             {
-                Notifications.Enqueue(NotificationRequest, FriendsLogic.DisplayName(request.username, request.playerName));
+                Notifications.EnqueueRequest(NotificationRequest, FriendsLogic.DisplayName(request.username, request.playerName), request.requestId);
             }
 
             // Not during a game, and not kept for later: it would no longer be news

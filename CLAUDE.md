@@ -248,7 +248,7 @@ Every service is exposed statically via the main `GLMod` class and has a dedicat
 - **Sync**: `KeepInSync()` every `FRIENDS_SYNC_SECONDS` (started by the first login on the main menu), so requests and statuses take 10 to 15 s to arrive: the site has no WebSocket. Nothing is declared while the menu is hidden by a mod or the tab removed. An API without the endpoints answers 404: asked again every `FRIENDS_UNAVAILABLE_RETRY_SECONDS`.
 - **Rules** (on the site, `FriendService`): a request needs the same room or a game in common among the last 20; acceptance required; silent refusal, 24 h before a new request; blocked and "refuse every request" both answer `unavailable`; requests expire after 30 days; 100 friends max.
 - **Join**: `Join(friend)` needs `friend.canJoin` (friend in a lobby, same server and mod, the site gives the code only then; it is never displayed). Leaves the current game like the Leave button, waits for the main menu, checks the region, joins.
-- **During a game**: only the count on the chip of the menu changes. Request notifications wait for the lobby ([FriendNotificationQueue.cs](GLMod/Class/FriendNotificationQueue.cs)), connection alerts are dropped.
+- **During a game**: only the count on the chip of the menu changes. Request notifications wait for the lobby ([FriendNotificationQueue.cs](GLMod/Class/FriendNotificationQueue.cs)) and each sync forgets those no longer pending (answered, expired), connection alerts are dropped.
 - **Members**: `State`, `PendingRequestCount`, `IsAvailable`, `RecentPlayers`, `Notifications`, `Sync()`, `KeepInSync()`, `ReloadRecentPlayers()`, `SendRequest`, `Answer`, `Remove`, `SetBlocked`, `UpdateSettings`, `Join`. Errors of the actions are API codes, shown through `friends.error.<code>`; a code without text (network failure, `HTTP 502`, unknown API message) shows `friends.error.network`.
 
 ## 4. Domain entities (`GLMod/GLEntities/`)
@@ -427,7 +427,7 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 | `GoodLossServers.cs`   | `IsGoodLossServer(pingServer)` (pure) and `IsCurrentRegion()`: the Good Loss servers. `ReceivesRoomTicket(onlineGame, pingServer)` (pure) and `IsCurrentConnectionEligible()`: the connections that carry the room ticket. `IsPresenceServer` and `HasRoomList` (pure), `IsInRoomWithList()`: the games that have a room list. |
 | `RoomTicketFooter.cs`  | Pure, unit-tested: `Append(data, ticket)` = data + ticket + length (2 bytes LE) + `GLMT`. GLPlugin reads it from the end. |
 | `FriendsLogic.cs`      | Pure, unit-tested: `DisplayName` ("Account (in-game name)", the account alone when the name is unknown or the same), order of the list, friends just online, new requests, "seen X ago". |
-| `FriendNotificationQueue.cs` | Pure, unit-tested: notifications shown one at a time, none during a game; connection alerts still waiting are dropped (`EnqueueAlert`, `DropAlerts`). |
+| `FriendNotificationQueue.cs` | Pure, unit-tested: notifications shown one at a time, none during a game; connection alerts still waiting are dropped (`EnqueueAlert`, `DropAlerts`), requests no longer pending too (`EnqueueRequest`, `RetainRequests`). |
 | `GamePresence.cs`      | What is declared to the site: state (`StateOf`, pure: the end screen is a game, only a lobby can be joined), region, server, game code (Good Loss servers only), client id, in-game name. Main thread only. |
 | `VanillaEvents.cs`     | Default implementations (`startGameVanilla`, `endGameVanilla`…) used when the matching `ServiceType` is enabled. |
 
