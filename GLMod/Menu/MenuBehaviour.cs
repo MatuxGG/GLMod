@@ -304,8 +304,14 @@ namespace GLMod.Menu
         /// </summary>
         private static void DrawFriendNotification()
         {
-            if (GLMod.FriendsService == null || _slide > 0f)
+            if (GLMod.FriendsService == null)
             {
+                return;
+            }
+            // The open menu hides the notifications: the alerts would come out late when it closes
+            if (_slide > 0f)
+            {
+                GLMod.FriendsService.Notifications.DropAlerts();
                 return;
             }
 

@@ -146,6 +146,37 @@ namespace GLMod.Tests
         {
             Assert.Null(new FriendNotificationQueue().Current(0f, Duration, false));
         }
+
+        // k0035: the alerts still waiting when a game started came out one by one after it
+        [Fact]
+        public void AlertsStillWaitingAreDroppedByAGameButNotRequests()
+        {
+            var queue = new FriendNotificationQueue();
+            queue.EnqueueAlert("online", "1");
+            queue.EnqueueAlert("online", "2");
+            queue.Enqueue("request", "3");
+
+            Assert.Equal("1", queue.Current(0f, Duration, false)?.name);
+            Assert.Null(queue.Current(2f, Duration, true));
+            Assert.Equal("3", queue.Current(600f, Duration, false)?.name);
+            Assert.Null(queue.Current(606f, Duration, false));
+        }
+
+        // k0035: the open menu drops the alerts the same way
+        [Fact]
+        public void DropAlertsKeepsTheRequestsInOrder()
+        {
+            var queue = new FriendNotificationQueue();
+            queue.Enqueue("request", "1");
+            queue.EnqueueAlert("online", "2");
+            queue.Enqueue("request", "3");
+
+            queue.DropAlerts();
+
+            Assert.Equal(2, queue.Count);
+            Assert.Equal("1", queue.Current(0f, Duration, false)?.name);
+            Assert.Equal("3", queue.Current(6f, Duration, false)?.name);
+        }
     }
 
     public class FriendsResponseTests

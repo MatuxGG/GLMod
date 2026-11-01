@@ -110,7 +110,7 @@ namespace GLMod.Services.Implementations
             {
                 foreach (GLFriend friend in FriendsLogic.NewlyOnline(previous, current))
                 {
-                    Notifications.Enqueue(NotificationOnline, FriendsLogic.DisplayName(friend.username, friend.playerName));
+                    Notifications.EnqueueAlert(NotificationOnline,FriendsLogic.DisplayName(friend.username, friend.playerName));
                 }
             }
         }
