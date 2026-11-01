@@ -92,6 +92,25 @@ namespace GLMod.Tests
         {
             Assert.Equal((key, value), FriendsLogic.SeenAgo(1000000 - secondsAgo, 1000000));
         }
+
+        // k0029: an error without text gave a raw key on screen ("friends.error.HTTP 0")
+        [Theory]
+        [InlineData("HTTP 0", "friends.error.network")]
+        [InlineData("HTTP 502", "friends.error.network")]
+        [InlineData("Invalid token", "friends.error.network")]
+        [InlineData("not_met", "friends.error.not_met")]
+        [InlineData("friends.error.join", "friends.error.join")]
+        public void ErrorKey_NeverGivesAKeyWithoutText(string error, string expected)
+        {
+            var table = new TranslationTable();
+            table.Add("en", new Dictionary<string, string>
+            {
+                { "friends.error.network", "n" },
+                { "friends.error.not_met", "m" },
+                { "friends.error.join", "j" },
+            });
+            Assert.Equal(expected, FriendsLogic.ErrorKey(error, key => table.Find("en", key) != null));
+        }
     }
 
     public class FriendNotificationQueueTests

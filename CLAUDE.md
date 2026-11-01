@@ -249,7 +249,7 @@ Every service is exposed statically via the main `GLMod` class and has a dedicat
 - **Rules** (on the site, `FriendService`): a request needs the same room or a game in common among the last 20; acceptance required; silent refusal, 24 h before a new request; blocked and "refuse every request" both answer `unavailable`; requests expire after 30 days; 100 friends max.
 - **Join**: `Join(friend)` needs `friend.canJoin` (friend in a lobby, same server and mod, the site gives the code only then; it is never displayed). Leaves the current game like the Leave button, waits for the main menu, checks the region, joins.
 - **During a game**: only the count on the chip of the menu changes. Request notifications wait for the lobby ([FriendNotificationQueue.cs](GLMod/Class/FriendNotificationQueue.cs)), connection alerts are dropped.
-- **Members**: `State`, `PendingRequestCount`, `IsAvailable`, `RecentPlayers`, `Notifications`, `Sync()`, `KeepInSync()`, `ReloadRecentPlayers()`, `SendRequest`, `Answer`, `Remove`, `SetBlocked`, `UpdateSettings`, `Join`. Errors of the actions are API codes, shown through `friends.error.<code>`.
+- **Members**: `State`, `PendingRequestCount`, `IsAvailable`, `RecentPlayers`, `Notifications`, `Sync()`, `KeepInSync()`, `ReloadRecentPlayers()`, `SendRequest`, `Answer`, `Remove`, `SetBlocked`, `UpdateSettings`, `Join`. Errors of the actions are API codes, shown through `friends.error.<code>`; a code without text (network failure, `HTTP 502`, unknown API message) shows `friends.error.network`.
 
 ## 4. Domain entities (`GLMod/GLEntities/`)
 

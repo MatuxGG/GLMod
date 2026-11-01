@@ -79,7 +79,7 @@ namespace GLMod.Menu
 
         private void Report(string error)
         {
-            _message = error == null ? null : _t.Get(error.StartsWith("friends.") ? error : "friends.error." + error);
+            _message = error == null ? null : _t.Get(FriendsLogic.ErrorKey(error, _t.Has));
         }
 
         public void Draw()

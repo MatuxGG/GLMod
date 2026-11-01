@@ -96,5 +96,15 @@ namespace GLMod.Class
             if (seconds < Day) return ("friends.seen.hours", seconds / Hour);
             return ("friends.seen.days", seconds / Day);
         }
+
+        /// <summary>
+        /// Translation key of an action error: the key itself or friends.error.&lt;code&gt;. An error without
+        /// text (network failure, "HTTP 502", unknown API message) gives the network text.
+        /// </summary>
+        public static string ErrorKey(string error, Func<string, bool> hasText)
+        {
+            string key = error.StartsWith("friends.") ? error : "friends.error." + error;
+            return hasText(key) ? key : "friends.error.network";
+        }
     }
 }
