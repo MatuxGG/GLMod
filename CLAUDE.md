@@ -414,7 +414,7 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 | `PlayerApiQuery.cs`    | Pure URL builder of the `/player/*` GET requests: `?username=` plus `&theme=` when a theme is given. |
 | `TranslationTable.cs`  | Pure translation lookup: texts by language and key, fallbacks (base language, English, key), `{0}` formatting, JSON loading. |
 | `GameLanguage.cs`      | `SupportedLangs` name → language code (pure `ToCode`) and `CurrentCode()` (reads the game settings). |
-| `PlayModeHelper.cs`    | `IsFreePlay()` — free play games are never recorded nor sent (§3.3). `CurrentOnlineGameCode()` — code of the online game the player is in, null otherwise. |
+| `PlayModeHelper.cs`    | `IsFreePlay()` — free play games are never recorded nor sent (§3.3). `IsInOnlineGame(state)` (pure) and `CurrentOnlineGameCode()` — code of the online game the player is in (lobby, running game or end screen), null otherwise. |
 | `RankedMod.cs`         | `Matches(modName)` — "Among Us Ranked" and its variants ("Among Us Ranked Roles"…), case-insensitive. Pure. |
 | `StatFormat.cs`        | Pure formatting of menu stats: durations ("1 min 05 s", "2 h 05"), ratios, win percentages (`WinPercent`, rounded like the site), Yes/No, numbers, local dates, vanilla role names. |
 | `ServerClock.cs`       | `NowMs()` — Unix ms aligned on the API server clock. The offset is refreshed from the `Date` header of every `ApiService` response, unless the new measurement is within `CLOCK_DATE_RESOLUTION_MS` of the current offset (so `NowMs()` does not go back mid-game). **Every timestamp sent to the API (actions, positions) must use `ServerClock.NowMs()`**, never `DateTimeOffset.UtcNow`. |
@@ -428,7 +428,7 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 | `RoomTicketFooter.cs`  | Pure, unit-tested: `Append(data, ticket)` = data + ticket + length (2 bytes LE) + `GLMT`. GLPlugin reads it from the end. |
 | `FriendsLogic.cs`      | Pure, unit-tested: `DisplayName` ("Account (in-game name)", the account alone when the name is unknown or the same), order of the list, friends just online, new requests, "seen X ago". |
 | `FriendNotificationQueue.cs` | Pure, unit-tested: notifications shown one at a time, none during a game; connection alerts still waiting are dropped (`EnqueueAlert`, `DropAlerts`). |
-| `GamePresence.cs`      | What is declared to the site: state, region, server, game code (Good Loss servers only), client id, in-game name. Main thread only. |
+| `GamePresence.cs`      | What is declared to the site: state (`StateOf`, pure: the end screen is a game, only a lobby can be joined), region, server, game code (Good Loss servers only), client id, in-game name. Main thread only. |
 | `VanillaEvents.cs`     | Default implementations (`startGameVanilla`, `endGameVanilla`…) used when the matching `ServiceType` is enabled. |
 
 ### 8.1 Good Loss menu (`GLMod/Menu/`, namespace `GLMod.Menu`)

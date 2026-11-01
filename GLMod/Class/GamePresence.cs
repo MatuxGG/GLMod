@@ -28,6 +28,14 @@ namespace GLMod.Class
             }
         }
 
+        /// <summary>
+        /// State of a player in an online game. Only a lobby can be joined: the end screen is declared as a game. Pure.
+        /// </summary>
+        public static string StateOf(InnerNetClient.GameStates state)
+        {
+            return state == InnerNetClient.GameStates.Joined ? GameConstants.PRESENCE_STATE_LOBBY : GameConstants.PRESENCE_STATE_GAME;
+        }
+
         public static GamePresence Read()
         {
             var presence = new GamePresence();
@@ -46,11 +54,12 @@ namespace GLMod.Class
                     return presence;
                 }
 
-                presence.State = IsInGame() ? GameConstants.PRESENCE_STATE_GAME : GameConstants.PRESENCE_STATE_LOBBY;
+                presence.State = StateOf(AmongUsClient.Instance.GameState);
                 presence.ClientId = AmongUsClient.Instance.ClientId;
-                presence.PlayerName = PlayerControl.LocalPlayer?.Data?.PlayerName;
                 // The code of a game never leaves for a server that is not ours
                 presence.GameCode = GoodLossServers.IsPresenceServer(presence.Server) ? code : null;
+                // Last: the players may already be destroyed on the end screen
+                presence.PlayerName = PlayerControl.LocalPlayer?.Data?.PlayerName;
             }
             catch (Exception)
             {

@@ -24,6 +24,16 @@ namespace GLMod.Class
         }
 
         /// <summary>
+        /// True when the client is in a game: lobby, running game or end screen. Pure.
+        /// </summary>
+        public static bool IsInOnlineGame(InnerNetClient.GameStates state)
+        {
+            return state == InnerNetClient.GameStates.Joined
+                || state == InnerNetClient.GameStates.Started
+                || state == InnerNetClient.GameStates.Ended;
+        }
+
+        /// <summary>
         /// Code of the online game the player is in, null outside of one. Must be called from the Unity main thread.
         /// </summary>
         public static string CurrentOnlineGameCode()
@@ -32,7 +42,7 @@ namespace GLMod.Class
             {
                 AmongUsClient client = AmongUsClient.Instance;
                 if (client == null || client.NetworkMode != NetworkModes.OnlineGame) return null;
-                if (client.GameState != InnerNetClient.GameStates.Joined && client.GameState != InnerNetClient.GameStates.Started) return null;
+                if (!IsInOnlineGame(client.GameState)) return null;
                 return GameCode.IntToGameName(client.GameId);
             }
             catch (Exception)
