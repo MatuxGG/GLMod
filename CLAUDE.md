@@ -616,6 +616,7 @@ GLMod/                                # Repo root
 │   ├── RoomTicketTests.cs            # RoomTicketFooter, GoodLossServers, ticket answer, known room code, PluginChecks.
 │   ├── FriendsTests.cs               # FriendsLogic, FriendNotificationQueue, friends answers, presence servers.
 │   ├── FriendsMenuTabTests.cs        # Recent players reloaded each time the tab is shown.
+│   ├── FriendsServiceTests.cs        # List read again after an action, even with a sync running.
 │   ├── RankedModTests.cs             # RankedMod (theme selection).
 │   ├── TranslationTests.cs           # TranslationTable, GameLanguage, embedded translation files.
 │   ├── ScenarioTests.cs              # ScenarioPlan / ScenarioVerifier (E2E harness logic).

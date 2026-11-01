@@ -231,6 +231,11 @@ namespace GLMod.Services.Implementations
                 Log($"[{path}] failed: {error}");
             }
 
+            // A sync already running may have read the list before this action, and would write it after
+            while (_syncing)
+            {
+                yield return null;
+            }
             yield return Sync();
             onDone?.Invoke(error);
         }
