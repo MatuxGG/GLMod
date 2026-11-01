@@ -1,4 +1,5 @@
 using GLMod.Constants;
+using InnerNet;
 using System;
 using System.Linq;
 
@@ -16,6 +17,15 @@ namespace GLMod.Class
         {
             return pingServer != null
                 && GameConstants.GOOD_LOSS_GAME_SERVERS.Contains(pingServer.Trim(), StringComparer.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// True when a connection goes to a Good Loss game server: an online game on a Good Loss
+        /// region. A LAN or free play game keeps the selected region but connects elsewhere. Pure.
+        /// </summary>
+        public static bool ReceivesRoomTicket(bool onlineGame, string pingServer)
+        {
+            return onlineGame && IsGoodLossServer(pingServer);
         }
 
         /// <summary>
@@ -62,6 +72,26 @@ namespace GLMod.Class
             {
                 return DestroyableSingleton<ServerManager>.InstanceExists
                     && IsGoodLossServer(DestroyableSingleton<ServerManager>.Instance.CurrentRegion?.PingServer);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// True when the connection being opened may carry the room ticket. Must be called from the
+        /// Unity main thread.
+        /// </summary>
+        public static bool IsCurrentConnectionEligible()
+        {
+            try
+            {
+                return AmongUsClient.Instance != null
+                    && DestroyableSingleton<ServerManager>.InstanceExists
+                    && ReceivesRoomTicket(
+                        AmongUsClient.Instance.NetworkMode == NetworkModes.OnlineGame,
+                        DestroyableSingleton<ServerManager>.Instance.CurrentRegion?.PingServer);
             }
             catch (Exception)
             {

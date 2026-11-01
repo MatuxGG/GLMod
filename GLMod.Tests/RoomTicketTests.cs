@@ -56,6 +56,18 @@ namespace GLMod.Tests
         {
             Assert.Equal(expected, GoodLossServers.IsGoodLossServer(pingServer));
         }
+
+        // k0040: a LAN or free play game keeps the selected region, its host must not get the ticket
+        [Theory]
+        [InlineData(true, "impranked.goodloss.fr", true)]
+        [InlineData(false, "impranked.goodloss.fr", false)]
+        [InlineData(true, "matchmaker.among.us", false)]
+        [InlineData(false, "matchmaker.among.us", false)]
+        [InlineData(true, null, false)]
+        public void OnlyAnOnlineGameOnAGoodLossServerGetsTheTicket(bool onlineGame, string pingServer, bool expected)
+        {
+            Assert.Equal(expected, GoodLossServers.ReceivesRoomTicket(onlineGame, pingServer));
+        }
     }
 
     public class RoomTicketResponseTests
