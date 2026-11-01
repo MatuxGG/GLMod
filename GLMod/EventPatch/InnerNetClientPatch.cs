@@ -59,7 +59,7 @@ namespace GLMod
             {
                 try
                 {
-                    if (!GoodLossServers.IsCurrentRegion()) return;
+                    if (!GoodLossServers.IsCurrentConnectionEligible()) return;
 
                     string ticket = GLMod.RoomTicketService?.Ticket;
                     if (ticket == null)

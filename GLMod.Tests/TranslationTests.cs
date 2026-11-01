@@ -151,5 +151,15 @@ namespace GLMod.Tests
             var missing = languages["en"].Keys.Where(key => !key.StartsWith("role.") && !languages["fr"].ContainsKey(key));
             Assert.Empty(missing);
         }
+
+        // k0045: the room code of the account has its own text while it is not known yet
+        [Fact]
+        public void UnknownRoomCodeHasItsOwnText()
+        {
+            Dictionary<string, Dictionary<string, string>> languages = LoadAll();
+
+            Assert.Equal("?", languages["en"]["menu.room.unknown"]);
+            Assert.Equal("?", languages["fr"]["menu.room.unknown"]);
+        }
     }
 }

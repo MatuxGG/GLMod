@@ -16,6 +16,14 @@ namespace GLMod.Class
         private const long Day = 86400;
 
         /// <summary>
+        /// Joining a friend starts from the main menu: true in a game or on any other screen.
+        /// </summary>
+        public static bool MustGoToMainMenu(bool inGame, string sceneName)
+        {
+            return inGame || sceneName != GameConstants.SCENE_MAIN_MENU;
+        }
+
+        /// <summary>
         /// "Account (in-game name)", the account alone when the name is unknown or the same.
         /// </summary>
         public static string DisplayName(string username, string playerName)
@@ -86,6 +94,14 @@ namespace GLMod.Class
         }
 
         /// <summary>
+        /// Translation keys of the title and text shown while there is no list: loading, or the failure of the last sync.
+        /// </summary>
+        public static (string title, string text) EmptyStateKeys(string error)
+        {
+            return error == null ? ("state.loading", "friends.loading") : ("state.unavailable", "friends.error");
+        }
+
+        /// <summary>
         /// Translation key and value of "seen X ago".
         /// </summary>
         public static (string key, long value) SeenAgo(long lastSeen, long now)
@@ -95,6 +111,16 @@ namespace GLMod.Class
             if (seconds < Hour) return ("friends.seen.minutes", seconds / Minute);
             if (seconds < Day) return ("friends.seen.hours", seconds / Hour);
             return ("friends.seen.days", seconds / Day);
+        }
+
+        /// <summary>
+        /// Translation key of an action error: the key itself or friends.error.&lt;code&gt;. An error without
+        /// text (network failure, "HTTP 502", unknown API message) gives the network text.
+        /// </summary>
+        public static string ErrorKey(string error, Func<string, bool> hasText)
+        {
+            string key = error.StartsWith("friends.") ? error : "friends.error." + error;
+            return hasText(key) ? key : "friends.error.network";
         }
     }
 }

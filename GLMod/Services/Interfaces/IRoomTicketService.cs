@@ -14,6 +14,11 @@ namespace GLMod.Services.Interfaces
         string RoomCode { get; }
 
         /// <summary>
+        /// True once the API has answered a valid ticket: a null RoomCode then means the account has no code.
+        /// </summary>
+        bool IsRoomCodeKnown { get; }
+
+        /// <summary>
         /// The ticket to send to a Good Loss server, null when there is no valid one. Never log it.
         /// </summary>
         string Ticket { get; }

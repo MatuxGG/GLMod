@@ -304,8 +304,14 @@ namespace GLMod.Menu
         /// </summary>
         private static void DrawFriendNotification()
         {
-            if (GLMod.FriendsService == null || _slide > 0f)
+            if (GLMod.FriendsService == null)
             {
+                return;
+            }
+            // The open menu hides the notifications: the alerts would come out late when it closes
+            if (_slide > 0f)
+            {
+                GLMod.FriendsService.Notifications.DropAlerts();
                 return;
             }
 
@@ -408,7 +414,8 @@ namespace GLMod.Menu
 
             if (GoodLossServers.IsCurrentRegion() && GLMod.AuthService.IsLoggedIn)
             {
-                string mine = GLMod.RoomTicketService.RoomCode ?? texts.Get("menu.room.none");
+                IRoomTicketService tickets = GLMod.RoomTicketService;
+                string mine = tickets.RoomCode ?? texts.Get(tickets.IsRoomCodeKnown ? "menu.room.none" : "menu.room.unknown");
                 DrawRoomCodeLine(right, top + MenuUI.U(20f), texts.Get("menu.room.mine"), mine);
             }
         }

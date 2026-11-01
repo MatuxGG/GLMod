@@ -7,6 +7,7 @@ using InnerNet;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -30,6 +31,7 @@ namespace GLMod.Services.Implementations
         public GLFriendsState State { get; private set; }
         public int PendingRequestCount => State?.incoming?.Count ?? 0;
         public bool IsAvailable { get; private set; } = true;
+        public string Error { get; private set; }
         public IReadOnlyList<GLRecentPlayer> RecentPlayers { get; private set; }
         public FriendNotificationQueue Notifications { get; } = new FriendNotificationQueue();
 
@@ -50,6 +52,7 @@ namespace GLMod.Services.Implementations
             if (!CanCall)
             {
                 State = null;
+                Error = null;
                 yield break;
             }
             if (_syncing)
@@ -75,6 +78,8 @@ namespace GLMod.Services.Implementations
             {
                 // An API without these endpoints answers 404: asked again later
                 IsAvailable = response?.StatusCode != 404;
+                Error = PlayerApiResponse.ReadError(response?.Content)
+                    ?? (response == null || response.StatusCode == 0 ? "Network error" : "HTTP " + response.StatusCode);
                 Log($"[Sync] failed: {(response == null ? "no response" : "HTTP " + response.StatusCode)}");
                 yield break;
             }
@@ -82,10 +87,12 @@ namespace GLMod.Services.Implementations
             if (!PlayerApiResponse.TryParse(response.Content, out GLFriendsState state, out string error))
             {
                 Log("[Sync] unreadable answer: " + error);
+                Error = "Unreadable response";
                 yield break;
             }
 
             IsAvailable = true;
+            Error = null;
             Notify(State, state);
             State = state;
         }
@@ -100,9 +107,11 @@ namespace GLMod.Services.Implementations
 
         private void Notify(GLFriendsState previous, GLFriendsState current)
         {
+            // A request answered or expired while its notification was waiting is no longer news
+            Notifications.RetainRequests((current.incoming ?? new List<GLFriendRequest>()).Select(r => r.requestId));
             foreach (GLFriendRequest request in FriendsLogic.NewRequests(previous, current))
             {
-                Notifications.Enqueue(NotificationRequest, FriendsLogic.DisplayName(request.username, request.playerName));
+                Notifications.EnqueueRequest(NotificationRequest, FriendsLogic.DisplayName(request.username, request.playerName), request.requestId);
             }
 
             // Not during a game, and not kept for later: it would no longer be news
@@ -110,7 +119,7 @@ namespace GLMod.Services.Implementations
             {
                 foreach (GLFriend friend in FriendsLogic.NewlyOnline(previous, current))
                 {
-                    Notifications.Enqueue(NotificationOnline, FriendsLogic.DisplayName(friend.username, friend.playerName));
+                    Notifications.EnqueueAlert(NotificationOnline,FriendsLogic.DisplayName(friend.username, friend.playerName));
                 }
             }
         }
@@ -125,6 +134,7 @@ namespace GLMod.Services.Implementations
                 if (!CanCall)
                 {
                     State = null;
+                    Error = null;
                     next = 0f;
                     continue;
                 }
@@ -239,13 +249,17 @@ namespace GLMod.Services.Implementations
             }
 
             AmongUsClient client = AmongUsClient.Instance;
-            if (client.GameState != InnerNetClient.GameStates.NotJoined)
+            bool inGame = client.GameState != InnerNetClient.GameStates.NotJoined;
+            if (FriendsLogic.MustGoToMainMenu(inGame, SceneManager.GetActiveScene().name))
             {
                 string failure = null;
                 try
                 {
                     // Like the Leave button of the game: the scene change is not part of ExitGame
-                    client.ExitGame(DisconnectReasons.ExitGame);
+                    if (inGame)
+                    {
+                        client.ExitGame(DisconnectReasons.ExitGame);
+                    }
                     SceneChanger.ChangeScene(GameConstants.SCENE_MAIN_MENU);
                 }
                 catch (Exception e)

@@ -24,7 +24,7 @@ namespace GLMod.Menu
         private readonly IFriendsService _friends;
         private readonly IAuthenticationService _authService;
         private readonly ITranslationService _t;
-        private bool _recentRequested;
+        private readonly Action<IEnumerator> _run;
         private bool _busy;
         private string _message;
 
@@ -40,10 +40,16 @@ namespace GLMod.Menu
         }
 
         public FriendsMenuTab(IFriendsService friends, IAuthenticationService authService, ITranslationService translations)
+            : this(friends, authService, translations, routine => CoroutineRunner.Run(routine))
+        {
+        }
+
+        public FriendsMenuTab(IFriendsService friends, IAuthenticationService authService, ITranslationService translations, Action<IEnumerator> run)
         {
             _friends = friends ?? throw new ArgumentNullException(nameof(friends));
             _authService = authService ?? throw new ArgumentNullException(nameof(authService));
             _t = translations ?? throw new ArgumentNullException(nameof(translations));
+            _run = run ?? throw new ArgumentNullException(nameof(run));
         }
 
         public void OnShown()
@@ -52,17 +58,14 @@ namespace GLMod.Menu
             if (_authService.IsLoggedIn)
             {
                 Run(_friends.Sync());
-                if (!_recentRequested)
-                {
-                    _recentRequested = true;
-                    Run(_friends.ReloadRecentPlayers());
-                }
+                // Each time: the last game may have added players, and a failed call is caught up here
+                Run(_friends.ReloadRecentPlayers());
             }
         }
 
-        private static void Run(IEnumerator routine)
+        private void Run(IEnumerator routine)
         {
-            CoroutineRunner.Run(routine);
+            _run(routine);
         }
 
         private void RunAction(IEnumerator routine)
@@ -79,7 +82,7 @@ namespace GLMod.Menu
 
         private void Report(string error)
         {
-            _message = error == null ? null : _t.Get(error.StartsWith("friends.") ? error : "friends.error." + error);
+            _message = error == null ? null : _t.Get(FriendsLogic.ErrorKey(error, _t.Has));
         }
 
         public void Draw()
@@ -95,7 +98,8 @@ namespace GLMod.Menu
             if (state == null)
             {
                 MenuUI.Heading(_t.Get("friends.list"));
-                MenuUI.EmptyState(_friends.IsAvailable ? _t.Get("state.loading") : _t.Get("state.unavailable"), _t.Get("friends.loading"));
+                (string title, string text) = FriendsLogic.EmptyStateKeys(_friends.Error);
+                MenuUI.EmptyState(_t.Get(title), _t.Get(text, _friends.Error));
                 return;
             }
 
@@ -237,7 +241,8 @@ namespace GLMod.Menu
         private static List<PlayerControl> OtherPlayers()
         {
             var players = new List<PlayerControl>();
-            if (PlayModeHelper.CurrentOnlineGameCode() == null || PlayerControl.LocalPlayer == null)
+            // Elsewhere the site has no room list: every player would wrongly show as "no account"
+            if (!GoodLossServers.IsInRoomWithList() || PlayerControl.LocalPlayer == null)
             {
                 return players;
             }

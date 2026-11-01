@@ -22,6 +22,8 @@ namespace GLMod.Services.Implementations
 
         public string RoomCode => _current?.roomCode;
 
+        public bool IsRoomCodeKnown => _current != null;
+
         public string Ticket
         {
             get
