@@ -24,6 +24,23 @@ namespace GLMod.Class
         }
 
         /// <summary>
+        /// True when the selected region is the one the friend plays on: the code only exists on their server.
+        /// </summary>
+        public static bool IsOnRegionOf(string currentRegion, GLFriend friend)
+        {
+            return friend != null && currentRegion == friend.region;
+        }
+
+        /// <summary>
+        /// Joining a friend on another region fails: true when leaving the game would lose it for nothing.
+        /// Out of a game there is nothing to lose, and a mod may still set its region when the main menu starts.
+        /// </summary>
+        public static bool MustStayInGame(bool inGame, string currentRegion, GLFriend friend)
+        {
+            return inGame && !IsOnRegionOf(currentRegion, friend);
+        }
+
+        /// <summary>
         /// "Account (in-game name)", the account alone when the name is unknown or the same.
         /// </summary>
         public static string DisplayName(string username, string playerName)

@@ -255,6 +255,12 @@ namespace GLMod.Services.Implementations
 
             AmongUsClient client = AmongUsClient.Instance;
             bool inGame = client.GameState != InnerNetClient.GameStates.NotJoined;
+            if (FriendsLogic.MustStayInGame(inGame, CurrentRegionName(), friend))
+            {
+                Log("[Join] the friend is on another region: staying in the game");
+                onDone?.Invoke(ErrorJoinFailed);
+                yield break;
+            }
             if (FriendsLogic.MustGoToMainMenu(inGame, SceneManager.GetActiveScene().name))
             {
                 string failure = null;
@@ -296,7 +302,7 @@ namespace GLMod.Services.Implementations
             string joinError = null;
             try
             {
-                if (DestroyableSingleton<ServerManager>.Instance.CurrentRegion?.Name != friend.region)
+                if (!FriendsLogic.IsOnRegionOf(DestroyableSingleton<ServerManager>.Instance.CurrentRegion?.Name, friend))
                 {
                     joinError = ErrorJoinFailed;
                 }
@@ -315,6 +321,19 @@ namespace GLMod.Services.Implementations
                 joinError = ErrorJoinFailed;
             }
             onDone?.Invoke(joinError);
+        }
+
+        private static string CurrentRegionName()
+        {
+            try
+            {
+                return DestroyableSingleton<ServerManager>.Instance.CurrentRegion?.Name;
+            }
+            catch (Exception)
+            {
+                // Without a selected region the join fails: an exception here would leave the tab busy
+                return null;
+            }
         }
 
         private static bool IsAtMainMenu()

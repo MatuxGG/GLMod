@@ -23,6 +23,32 @@ namespace GLMod.Tests
             Assert.Equal(expected, FriendsLogic.MustGoToMainMenu(inGame, scene));
         }
 
+        // k0046: the game was left before seeing that the friend is on another region
+        [Theory]
+        [InlineData(true, "GL Modded", "Good Loss", true)]
+        [InlineData(true, null, "Good Loss", true)]
+        [InlineData(true, "Good Loss", "Good Loss", false)]
+        [InlineData(false, "GL Modded", "Good Loss", false)]
+        public void MustStayInGame_WhenInAGameAndTheFriendIsOnAnotherRegion(bool inGame, string current, string friendRegion, bool expected)
+        {
+            Assert.Equal(expected, FriendsLogic.MustStayInGame(inGame, current, new GLFriend { region = friendRegion }));
+        }
+
+        [Theory]
+        [InlineData("Good Loss", "Good Loss", true)]
+        [InlineData("GL Modded", "Good Loss", false)]
+        [InlineData(null, "Good Loss", false)]
+        public void IsOnRegionOf_ComparesTheRegionNames(string current, string friendRegion, bool expected)
+        {
+            Assert.Equal(expected, FriendsLogic.IsOnRegionOf(current, new GLFriend { region = friendRegion }));
+        }
+
+        [Fact]
+        public void IsOnRegionOf_IsFalseWithoutAFriend()
+        {
+            Assert.False(FriendsLogic.IsOnRegionOf("Good Loss", null));
+        }
+
         [Theory]
         [InlineData("Matux", "Shedconic", "Matux (Shedconic)")]
         [InlineData("Matux", "matux", "Matux")]

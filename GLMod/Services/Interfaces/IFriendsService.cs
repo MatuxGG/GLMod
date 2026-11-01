@@ -84,6 +84,7 @@ namespace GLMod.Services.Interfaces
 
         /// <summary>
         /// Joins the lobby of a friend (friend.canJoin), leaving the current game first.
+        /// A friend on another region fails without leaving it.
         /// onDone receives null when the join started, otherwise a translation key.
         /// </summary>
         IEnumerator Join(GLFriend friend, Action<string> onDone = null);
