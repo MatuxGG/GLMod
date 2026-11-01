@@ -11,6 +11,7 @@ namespace GLMod.Class
     {
         private readonly Queue<(string key, string name, bool isAlert)> _waiting = new Queue<(string key, string name, bool isAlert)>();
         private (string key, string name)? _shown;
+        private bool _shownIsAlert;
         private float _shownUntil;
 
         /// <summary>
@@ -51,20 +52,32 @@ namespace GLMod.Class
         /// </summary>
         public (string key, string name)? Current(float now, float durationSeconds, bool inGame)
         {
-            if (inGame)
-            {
-                DropAlerts();
-                return null;
-            }
-
             if (_shown.HasValue && now >= _shownUntil)
             {
                 _shown = null;
+            }
+
+            if (inGame)
+            {
+                DropAlerts();
+                // Interrupted on screen: an alert is lost like the others, a request starts over in the lobby
+                if (_shownIsAlert)
+                {
+                    _shown = null;
+                }
+                _shownUntil = float.PositiveInfinity;
+                return null;
+            }
+
+            if (_shown.HasValue && float.IsPositiveInfinity(_shownUntil))
+            {
+                _shownUntil = now + durationSeconds;
             }
             if (!_shown.HasValue && _waiting.Count > 0)
             {
                 (string key, string name, bool isAlert) next = _waiting.Dequeue();
                 _shown = (next.key, next.name);
+                _shownIsAlert = next.isAlert;
                 _shownUntil = now + durationSeconds;
             }
             return _shown;

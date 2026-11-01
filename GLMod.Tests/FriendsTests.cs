@@ -141,6 +141,45 @@ namespace GLMod.Tests
             Assert.Equal("a", queue.Current(200f, Duration, false)?.key);
         }
 
+        // k0036: the request on screen when a game started kept its timer and never came back
+        [Fact]
+        public void ARequestInterruptedByAGameIsShownAgainInFullInTheLobby()
+        {
+            var queue = new FriendNotificationQueue();
+            queue.Enqueue("a", "1");
+
+            Assert.Equal("a", queue.Current(0f, Duration, false)?.key);
+            Assert.Null(queue.Current(0.5f, Duration, true));
+            Assert.Equal(1, queue.Count);
+            Assert.Equal("a", queue.Current(300f, Duration, false)?.key);
+            Assert.Equal("a", queue.Current(305f, Duration, false)?.key);
+            Assert.Null(queue.Current(306f, Duration, false));
+        }
+
+        // k0036: only an interrupted request starts over, one already over stays over
+        [Fact]
+        public void ARequestAlreadyOverWhenTheGameStartsDoesNotComeBack()
+        {
+            var queue = new FriendNotificationQueue();
+            queue.Enqueue("a", "1");
+
+            Assert.Equal("a", queue.Current(0f, Duration, false)?.key);
+            Assert.Null(queue.Current(6f, Duration, true));
+            Assert.Null(queue.Current(300f, Duration, false));
+        }
+
+        // k0036: an alert on screen when a game started does not come back after it
+        [Fact]
+        public void AnAlertInterruptedByAGameDoesNotComeBack()
+        {
+            var queue = new FriendNotificationQueue();
+            queue.EnqueueAlert("online", "1");
+
+            Assert.Equal("online", queue.Current(0f, Duration, false)?.key);
+            Assert.Null(queue.Current(0.5f, Duration, true));
+            Assert.Null(queue.Current(300f, Duration, false));
+        }
+
         [Fact]
         public void EmptyQueueShowsNothing()
         {
