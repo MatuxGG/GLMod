@@ -104,6 +104,23 @@ namespace GLMod.Tests
             Assert.Equal((key, value), FriendsLogic.SeenAgo(1000000 - secondsAgo, 1000000));
         }
 
+        // k0048: a failed first sync stayed on "Loading" (500, 401, network) or "Unavailable / Loading your friends..." (404)
+        [Fact]
+        public void EmptyStateKeys_LoadingOnlyWithoutError()
+        {
+            Assert.Equal(("state.loading", "friends.loading"), FriendsLogic.EmptyStateKeys(null));
+        }
+
+        [Theory]
+        [InlineData("HTTP 500")]
+        [InlineData("HTTP 404")]
+        [InlineData("Network error")]
+        [InlineData("Unreadable response")]
+        public void EmptyStateKeys_AFailedSyncIsNotLoading(string error)
+        {
+            Assert.Equal(("state.unavailable", "friends.error"), FriendsLogic.EmptyStateKeys(error));
+        }
+
         // k0029: an error without text gave a raw key on screen ("friends.error.HTTP 0")
         [Theory]
         [InlineData("HTTP 0", "friends.error.network")]

@@ -31,6 +31,7 @@ namespace GLMod.Services.Implementations
         public GLFriendsState State { get; private set; }
         public int PendingRequestCount => State?.incoming?.Count ?? 0;
         public bool IsAvailable { get; private set; } = true;
+        public string Error { get; private set; }
         public IReadOnlyList<GLRecentPlayer> RecentPlayers { get; private set; }
         public FriendNotificationQueue Notifications { get; } = new FriendNotificationQueue();
 
@@ -51,6 +52,7 @@ namespace GLMod.Services.Implementations
             if (!CanCall)
             {
                 State = null;
+                Error = null;
                 yield break;
             }
             if (_syncing)
@@ -76,6 +78,8 @@ namespace GLMod.Services.Implementations
             {
                 // An API without these endpoints answers 404: asked again later
                 IsAvailable = response?.StatusCode != 404;
+                Error = PlayerApiResponse.ReadError(response?.Content)
+                    ?? (response == null || response.StatusCode == 0 ? "Network error" : "HTTP " + response.StatusCode);
                 Log($"[Sync] failed: {(response == null ? "no response" : "HTTP " + response.StatusCode)}");
                 yield break;
             }
@@ -83,10 +87,12 @@ namespace GLMod.Services.Implementations
             if (!PlayerApiResponse.TryParse(response.Content, out GLFriendsState state, out string error))
             {
                 Log("[Sync] unreadable answer: " + error);
+                Error = "Unreadable response";
                 yield break;
             }
 
             IsAvailable = true;
+            Error = null;
             Notify(State, state);
             State = state;
         }
@@ -128,6 +134,7 @@ namespace GLMod.Services.Implementations
                 if (!CanCall)
                 {
                     State = null;
+                    Error = null;
                     next = 0f;
                     continue;
                 }

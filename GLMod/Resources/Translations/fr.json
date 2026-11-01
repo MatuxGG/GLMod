@@ -14,6 +14,7 @@
   "friends.requestReceived": "Demande reçue : réponds au-dessus",
   "friends.offline": "Connecte-toi avec Steam au menu principal pour voir tes amis.",
   "friends.loading": "Chargement de tes amis...",
+  "friends.error": "Tes amis n'ont pas pu être chargés ({0}).",
   "friends.incoming": "Demandes reçues",
   "friends.list": "Amis",
   "friends.empty": "Aucun ami pour l'instant : ajoute-les depuis ta room ou tes dernières parties, ci-dessous.",

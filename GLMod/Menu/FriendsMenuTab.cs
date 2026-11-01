@@ -98,7 +98,8 @@ namespace GLMod.Menu
             if (state == null)
             {
                 MenuUI.Heading(_t.Get("friends.list"));
-                MenuUI.EmptyState(_friends.IsAvailable ? _t.Get("state.loading") : _t.Get("state.unavailable"), _t.Get("friends.loading"));
+                (string title, string text) = FriendsLogic.EmptyStateKeys(_friends.Error);
+                MenuUI.EmptyState(_t.Get(title), _t.Get(text, _friends.Error));
                 return;
             }
 

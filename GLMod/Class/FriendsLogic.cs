@@ -94,6 +94,14 @@ namespace GLMod.Class
         }
 
         /// <summary>
+        /// Translation keys of the title and text shown while there is no list: loading, or the failure of the last sync.
+        /// </summary>
+        public static (string title, string text) EmptyStateKeys(string error)
+        {
+            return error == null ? ("state.loading", "friends.loading") : ("state.unavailable", "friends.error");
+        }
+
+        /// <summary>
         /// Translation key and value of "seen X ago".
         /// </summary>
         public static (string key, long value) SeenAgo(long lastSeen, long now)

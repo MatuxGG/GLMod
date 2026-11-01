@@ -28,6 +28,11 @@ namespace GLMod.Services.Interfaces
         bool IsAvailable { get; }
 
         /// <summary>
+        /// Why the last sync failed, null when it succeeded, before the first answer or when logged out.
+        /// </summary>
+        string Error { get; }
+
+        /// <summary>
         /// Accounts met in the last games, null until ReloadRecentPlayers answered.
         /// </summary>
         IReadOnlyList<GLRecentPlayer> RecentPlayers { get; }
