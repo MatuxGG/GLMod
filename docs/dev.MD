@@ -223,10 +223,11 @@ GLMod.GameHistoryService.EntryRecorded += entry => { /* a game just ended */ };
 ```
 
 ### Room Ticket Service (IRoomTicketService)
-Room code configured on the Good Loss account of the player (`/account` on the site), null when there is none. On the Among Us Ranked servers, a game takes the code of its creator when it is free.
+Room code configured on the Good Loss account of the player (`/account` on the site), null when there is none or it is not known yet. On the Among Us Ranked servers, a game takes the code of its creator when it is free.
 
 ```csharp
 string code = GLMod.RoomTicketService.RoomCode;
+bool known = GLMod.RoomTicketService.IsRoomCodeKnown; // true once a valid ticket was received: a null code then means none
 ```
 
 The ticket behind it is only sent to the Good Loss game servers: your mod has no reason to read `Ticket`, and must never log it.

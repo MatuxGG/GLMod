@@ -414,7 +414,8 @@ namespace GLMod.Menu
 
             if (GoodLossServers.IsCurrentRegion() && GLMod.AuthService.IsLoggedIn)
             {
-                string mine = GLMod.RoomTicketService.RoomCode ?? texts.Get("menu.room.none");
+                IRoomTicketService tickets = GLMod.RoomTicketService;
+                string mine = tickets.RoomCode ?? texts.Get(tickets.IsRoomCodeKnown ? "menu.room.none" : "menu.room.unknown");
                 DrawRoomCodeLine(right, top + MenuUI.U(20f), texts.Get("menu.room.mine"), mine);
             }
         }

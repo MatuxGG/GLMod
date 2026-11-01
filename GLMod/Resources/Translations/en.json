@@ -9,6 +9,7 @@
   "menu.room.current": "ROOM",
   "menu.room.mine": "MY CODE",
   "menu.room.none": "NONE",
+  "menu.room.unknown": "?",
   "tab.friends": "Friends",
   "friends.requestReceived": "Request received: answer above",
   "friends.offline": "Connect with Steam on the main menu to see your friends.",

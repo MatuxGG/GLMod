@@ -1,7 +1,11 @@
 using GLMod.Class;
 using GLMod.GLEntities;
+using GLMod.Services.Implementations;
+using GLMod.Services.Interfaces;
 using GLMod.TestHarness;
 using System.Linq;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Xunit;
 
@@ -88,6 +92,47 @@ namespace GLMod.Tests
         {
             Assert.True(PlayerApiResponse.TryParse("{\"ticket\":\"t\",\"roomCode\":null,\"expiresAt\":1}", out GLRoomTicket ticket));
             Assert.Null(ticket.roomCode);
+        }
+    }
+
+    // k0045: the F2 panel showed NONE to a player with a code as long as no ticket had been received
+    public class RoomCodeKnownTests
+    {
+        // The constructor takes a BepInEx logger, which this project does not reference: only the ticket matters here
+        private static IRoomTicketService ServiceWith(GLRoomTicket current)
+        {
+            object service = RuntimeHelpers.GetUninitializedObject(typeof(RoomTicketService));
+            typeof(RoomTicketService)
+                .GetField("_current", BindingFlags.Instance | BindingFlags.NonPublic)
+                .SetValue(service, current);
+            return (IRoomTicketService)service;
+        }
+
+        [Fact]
+        public void RoomCodeIsNotKnownBeforeTheFirstTicket()
+        {
+            IRoomTicketService service = ServiceWith(null);
+
+            Assert.Null(service.RoomCode);
+            Assert.False(service.IsRoomCodeKnown);
+        }
+
+        [Fact]
+        public void AValidTicketWithoutCodeMeansTheAccountHasNone()
+        {
+            IRoomTicketService service = ServiceWith(new GLRoomTicket { ticket = "t", roomCode = null, expiresAt = 1 });
+
+            Assert.Null(service.RoomCode);
+            Assert.True(service.IsRoomCodeKnown);
+        }
+
+        [Fact]
+        public void AValidTicketGivesTheCodeOfTheAccount()
+        {
+            IRoomTicketService service = ServiceWith(new GLRoomTicket { ticket = "t", roomCode = "GVOVVF", expiresAt = 1 });
+
+            Assert.Equal("GVOVVF", service.RoomCode);
+            Assert.True(service.IsRoomCodeKnown);
         }
     }
 
