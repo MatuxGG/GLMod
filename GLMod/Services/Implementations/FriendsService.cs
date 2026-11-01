@@ -242,13 +242,17 @@ namespace GLMod.Services.Implementations
             }
 
             AmongUsClient client = AmongUsClient.Instance;
-            if (client.GameState != InnerNetClient.GameStates.NotJoined)
+            bool inGame = client.GameState != InnerNetClient.GameStates.NotJoined;
+            if (FriendsLogic.MustGoToMainMenu(inGame, SceneManager.GetActiveScene().name))
             {
                 string failure = null;
                 try
                 {
                     // Like the Leave button of the game: the scene change is not part of ExitGame
-                    client.ExitGame(DisconnectReasons.ExitGame);
+                    if (inGame)
+                    {
+                        client.ExitGame(DisconnectReasons.ExitGame);
+                    }
                     SceneChanger.ChangeScene(GameConstants.SCENE_MAIN_MENU);
                 }
                 catch (Exception e)

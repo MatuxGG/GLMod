@@ -16,6 +16,14 @@ namespace GLMod.Class
         private const long Day = 86400;
 
         /// <summary>
+        /// Joining a friend starts from the main menu: true in a game or on any other screen.
+        /// </summary>
+        public static bool MustGoToMainMenu(bool inGame, string sceneName)
+        {
+            return inGame || sceneName != GameConstants.SCENE_MAIN_MENU;
+        }
+
+        /// <summary>
         /// "Account (in-game name)", the account alone when the name is unknown or the same.
         /// </summary>
         public static string DisplayName(string username, string playerName)

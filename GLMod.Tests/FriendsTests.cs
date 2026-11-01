@@ -12,6 +12,17 @@ namespace GLMod.Tests
 
         private static GLFriendsState WithFriends(params GLFriend[] friends) => new GLFriendsState { friends = friends.ToList() };
 
+        // k0044: not in a game on another screen, nothing went back to the main menu and Join timed out
+        [Theory]
+        [InlineData(true, "MainMenu", true)]
+        [InlineData(true, "OnlineGame", true)]
+        [InlineData(false, "FindAGame", true)]
+        [InlineData(false, "MainMenu", false)]
+        public void MustGoToMainMenu_InAGameOrOnAnotherScreen(bool inGame, string scene, bool expected)
+        {
+            Assert.Equal(expected, FriendsLogic.MustGoToMainMenu(inGame, scene));
+        }
+
         [Theory]
         [InlineData("Matux", "Shedconic", "Matux (Shedconic)")]
         [InlineData("Matux", "matux", "Matux")]
