@@ -23,7 +23,7 @@ namespace GLMod
     public class GLMod : BasePlugin
     {
         public const string Id = "glmod";
-        public const string Version = "5.9.1";
+        public const string Version = "5.10.0";
 
         public Harmony Harmony { get; } = new Harmony(Id);
 
@@ -42,8 +42,10 @@ namespace GLMod
         public static ITranslationService TranslationService { get; private set; }
         public static IRoomTicketService RoomTicketService { get; private set; }
         public static IFriendsService FriendsService { get; private set; }
+        public static IPlannedLobbyService PlannedLobbyService { get; private set; }
 
         public static ConfigEntry<string> connectionState { get; private set; }
+        public static ConfigEntry<string> dismissedLobby { get; private set; }
         public static ConfigEntry<string> stepConf { get; private set; }
         public static ConfigEntry<string> stepRpc { get; private set; }
         public static ConfigEntry<string> enabled { get; private set; }
@@ -84,6 +86,7 @@ namespace GLMod
         {
             connectionState = Config.Bind("GoodLoss", "Connected", "");
             enabled = Config.Bind("GoodLoss", "Enabled", "Yes");
+            dismissedLobby = Config.Bind("Menu", "DismissedLobby", "");
             stepConf = Config.Bind("Validation", "steps", "");
             stepRpc = Config.Bind("Validation", "RPC", "");
 
@@ -114,6 +117,7 @@ namespace GLMod
             TranslationService = new TranslationService(Logger, GameLanguage.CurrentCode);
             RoomTicketService = new RoomTicketService(Logger, AuthService, api);
             FriendsService = new FriendsService(Logger, AuthService, MenuService, api);
+            PlannedLobbyService = new PlannedLobbyService(Logger, MenuService, ConfigService, dismissedLobby, api);
         }
 
         private void InitializeMenu()

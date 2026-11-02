@@ -42,7 +42,7 @@ Any code review MUST reject contributions that introduce non-English identifiers
 
 ### 1.1 Identity
 - **Name**: GLMod (Good Loss Mod)
-- **Current version**: `5.9.1` (see [GLMod/GLMod.csproj](GLMod/GLMod.csproj) and [GLMod/GLMod.cs](GLMod/GLMod.cs))
+- **Current version**: `5.10.0` (see [GLMod/GLMod.csproj](GLMod/GLMod.csproj) and [GLMod/GLMod.cs](GLMod/GLMod.cs))
 - **BepInEx plugin Id**: `glmod`
 - **Author**: Matux
 - **License**: GNU GPLv3
@@ -114,6 +114,7 @@ PlayerService             ← Logger, apiEndpoint
 TranslationService        ← Logger, language provider (GameLanguage.CurrentCode)
 RoomTicketService         ← Logger, AuthService, apiEndpoint
 FriendsService            ← Logger, AuthService, MenuService, apiEndpoint
+PlannedLobbyService       ← Logger, MenuService, ConfigService, dismissed lobby entry, apiEndpoint
 ```
 
 ### 2.4 Coroutines & async
@@ -251,6 +252,12 @@ Every service is exposed statically via the main `GLMod` class and has a dedicat
 - **During a game**: only the count on the chip of the menu changes. Request notifications wait for the lobby ([FriendNotificationQueue.cs](GLMod/Class/FriendNotificationQueue.cs)) and each sync forgets those no longer pending (answered, expired), connection alerts are dropped.
 - **Members**: `State`, `PendingRequestCount`, `IsAvailable`, `Error`, `RecentPlayers`, `Notifications`, `Sync()`, `KeepInSync()`, `ReloadRecentPlayers()`, `SendRequest`, `Answer`, `Remove`, `SetBlocked`, `UpdateSettings`, `Join`. Errors of the actions are API codes, shown through `friends.error.<code>`; a code without text (network failure, `HTTP 502`, unknown API message) shows `friends.error.network`. `Error` is why the last sync failed: without a list yet, the tab shows "Unavailable" with `friends.error` until a sync succeeds; a list already received stays on screen.
 
+### 3.15 `IPlannedLobbyService` — [Interfaces/IPlannedLobbyService.cs](GLMod/Services/Interfaces/IPlannedLobbyService.cs)
+- **Role**: the next planned lobby of the site (`goodloss.fr/lobbies`), for the banner of the main menu (§8.1). New players have nobody to play with: this shows them when and where.
+- **Read**: `GET {API}/lobbies/next?language=&mod=`, no token: only the language of the game and the name of the mod leave. The site answers the lobby and its texts in that language, because it has more languages than `TranslationService`, and falls back to English and to any mod. Reloaded every `LOBBY_REFRESH_SECONDS` on the main menu only, never while the menu is hidden by a mod. A failure keeps the last answer and only logs.
+- **Banner**: `PlannedLobbyLogic.ShouldShow` wants a lobby to come, texts, a web page (the server decides what opens in the browser of the player) and a lobby not dismissed; × stores its id in `Menu.DismissedLobby`, so it stays hidden after a restart until another lobby comes up.
+- **Members**: `Next`, `HasBanner`, `Dismiss()`, `Reload()`, `KeepFresh()`; static `PlannedLobbyService.IsAtMainMenu()`.
+
 ## 4. Domain entities (`GLMod/GLEntities/`)
 
 | Class           | Role                                                          |
@@ -356,6 +363,8 @@ Reactor, Coms, Lights, O2
 | `GOOD_LOSS_PRESENCE_SERVERS`  | `impranked.goodloss.fr`, `betaranked.goodloss.fr`, `imp.goodloss.fr` — servers whose game codes may reach the site (same list as the site) |
 | `PRESENCE_STATE_*` / `FRIEND_STATUS_*` | `menu`, `lobby`, `game` / `offline`, `online`, `lobby`, `game`, `room` |
 | `FRIENDS_SYNC_SECONDS`        | `15f` — between two syncs of the friends list |
+| `API_PATH_LOBBIES_NEXT`       | `/lobbies/next` — next planned lobby |
+| `LOBBY_REFRESH_SECONDS`       | `600f` — between two reads of the next planned lobby, on the main menu |
 | `FRIENDS_UNAVAILABLE_RETRY_SECONDS` | `300f` — before asking again an API without the friends endpoints |
 | `FRIEND_NOTIFICATION_SECONDS` | `6f` — a friend notification on screen |
 | `FRIEND_JOIN_LEAVE_TIMEOUT`   | `20f` — wait to be back at the main menu before joining a friend |
@@ -427,6 +436,7 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 | `GoodLossServers.cs`   | `IsGoodLossServer(pingServer)` (pure) and `IsCurrentRegion()`: the Good Loss servers. `ReceivesRoomTicket(onlineGame, pingServer)` (pure) and `IsCurrentConnectionEligible()`: the connections that carry the room ticket. `IsPresenceServer` and `HasRoomList` (pure), `IsInRoomWithList()`: the games that have a room list. |
 | `RoomTicketFooter.cs`  | Pure, unit-tested: `Append(data, ticket)` = data + ticket + length (2 bytes LE) + `GLMT`. GLPlugin reads it from the end. |
 | `FriendsLogic.cs`      | Pure, unit-tested: `DisplayName` ("Account (in-game name)", the account alone when the name is unknown or the same), order of the list, friends just online, new requests, "seen X ago", texts shown without a list (`EmptyStateKeys`). |
+| `PlannedLobbyLogic.cs` | Pure, unit-tested: URL of the next lobby, whether the banner shows, its text and culture. |
 | `FriendNotificationQueue.cs` | Pure, unit-tested: notifications shown one at a time, none during a game; connection alerts still waiting are dropped (`EnqueueAlert`, `DropAlerts`, `HoldForMenu` while the menu is open), requests no longer pending too (`EnqueueRequest`, `RetainRequests`). |
 | `GamePresence.cs`      | What is declared to the site: state (`StateOf`, pure: the end screen is a game, only a lobby can be joined), region, server, game code (Good Loss servers only), client id, in-game name. Main thread only. |
 | `VanillaEvents.cs`     | Default implementations (`startGameVanilla`, `endGameVanilla`…) used when the matching `ServiceType` is enabled. |
@@ -460,6 +470,7 @@ API tabs load through `RemoteData<T>` (internal): cache per account **and API th
 
 - **Friends tab** (`FriendsMenuTab`, second tab, title with the number of pending requests): requests received (Accept / Refuse), friends (in my room, in a lobby + server + **Join**, online, in a game + server, offline + "seen X ago"; Remove, Block), players of the room, on the presence servers only (Add, or their state: friend, request sent, request received, no account), players of the last games not in the room (Add; reloaded each time the tab is shown), blocked players (Unblock), settings (refuse requests, appear offline, connection alert). Names are `Account (in-game name)`. Rows with 3 buttons put them on a line of their own, so the name is never cut.
 - **Chip and notifications**: the chip shows the number of pending requests in a small pill, also during a game. Above it, outside of a game and when the menu is closed, a 6 s notification for a request received or a friend coming online. A connection alert not shown yet is lost when a game starts or while the menu is open, one on screen is lost when a game starts; requests wait, and one interrupted by a game or the menu is shown again for 6 s afterwards.
+- **Planned lobby banner**: on the main menu only, menu closed, above the room of the friend notifications: "Next lobby · Sun 8 Nov 21:00 · 3/15 players" in the time zone of the player, a button opening the page of the lobby (`Application.OpenURL`), × to hide it until the next lobby (§3.15). It counts as menu for the clicks (`IsPointerOverMenu`). Its texts come from the site, not from `ITranslationService`.
 - **Translations**: every text of the menu comes from `ITranslationService` (§3.12) and follows the game language, English otherwise.
 - **Mods built on GLMod**: from their `Load()` (GLMod is loaded first, its built-in tabs already registered) or later, they can hide the menu, remove built-in tabs by id and add / insert their own tabs (§3.10); documented in `docs/dev.MD`. The Last game tab does not poll after a game when the menu is disabled or the tab was removed.
 
@@ -472,6 +483,7 @@ API tabs load through `RemoteData<T>` (internal): cache per account **and API th
 | `GoodLoss`   | `Connected`    | Persisted connection state.                          |
 | `GoodLoss`   | `Enabled`      | `"Yes"` / `"No"` — global mod toggle.                |
 | `GoodLoss`   | `Support Id`   | 10-character support id, generated once.             |
+| `Menu`       | `DismissedLobby` | Id of the planned lobby whose banner the player hid. |
 | `Validation` | `steps`        | Must be `"YES"` after a complete match.              |
 | `Validation` | `RPC`          | Must be `"YES"` (with history) after a complete match. |
 
@@ -497,6 +509,7 @@ Base: `https://goodloss.fr/api` (production). It can be overridden at startup wi
 | `/friends/remove`              | POST   | FriendsService    | Removes a friend (`userId`). |
 | `/friends/block`               | POST   | FriendsService    | Blocks or unblocks a player (`userId`, `blocked`). |
 | `/friends/settings`            | POST   | FriendsService    | Changes the settings (`refuseRequests`, `appearOffline`, `onlineAlert`). |
+| `/lobbies/next?language=&mod=` | GET    | PlannedLobbyService | Next planned lobby and its texts, without token (banner of the main menu). |
 | `/data`                        | POST   | IntegrityService  | Generic data lookup by id; `checksum_*` ids hold DLL checksums (§3.6). |
 | `/game/start`                  | POST   | GameStateManager  | Sends a new match.                     |
 | `/game/addMyPlayer`            | POST   | GameStateManager  | Registers the local player (Bearer game token). |
@@ -614,6 +627,7 @@ GLMod/                                # Repo root
 │   ├── MovementTests.cs              # NavGrid, PositionAccuracy, ScenarioVerifier.VerifyPositions.
 │   ├── PositionSimplifierTests.cs    # PositionSimplifier.
 │   ├── RoomTicketTests.cs            # RoomTicketFooter, GoodLossServers, ticket answer, known room code, PluginChecks.
+│   ├── PlannedLobbyLogicTests.cs     # PlannedLobbyLogic: URL, banner shown or not, text.
 │   ├── FriendsTests.cs               # FriendsLogic, FriendNotificationQueue, friends answers, presence servers.
 │   ├── FriendsMenuTabTests.cs        # Recent players reloaded each time the tab is shown.
 │   ├── FriendsServiceTests.cs        # List read again after an action, even with a sync running.
@@ -666,6 +680,7 @@ GLMod/                                # Repo root
     │   ├── RoomTicketFooter.cs       # Pure: room ticket at the end of the connection data.
     │   ├── FriendsLogic.cs           # Pure logic of the friends list.
     │   ├── FriendNotificationQueue.cs # Pure: friend notifications.
+    │   ├── PlannedLobbyLogic.cs      # Pure: banner of the next planned lobby.
     │   ├── GamePresence.cs           # Presence declared to the site (IL2CPP).
     │   ├── PlayerApiResponse.cs      # Pure parsing of the /player/* GET responses.
     │   ├── PlayerApiQuery.cs         # Pure URL builder of the /player/* GET requests.
@@ -712,6 +727,7 @@ GLMod/                                # Repo root
     │   ├── GLFriendRequest.cs        # …a request…
     │   ├── GLRoomAccount.cs          # …an account in the room…
     │   ├── GLBlockedPlayer.cs        # …a blocked player…
+    │   ├── GLNextLobby.cs            # Next planned lobby, its texts.
     │   ├── GLFriendSettings.cs       # …the settings.
     │   ├── GLRecentPlayers.cs        # POST /friends/recent answer…
     │   ├── GLRecentPlayer.cs         # …an account met recently.
@@ -768,6 +784,7 @@ GLMod/                                # Repo root
         │   └── ITranslationService.cs
         │   ├── IRoomTicketService.cs
         │   ├── IFriendsService.cs
+        │   ├── IPlannedLobbyService.cs
         └── Implementations/          # ONE file per implementation, same name without "I".
             ├── AuthenticationService.cs
             ├── ConfigurationService.cs
@@ -783,6 +800,7 @@ GLMod/                                # Repo root
             └── TranslationService.cs
             ├── RoomTicketService.cs
             ├── FriendsService.cs
+            ├── PlannedLobbyService.cs
 ```
 
 ### 12.1 Structure rules (NON-NEGOTIABLE)
@@ -923,5 +941,5 @@ For every change to the project:
 
 ---
 
-*Last updated: 2026-10-31 — GLMod version 5.9.1.*
+*Last updated: 2026-11-02 — GLMod version 5.10.0.*
 *Every change to the project must be accompanied by an update of this file.*
