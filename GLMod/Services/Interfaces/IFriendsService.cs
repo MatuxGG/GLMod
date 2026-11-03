@@ -43,12 +43,19 @@ namespace GLMod.Services.Interfaces
         FriendNotificationQueue Notifications { get; }
 
         /// <summary>
+        /// Gets or sets whether KeepInSync declares the presence of the player. True by default, whether the menu
+        /// is shown or not; false stops the regular syncs (the friends list is then no longer read either).
+        /// </summary>
+        bool PresenceEnabled { get; set; }
+
+        /// <summary>
         /// Declares the presence of the player and reads the list (POST /friends/sync).
         /// </summary>
         IEnumerator Sync();
 
         /// <summary>
-        /// Endless coroutine syncing regularly while the player is logged in and the Friends tab exists.
+        /// Endless coroutine syncing regularly while the player is logged in and PresenceEnabled is true,
+        /// even when a mod hides the menu or removes the Friends tab.
         /// </summary>
         IEnumerator KeepInSync();
 

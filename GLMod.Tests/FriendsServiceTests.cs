@@ -1,5 +1,6 @@
 using GLMod.Class;
 using GLMod.Constants;
+using GLMod.Menu;
 using GLMod.Services.Implementations;
 using GLMod.Services.Interfaces;
 using System;
@@ -29,7 +30,7 @@ namespace GLMod.Tests
         }
 
         // The constructor takes a BepInEx logger, which this project does not reference: the logger is only used on failures
-        private static IFriendsService CreateService(string apiEndpoint)
+        private static IFriendsService CreateService(string apiEndpoint, IMenuService menu = null)
         {
             IAuthenticationService auth = DispatchProxy.Create<IAuthenticationService, Fake<IAuthenticationService>>();
             ((Fake<IAuthenticationService>)(object)auth).Handler = method =>
@@ -38,6 +39,7 @@ namespace GLMod.Tests
             object service = RuntimeHelpers.GetUninitializedObject(typeof(FriendsService));
             SetField(service, "_authService", auth);
             SetField(service, "_apiEndpoint", apiEndpoint);
+            SetField(service, "_menuService", menu ?? new MenuService());
             SetField(service, "<Notifications>k__BackingField", new FriendNotificationQueue());
             return (IFriendsService)service;
         }
@@ -108,6 +110,58 @@ namespace GLMod.Tests
             Assert.Equal(2, Volatile.Read(ref syncs));
             Assert.Equal(0, service.PendingRequestCount);
             Assert.Equal(0, pendingWhenDone);
+        }
+
+        private static IMenuService MenuWithFriendsTab(bool enabled)
+        {
+            var menu = new MenuService();
+            menu.RegisterTab(new MenuTab(GameConstants.MENU_TAB_FRIENDS, "Friends", () => { }));
+            menu.Enabled = enabled;
+            return menu;
+        }
+
+        private static void RunToEnd(IEnumerator routine)
+        {
+            var pump = new Pump(routine);
+            var watch = Stopwatch.StartNew();
+            while (!pump.Done && watch.Elapsed < Timeout)
+            {
+                pump.Step();
+            }
+            Assert.True(pump.Done, "coroutine timed out");
+        }
+
+        // A mod hiding the menu (the TCG) showed its players offline: the presence must not depend on the menu
+        [Fact]
+        public void Sync_WithTheMenuHidden_StillDeclaresThePresenceWithoutNotifying()
+        {
+            int syncs = 0;
+            using var api = new ApiStub(path =>
+            {
+                if (path == GameConstants.API_PATH_FRIENDS_SYNC)
+                {
+                    Interlocked.Increment(ref syncs);
+                }
+                return "{\"incoming\":[{\"requestId\":7,\"userId\":2,\"username\":\"New\"}]}";
+            });
+            IFriendsService service = CreateService(api.Url, MenuWithFriendsTab(enabled: false));
+
+            RunToEnd(service.Sync());
+
+            Assert.Equal(1, Volatile.Read(ref syncs));
+            Assert.Equal(1, service.PendingRequestCount);
+            Assert.Equal(0, service.Notifications.Count);
+        }
+
+        [Fact]
+        public void Sync_WithTheFriendsTab_NotifiesANewRequest()
+        {
+            using var api = new ApiStub(_ => "{\"incoming\":[{\"requestId\":7,\"userId\":2,\"username\":\"New\"}]}");
+            IFriendsService service = CreateService(api.Url, MenuWithFriendsTab(enabled: true));
+
+            RunToEnd(service.Sync());
+
+            Assert.Equal(1, service.Notifications.Count);
         }
 
         /// <summary>
