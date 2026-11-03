@@ -135,6 +135,7 @@ namespace GLMod
 
         public static void Postfix(MainMenuManager __instance)
         {
+            MainMenuScreen.Track(__instance);
             try
             {
                 if (!SteamAPI.Init())

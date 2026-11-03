@@ -122,6 +122,18 @@ namespace GLMod.Constants
         public const string SITE_GAME_PATH = "/game/";
 
         /// <summary>
+        /// Site page of the account. A visitor who is not logged in goes through the Good Loss login,
+        /// which links a temporary account to the real one of the same Steam account.
+        /// </summary>
+        public const string SITE_ACCOUNT_PATH = "/account";
+
+        /// <summary>
+        /// Start of the name of a temporary account, created by the site at the first login from the game
+        /// of a Steam account without Good Loss account.
+        /// </summary>
+        public const string TEMPORARY_ACCOUNT_PREFIX = "Player_";
+
+        /// <summary>
         /// Local game history file, stored in the BepInEx config folder.
         /// </summary>
         public const string GAME_HISTORY_FILE_NAME = "glmod-history.json";

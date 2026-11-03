@@ -29,6 +29,8 @@ namespace GLMod.Menu
         private const float FooterHeight = 42f;
         private const float ChipHeight = 22f;
         private const float ChipLeft = 12f;
+        private const float BannerHeight = 40f;
+        private const float BannerGap = 6f;
         private const float OpenSeconds = 0.32f;
         private const float CloseSeconds = 0.2f;
         private const float ContentSeconds = 0.22f;
@@ -49,7 +51,9 @@ namespace GLMod.Menu
         private static readonly ShownTabTracker _shownTab = new ShownTabTracker();
         private static Rect _chipRect;
         private static Rect _panelRect;
-        private static Rect _lobbyBannerRect;
+        private static readonly List<Rect> _bannerRects = new List<Rect>();
+        // × of the activation banner: back at the next launch of the game
+        private static bool _accountBannerDismissed;
         private static readonly HashSet<string> _loggedErrors = new HashSet<string>();
 
         public MenuBehaviour(IntPtr ptr) : base(ptr)
@@ -69,8 +73,14 @@ namespace GLMod.Menu
                 }
                 Vector3 mouse = Input.mousePosition;
                 var point = new Vector2(mouse.x, Screen.height - mouse.y);
-                return _lobbyBannerRect.Contains(point)
-                    || (_slide < 1f && _chipRect.Contains(point))
+                foreach (Rect banner in _bannerRects)
+                {
+                    if (banner.Contains(point))
+                    {
+                        return true;
+                    }
+                }
+                return (_slide < 1f && _chipRect.Contains(point))
                     || (_slide > 0f && _panelRect.Contains(point));
             }
         }
@@ -161,7 +171,7 @@ namespace GLMod.Menu
             {
                 _chipRect = Rect.zero;
                 _panelRect = Rect.zero;
-                _lobbyBannerRect = Rect.zero;
+                _bannerRects.Clear();
                 return;
             }
 
@@ -172,7 +182,7 @@ namespace GLMod.Menu
                 MenuUI.ApplyTheme(MenuTheme.ForMod(GLMod.ConfigService?.ModName));
                 DrawChip(menu);
                 DrawFriendNotification();
-                DrawLobbyBanner();
+                DrawMainMenuBanners();
                 if (_slide > 0f)
                 {
                     DrawPanel(menu);
@@ -339,48 +349,97 @@ namespace GLMod.Menu
             MenuUI.DrawText(new Rect(rect.x + MenuUI.U(14f), rect.y, width - MenuUI.U(14f), height), text, MenuUI.RowStyle, MenuUI.Text);
         }
 
-        /// <summary>
-        /// Next planned lobby, on the main menu with the menu closed, above the chip and the friend notifications:
-        /// a button opens its page, × hides it until the next lobby.
-        /// </summary>
-        private static void DrawLobbyBanner()
+        private sealed class MainMenuBanner
         {
-            IPlannedLobbyService lobbies = GLMod.PlannedLobbyService;
-            if (lobbies == null || _slide > 0f || !lobbies.HasBanner || !PlannedLobbyService.IsAtMainMenu())
+            public string Text;
+            public string ButtonText;
+            public Action OnButton;
+            public Action OnClose;
+            public float TextWidth;
+            public float ButtonWidth;
+        }
+
+        /// <summary>
+        /// Banners of the main menu, with the menu closed: next planned lobby (× hides it until the next lobby),
+        /// then activation of a temporary account (× hides it until the game restarts). Centered, stacked up
+        /// from the bottom edge of the screen, the lowest one flush with it like the chip.
+        /// </summary>
+        private static void DrawMainMenuBanners()
+        {
+            _bannerRects.Clear();
+            // First screen only: the other ones of the main menu have buttons where the banners go
+            if (_slide > 0f || !MainMenuScreen.IsFirstScreen())
             {
-                _lobbyBannerRect = Rect.zero;
                 return;
             }
 
-            GLNextLobby next = lobbies.Next;
-            string text = PlannedLobbyLogic.Text(next, TimeZoneInfo.Local, PlannedLobbyLogic.CultureOf(GameLanguage.CurrentCode()));
-            float pad = MenuUI.U(14f);
-            float height = MenuUI.U(40f);
-            float actionWidth = MenuUI.SmallButtonStyle.CalcSize(new GUIContent(next.texts.action)).x + MenuUI.U(24f);
-            float closeWidth = MenuUI.U(24f);
-            float textWidth = MenuUI.RowStyle.CalcSize(new GUIContent(text)).x;
-            float width = pad + textWidth + pad + actionWidth + MenuUI.U(6f) + closeWidth + MenuUI.U(8f);
-            // Above the room for a friend notification, so that the two never overlap
-            float y = Screen.height - MenuUI.U(ChipHeight) - MenuUI.U(8f) - MenuUI.U(34f) - MenuUI.U(8f) - height;
-            var rect = new Rect(MenuUI.U(ChipLeft), y, width, height);
-            _lobbyBannerRect = rect;
-
-            GUI.color = new Color { r = 1f, g = 1f, b = 1f, a = 1f };
-            MenuUI.DrawGlow(rect, MenuUI.WithAlpha(MenuUI.Accent, 0.3f));
-            MenuUI.DrawOutline(rect, MenuUI.WithAlpha(MenuUI.Accent, 0.6f), MenuUI.PanelBottom, MenuUI.Corner.Small);
-            MenuUI.DrawText(new Rect(rect.x + pad, rect.y, textWidth + MenuUI.U(4f), height), text, MenuUI.RowStyle, MenuUI.Text);
-
-            float buttonHeight = MenuUI.U(26f);
-            float buttonY = rect.y + (height - buttonHeight) / 2f;
-            var action = new Rect(rect.x + pad + textWidth + pad, buttonY, actionWidth, buttonHeight);
-            if (MenuUI.DrawSecondaryButton(action, next.texts.action))
+            var banners = new List<MainMenuBanner>();
+            IPlannedLobbyService lobbies = GLMod.PlannedLobbyService;
+            if (lobbies != null && lobbies.HasBanner)
             {
-                Application.OpenURL(next.lobby.url);
+                GLNextLobby next = lobbies.Next;
+                banners.Add(new MainMenuBanner
+                {
+                    Text = PlannedLobbyLogic.Text(next, TimeZoneInfo.Local, PlannedLobbyLogic.CultureOf(GameLanguage.CurrentCode())),
+                    ButtonText = next.texts.action,
+                    OnButton = () => Application.OpenURL(next.lobby.url),
+                    OnClose = lobbies.Dismiss,
+                });
             }
-            var close = new Rect(action.xMax + MenuUI.U(6f), buttonY, closeWidth, buttonHeight);
-            if (GUI.Button(close, "×", MenuUI.CloseStyle))
+            IAuthenticationService auth = GLMod.AuthService;
+            if (!_accountBannerDismissed && auth != null && auth.IsLoggedIn && !auth.IsBanned
+                && LoginResponse.IsTemporaryAccount(auth.GetAccountName()))
             {
-                lobbies.Dismiss();
+                banners.Add(new MainMenuBanner
+                {
+                    Text = GLMod.TranslationService.Get("banner.account.text"),
+                    ButtonText = GLMod.TranslationService.Get("banner.account.action"),
+                    OnButton = () => Application.OpenURL(ApiEndpointResolver.AccountUrl(GLMod.api)),
+                    OnClose = () => _accountBannerDismissed = true,
+                });
+            }
+            if (banners.Count == 0)
+            {
+                return;
+            }
+
+            float pad = MenuUI.U(14f);
+            float closeWidth = MenuUI.U(24f);
+            float width = 0f;
+            foreach (MainMenuBanner banner in banners)
+            {
+                banner.TextWidth = MenuUI.RowStyle.CalcSize(new GUIContent(banner.Text)).x;
+                banner.ButtonWidth = MenuUI.SmallButtonStyle.CalcSize(new GUIContent(banner.ButtonText)).x + MenuUI.U(24f);
+                width = Mathf.Max(width, pad + banner.TextWidth + pad + banner.ButtonWidth + MenuUI.U(6f) + closeWidth + MenuUI.U(8f));
+            }
+
+            float height = MenuUI.U(BannerHeight);
+            float buttonHeight = MenuUI.U(26f);
+            float x = BannerStack.Left(Screen.width, width);
+            GUI.color = new Color { r = 1f, g = 1f, b = 1f, a = 1f };
+            for (int i = 0; i < banners.Count; i++)
+            {
+                MainMenuBanner banner = banners[i];
+                var rect = new Rect(x, BannerStack.Top(Screen.height, height, MenuUI.U(BannerGap), i), width, height);
+                _bannerRects.Add(rect);
+                // The lowest one goes below the bottom edge, so only its top corners are rounded
+                Rect background = i == 0 ? new Rect(rect.x, rect.y, rect.width, rect.height + MenuUI.U(8f)) : rect;
+                MenuUI.DrawGlow(background, MenuUI.WithAlpha(MenuUI.Accent, 0.3f));
+                MenuUI.DrawOutline(background, MenuUI.WithAlpha(MenuUI.Accent, 0.6f), MenuUI.PanelBottom, MenuUI.Corner.Small);
+                MenuUI.DrawText(new Rect(rect.x + pad, rect.y, banner.TextWidth + MenuUI.U(4f), height), banner.Text, MenuUI.RowStyle, MenuUI.Text);
+
+                // Button and × on the right, aligned from one banner to the next
+                float buttonY = rect.y + (height - buttonHeight) / 2f;
+                var close = new Rect(rect.xMax - MenuUI.U(8f) - closeWidth, buttonY, closeWidth, buttonHeight);
+                var action = new Rect(close.x - MenuUI.U(6f) - banner.ButtonWidth, buttonY, banner.ButtonWidth, buttonHeight);
+                if (MenuUI.DrawSecondaryButton(action, banner.ButtonText))
+                {
+                    banner.OnButton();
+                }
+                if (MenuUI.CloseButton(close, MenuUI.IsHover(close) ? MenuUI.White : MenuUI.Text))
+                {
+                    banner.OnClose();
+                }
             }
         }
 
@@ -443,8 +502,7 @@ namespace GLMod.Menu
             var close = new Rect(panel.xMax - pad - closeSize, panel.y + MenuUI.U(21f), closeSize, closeSize);
             bool hover = MenuUI.IsHover(close);
             MenuUI.DrawRect(close, hover ? MenuUI.WithAlpha(MenuUI.Danger, 0.85f) : MenuUI.Surface, MenuUI.Corner.Small);
-            MenuUI.CloseStyle.normal.textColor = hover ? MenuUI.White : MenuUI.Text;
-            if (GUI.Button(close, "×", MenuUI.CloseStyle))
+            if (MenuUI.CloseButton(close, hover ? MenuUI.White : MenuUI.Text))
             {
                 menu.Close();
             }

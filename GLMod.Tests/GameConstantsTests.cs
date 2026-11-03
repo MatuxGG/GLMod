@@ -72,6 +72,13 @@ namespace GLMod.Tests
                 ApiEndpointResolver.GameRecapUrl("https://preprod.goodloss.fr/api", "1234"));
         }
 
+        [Fact]
+        public void AccountUrl_PointsToTheSiteOfTheApi()
+        {
+            Assert.Equal("https://goodloss.fr/account", ApiEndpointResolver.AccountUrl("https://goodloss.fr/api"));
+            Assert.Equal("https://preprod.goodloss.fr/account", ApiEndpointResolver.AccountUrl("https://preprod.goodloss.fr/api/"));
+        }
+
         [Theory]
         [InlineData(null)]
         [InlineData("")]

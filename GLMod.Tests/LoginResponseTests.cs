@@ -79,6 +79,18 @@ namespace GLMod.Tests
             Assert.Equal(expected, LoginResponse.AccountNameOfLegacyToken(token));
         }
 
+        [Theory]
+        [InlineData("Player_1730000000_a1b2c3", true)]
+        [InlineData("Matux", false)]
+        [InlineData("player_1730000000_a1b2c3", false)]
+        [InlineData("MyPlayer_1", false)]
+        [InlineData("", false)]
+        [InlineData(null, false)]
+        public void IsTemporaryAccount(string accountName, bool expected)
+        {
+            Assert.Equal(expected, LoginResponse.IsTemporaryAccount(accountName));
+        }
+
         [Fact]
         public void CanReuseToken_OnlyWhileItStaysValidADayLonger()
         {

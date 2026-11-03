@@ -50,6 +50,14 @@ namespace GLMod.Class
         }
 
         /// <summary>
+        /// Account page on the site matching the API (login first when not logged in).
+        /// </summary>
+        public static string AccountUrl(string apiEndpoint)
+        {
+            return ToSiteUrl(apiEndpoint) + GameConstants.SITE_ACCOUNT_PATH;
+        }
+
+        /// <summary>
         /// Recap page of a game on the site matching the API, or "" without a game id.
         /// </summary>
         public static string GameRecapUrl(string apiEndpoint, string gameId)

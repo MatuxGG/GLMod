@@ -80,5 +80,13 @@ namespace GLMod.Class
         {
             return expiresAt.HasValue && expiresAt.Value - nowSeconds >= GameConstants.GAME_TOKEN_REUSE_MARGIN_SECONDS;
         }
+
+        /// <summary>
+        /// Whether an account name is a temporary account of the site ("Player_..."), still to activate.
+        /// </summary>
+        public static bool IsTemporaryAccount(string accountName)
+        {
+            return accountName != null && accountName.StartsWith(GameConstants.TEMPORARY_ACCOUNT_PREFIX, StringComparison.Ordinal);
+        }
     }
 }

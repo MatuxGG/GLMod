@@ -340,6 +340,8 @@ Reactor, Coms, Lights, O2
 | `ACTION_PREFIX_SAB_END`       | `SAB_END_` (suffixed by sabotage type)       |
 | `API_PATH_SUFFIX`             | `/api` — removed from the API URL to get the site URL |
 | `SITE_GAME_PATH`              | `/game/` — recap page, followed by the game id |
+| `SITE_ACCOUNT_PATH`           | `/account` — account page of the site (activation banner) |
+| `TEMPORARY_ACCOUNT_PREFIX`    | `Player_` — start of the name of a temporary account of the site |
 | `GAME_HISTORY_FILE_NAME`      | `glmod-history.json` (config folder)         |
 | `GAME_HISTORY_MAX_ENTRIES`    | `20`                                         |
 | `TRANSLATION_RESOURCE_PREFIX` | `GLMod.Resources.Translations.` — embedded translation files (§3.12) |
@@ -416,14 +418,15 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 | `HttpHelper.cs`        | Shared static `HttpClient`, proxy disabled.                                                |
 | `ApiService.cs`        | `PostFormAsync`, `PostFormWithErrorHandlingAsync` (optional `bearerToken` → `Authorization: Bearer`; response bodies are returned as sent, never `Regex.Unescape`d by default: it corrupts JSON escapes), `GetWithErrorHandlingAsync`, `ApiResponse` type. |
 | `SteamSessionTicket.cs` | `TryCreate` / `Cancel` — Steam session ticket (hex) of the Steam ticket login (§3.1). Main thread only. |
-| `LoginResponse.cs`     | Pure login helpers: ticket bytes → hex, ticket login answer (`GLLoginResponse`), ban reason, account name of a legacy token, token reuse. |
-| `ApiEndpointResolver.cs` | Resolves the API base URL: `API_ENDPOINT`, or the `GLMOD_API_ENDPOINT` environment variable when it is a valid http(s) URL. `ToSiteUrl(api)` / `GameRecapUrl(api, gameId)` give the matching site and recap URLs. |
+| `LoginResponse.cs`     | Pure login helpers: ticket bytes → hex, ticket login answer (`GLLoginResponse`), ban reason, account name of a legacy token, token reuse, temporary account (`IsTemporaryAccount`). |
+| `ApiEndpointResolver.cs` | Resolves the API base URL: `API_ENDPOINT`, or the `GLMOD_API_ENDPOINT` environment variable when it is a valid http(s) URL. `ToSiteUrl(api)` / `GameRecapUrl(api, gameId)` / `AccountUrl(api)` give the matching site, recap and account URLs. |
 | `GameHistoryList.cs`   | Pure operations on the local history (add with dedupe and truncation, JSON serialize / parse). |
 | `PlayerApiResponse.cs` | Pure parsing of the `/player/*` GET responses (`TryParse<T>`, `ReadError` for `{"error":...}`). |
 | `PlayerApiQuery.cs`    | Pure URL builder of the `/player/*` GET requests: `?username=` plus `&theme=` when a theme is given. |
 | `TranslationTable.cs`  | Pure translation lookup: texts by language and key, fallbacks (base language, English, key), `{0}` formatting, JSON loading. |
 | `GameLanguage.cs`      | `SupportedLangs` name → language code (pure `ToCode`) and `CurrentCode()` (reads the game settings). |
 | `PlayModeHelper.cs`    | `IsFreePlay()` — free play games are never recorded nor sent (§3.3). `IsInOnlineGame(state)` (pure) and `CurrentOnlineGameCode()` — code of the online game the player is in (lobby, running game or end screen), null otherwise. |
+| `MainMenuScreen.cs`    | `Track(manager)` (MainMenuManager.Start postfix) and `IsFirstScreen()`: first screen of the main menu, where the banners show (§8.1). Main thread only. |
 | `RankedMod.cs`         | `Matches(modName)` — "Among Us Ranked" and its variants ("Among Us Ranked Roles"…), case-insensitive. Pure. |
 | `StatFormat.cs`        | Pure formatting of menu stats: durations ("1 min 05 s", "2 h 05"), ratios, win percentages (`WinPercent`, rounded like the site), Yes/No, numbers, local dates, vanilla role names. |
 | `ServerClock.cs`       | `NowMs()` — Unix ms aligned on the API server clock. The offset is refreshed from the `Date` header of every `ApiService` response, unless the new measurement is within `CLOCK_DATE_RESOLUTION_MS` of the current offset (so `NowMs()` does not go back mid-game). **Every timestamp sent to the API (actions, positions) must use `ServerClock.NowMs()`**, never `DateTimeOffset.UtcNow`. |
@@ -455,8 +458,8 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 - **Fonts**: OS fonts through `Font.CreateDynamicFontFromOSFont`: display text (titles, tabs, buttons, captions) in Bahnschrift SemiBold (condensed DIN-like face of Windows 10+), body text in Segoe UI; Arial / the IMGUI default font elsewhere (Linux / Proton).
 - **Navigation**: left / right arrows (or the ‹ › buttons, or a click on a tab) switch tabs; up / down arrows and the mouse wheel scroll the current tab. The game does not see these inputs while the menu uses them (§7 patches).
 - **Rendering**: IMGUI from `MenuBehaviour` (`Update` = keys, scrolling, slide and content animations; `OnGUI` = drawing). Layout values are 1080p reference units converted to **screen pixels** with `MenuUI.U` (scale = screen height / 1080, never below `0.85`); styles (font sizes) are rebuilt when the scale changes, so text is rendered at its real size and stays sharp (no `GUI.matrix` scaling). Palette based on the Good Loss site (`--accent #A78BFA`, deeper `#7C3AED` for gradients, dark navy surfaces). `MenuBehaviour` notifies `IMenuTab.OnShown()` when a tab becomes visible, and again when the connected account (`AuthService.GetAccountName()`) changes while it stays visible, so a tab shown during the login loads its data once connected ([ShownTabTracker.cs](GLMod/Menu/ShownTabTracker.cs), pure, unit-tested); tab exceptions are logged once and replaced by an error message.
-- **Widgets**: [MenuUI.cs](GLMod/Menu/MenuUI.cs) — public, used by built-in and third-party tabs: `Heading`, `Highlight`, `Label`, `Muted`, `Field`, `Button`, `Row`, `ProgressBar`, `Tiles`, `StatGrid` (compact 3-column stat tiles, null values skipped), `Tags` (colored pills, wrapping), `WinRate` (label, counts, colored bar and percentage), `Space`, `Separator`, colors. Internal helpers for the built-in tabs: `Reserve`, `DrawRect`, `DrawGlow`, `DrawCircle`, `DrawRemoteImage` (image downloaded from a URL through `HttpHelper`, decoded on the main thread, cached by URL), `DrawAccentGradient`, `DrawPill`, `DrawSecondaryButton`, `EmptyState`.
-- **Textures**: generated once with `Texture2D.SetPixel` (white, tinted through `GUI.backgroundColor` and drawn with `GUI.Box` + 9-slice borders): rounded rectangles (4 / 7 / 12 px), circle, soft halos (large and small), accent and panel gradients (colors baked in). A halo whose 9-slice border is larger than the drawn rectangle turns into a block: `DrawGlow` switches to the small halo for elements under 24 px.
+- **Widgets**: [MenuUI.cs](GLMod/Menu/MenuUI.cs) — public, used by built-in and third-party tabs: `Heading`, `Highlight`, `Label`, `Muted`, `Field`, `Button`, `Row`, `ProgressBar`, `Tiles`, `StatGrid` (compact 3-column stat tiles, null values skipped), `Tags` (colored pills, wrapping), `WinRate` (label, counts, colored bar and percentage), `Space`, `Separator`, colors. Internal helpers for the built-in tabs: `Reserve`, `DrawRect`, `DrawGlow`, `DrawCircle`, `DrawRemoteImage` (image downloaded from a URL through `HttpHelper`, decoded on the main thread, cached by URL), `DrawAccentGradient`, `DrawPill`, `DrawSecondaryButton`, `CloseButton` (× of the panel and of the banners, drawn in the middle of the button), `EmptyState`.
+- **Textures**: generated once with `Texture2D.SetPixel` (white, tinted through `GUI.backgroundColor` and drawn with `GUI.Box` + 9-slice borders): rounded rectangles (4 / 7 / 12 px), circle, × (with mipmaps, as it is drawn far smaller than its 64 px: the "×" glyph of the fonts sits off the middle of its line, so it is not used unless the texture fails), soft halos (large and small), accent and panel gradients (colors baked in). A halo whose 9-slice border is larger than the drawn rectangle turns into a block: `DrawGlow` switches to the small halo for elements under 24 px.
 - **Built-in tabs** (class names end with `MenuTab`: Among Us already has a global `AccountTab` type, which would win name resolution):
 
 | Tab | Class | Content |
@@ -470,7 +473,9 @@ API tabs load through `RemoteData<T>` (internal): cache per account **and API th
 
 - **Friends tab** (`FriendsMenuTab`, second tab, title with the number of pending requests): requests received (Accept / Refuse), friends (in my room, in a lobby + server + **Join**, online, in a game + server, offline + "seen X ago"; Remove, Block), players of the room, on the presence servers only (Add, or their state: friend, request sent, request received, no account), players of the last games not in the room (Add; reloaded each time the tab is shown), blocked players (Unblock), settings (refuse requests, appear offline, connection alert). Names are `Account (in-game name)`. Rows with 3 buttons put them on a line of their own, so the name is never cut.
 - **Chip and notifications**: the chip shows the number of pending requests in a small pill, also during a game. Above it, outside of a game and when the menu is closed, a 6 s notification for a request received or a friend coming online. A connection alert not shown yet is lost when a game starts or while the menu is open, one on screen is lost when a game starts; requests wait, and one interrupted by a game or the menu is shown again for 6 s afterwards.
-- **Planned lobby banner**: on the main menu only, menu closed, above the room of the friend notifications: "Next lobby · Sun 8 Nov 21:00 · 3/15 players" in the time zone of the player, a button opening the page of the lobby (`Application.OpenURL`), × to hide it until the next lobby (§3.15). It counts as menu for the clicks (`IsPointerOverMenu`). Its texts come from the site, not from `ITranslationService`.
+- **Main menu banners**: on the first screen of the main menu only, menu closed ([MainMenuScreen.cs](GLMod/Class/MainMenuScreen.cs): `mainMenuUI` shown and none of the sub-screens of `MainMenuManager` open — play, online, enter code, account, credits, create game, announcements (`screenTint` is no sign, it is also active on the first screen); these stay in the MainMenu scene and have buttons where the banners go; each change of screen is logged `[Menu] Main menu screen: …`). Centered and stacked up from the bottom edge of the screen ([BannerStack.cs](GLMod/Menu/BannerStack.cs), pure, unit-tested): the lowest one is flush with it like the chip (only its top corners rounded), the others above with a small gap; all take the width of the widest one, the button and × aligned on the right. They count as menu for the clicks (`IsPointerOverMenu`). From the bottom:
+  - **Planned lobby**: "Next lobby · Sun 8 Nov 21:00 · 3/15 players" in the time zone of the player, a button opening the page of the lobby (`Application.OpenURL`), × to hide it until the next lobby (§3.15). Its texts come from the site, not from `ITranslationService`.
+  - **Account activation**: when the logged-in account is temporary (`LoginResponse.IsTemporaryAccount`: name starting with `TEMPORARY_ACCOUNT_PREFIX`, created by the site at the first login of a Steam account without Good Loss account), "Your Good Loss account is temporary" and a button opening `/account` of the site of the API (`ApiEndpointResolver.AccountUrl`): a visitor not logged in goes through the Good Loss login, which links the temporary account. × hides it until the game restarts.
 - **Translations**: every text of the menu comes from `ITranslationService` (§3.12) and follows the game language, English otherwise.
 - **Mods built on GLMod**: from their `Load()` (GLMod is loaded first, its built-in tabs already registered) or later, they can hide the menu, remove built-in tabs by id and add / insert their own tabs (§3.10); documented in `docs/dev.MD`. The Last game tab does not poll after a game when the menu is disabled or the tab was removed.
 
@@ -621,7 +626,8 @@ GLMod/                                # Repo root
 │   ├── EnumTests.cs
 │   ├── GameConstantsTests.cs         # + ApiEndpointResolver.
 │   ├── GameHistoryTests.cs           # GameHistoryList.
-│   ├── LoginResponseTests.cs         # LoginResponse (Steam ticket login answer, legacy token).
+│   ├── LoginResponseTests.cs         # LoginResponse (Steam ticket login answer, legacy token, temporary account).
+│   ├── BannerStackTests.cs           # BannerStack (main menu banners).
 │   ├── MenuServiceTests.cs
 │   ├── PlayerApiTests.cs             # PlayerApiResponse (captured preprod responses), StatFormat.
 │   ├── MovementTests.cs              # NavGrid, PositionAccuracy, ScenarioVerifier.VerifyPositions.
@@ -691,6 +697,7 @@ GLMod/                                # Repo root
     │   ├── TranslationTable.cs       # Pure translation lookup with fallbacks.
     │   ├── GameLanguage.cs           # Game language -> language code.
     │   ├── PlayModeHelper.cs         # Free play detection.
+    │   ├── MainMenuScreen.cs         # First screen of the main menu (banners, IL2CPP).
     │   ├── PositionRecorder.cs       # Player positions of the current game (IL2CPP).
     │   ├── PositionSimplifier.cs     # Pure trajectory simplification.
     │   ├── RankedMod.cs              # Among Us Ranked detection (menu theme).
@@ -758,6 +765,7 @@ GLMod/                                # Repo root
     │   ├── LastGameMenuTab.cs
     │   ├── SessionsMenuTab.cs
     │   ├── ShownTabTracker.cs        # Pure: when to notify OnShown (tab or account change).
+    │   ├── BannerStack.cs            # Pure: position of the main menu banners.
     │   └── RemoteData.cs             # Cached API data of a tab.
     ├── Resources/
     │   ├── goodloss-logo.png         # Good Loss logo (EmbeddedResource, menu header).
@@ -941,5 +949,5 @@ For every change to the project:
 
 ---
 
-*Last updated: 2026-11-02 — GLMod version 5.10.0.*
+*Last updated: 2026-11-03 — GLMod version 5.10.0.*
 *Every change to the project must be accompanied by an update of this file.*

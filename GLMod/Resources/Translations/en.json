@@ -74,6 +74,8 @@
   "account.banReason": "Ban reason",
   "account.offlineHint": "GLMod connects with your Steam account on the main menu. Your games are only linked to your Good Loss profile while you are connected.",
   "account.server": "Server",
+  "banner.account.text": "Your Good Loss account is temporary",
+  "banner.account.action": "Activate my account",
   "account.ranks": "Ranks",
   "account.ranks.loading": "Loading your ranks...",
   "account.ranks.error": "Your ranks could not be loaded ({0}).",

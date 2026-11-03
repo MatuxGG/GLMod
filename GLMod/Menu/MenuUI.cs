@@ -97,6 +97,8 @@ namespace GLMod.Menu
         private static GUIStyle _glow;
         private static GUIStyle _smallGlow;
         private static GUIStyle _circle;
+        // × of the close buttons, null when it could not be generated (the glyph of the font is used then)
+        private static GUIStyle _cross;
         // Textures baked with theme colors (gradients, logo), built once per theme
         private sealed class ThemeAssets
         {
@@ -443,6 +445,24 @@ namespace GLMod.Menu
         internal static void DrawCircle(Rect rect, Color color) => DrawBox(rect, _circle, color);
 
         /// <summary>
+        /// Close button: a × drawn in the middle of rect, true when clicked. The × is a texture, as the
+        /// glyph of the fonts does not sit in the middle of its line.
+        /// </summary>
+        internal static bool CloseButton(Rect rect, Color color)
+        {
+            if (_cross == null)
+            {
+                CloseStyle.normal.textColor = color;
+                return GUI.Button(rect, "×", CloseStyle);
+            }
+
+            float size = Mathf.Round(Mathf.Min(rect.width, rect.height) * 0.4f);
+            var cross = new Rect(Mathf.Round(rect.center.x - size / 2f), Mathf.Round(rect.center.y - size / 2f), size, size);
+            DrawBox(cross, _cross, color);
+            return GUI.Button(rect, _empty, InvisibleStyle);
+        }
+
+        /// <summary>
         /// Width / height ratio of the Good Loss logo
         /// </summary>
         internal static float LogoAspect => _assets?.LogoAspect ?? 1f;
@@ -674,6 +694,15 @@ namespace GLMod.Menu
             _fillMedium = SafeStyle(() => FillStyle(RoundedTexture(MediumRadius, White, White, false, 0), MediumRadius));
             _fillLarge = SafeStyle(() => FillStyle(RoundedTexture(LargeRadius, White, White, false, 0), LargeRadius));
             _circle = SafeStyle(() => FillStyle(CircleTexture(64), 0));
+            try
+            {
+                _cross = FillStyle(CrossTexture(64, 7f), 0);
+            }
+            catch (Exception e)
+            {
+                GLMod.log("[Menu] Cross texture generation failed, using the × glyph: " + e.Message);
+                _cross = null;
+            }
             _glow = SafeStyle(() => FillStyle(GlowTexture(LargeRadius, GlowSpread), LargeRadius + GlowSpread));
             _smallGlow = SafeStyle(() => FillStyle(GlowTexture(SmallGlowRadius, SmallGlowSpread), SmallGlowRadius + SmallGlowSpread));
         }
@@ -859,9 +888,9 @@ namespace GLMod.Menu
             return style;
         }
 
-        private static Texture2D NewTexture(int width, int height)
+        private static Texture2D NewTexture(int width, int height, bool mipmaps = false)
         {
-            var texture = new Texture2D(width, height, TextureFormat.ARGB32, false);
+            var texture = new Texture2D(width, height, TextureFormat.ARGB32, mipmaps);
             texture.hideFlags = HideFlags.HideAndDontSave;
             texture.wrapMode = TextureWrapMode.Clamp;
             texture.filterMode = FilterMode.Bilinear;
@@ -907,6 +936,41 @@ namespace GLMod.Menu
             }
             texture.Apply();
             return texture;
+        }
+
+        /// <summary>
+        /// × made of two anti-aliased diagonals with round ends. With mipmaps: it is drawn much smaller
+        /// than its size, and thin lines would break up without them.
+        /// </summary>
+        private static Texture2D CrossTexture(int size, float thickness)
+        {
+            Texture2D texture = NewTexture(size, size, true);
+            float half = thickness / 2f;
+            float low = half + 1f;
+            float high = size - half - 1f;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float px = x + 0.5f;
+                    float py = y + 0.5f;
+                    float distance = Mathf.Min(SegmentDistance(px, py, low, low, high, high), SegmentDistance(px, py, low, high, high, low));
+                    float alpha = Mathf.Clamp01(half - distance + 0.5f);
+                    texture.SetPixel(x, y, new Color { r = 1f, g = 1f, b = 1f, a = alpha });
+                }
+            }
+            texture.Apply();
+            return texture;
+        }
+
+        private static float SegmentDistance(float px, float py, float ax, float ay, float bx, float by)
+        {
+            float dx = bx - ax;
+            float dy = by - ay;
+            float t = Mathf.Clamp01(((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy));
+            float cx = ax + t * dx - px;
+            float cy = ay + t * dy - py;
+            return Mathf.Sqrt(cx * cx + cy * cy);
         }
 
         /// <summary>
