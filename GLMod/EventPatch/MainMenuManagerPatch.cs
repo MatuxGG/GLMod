@@ -15,6 +15,7 @@ namespace GLMod
     public class MainMenuManagerStartPatch
     {
         private static bool _roomTicketLoopStarted;
+        private static bool _plannedLobbyLoopStarted;
 
         private static IEnumerator TestIntegrityService()
         {
@@ -168,6 +169,12 @@ namespace GLMod
                                 {
                                     GLMod.log($"    - Ban Reason: {GLMod.AuthService.BanReason}");
                                 }
+                            }
+
+                            if (!_plannedLobbyLoopStarted)
+                            {
+                                _plannedLobbyLoopStarted = true;
+                                CoroutineRunner.Run(GLMod.PlannedLobbyService.KeepFresh());
                             }
 
                             // Test IntegrityService (does not require authentication)

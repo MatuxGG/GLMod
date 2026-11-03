@@ -297,6 +297,10 @@ namespace GLMod.Constants
         /// </summary>
         public const float FRIENDS_SYNC_SECONDS = 15f;
 
+        // Banner of the next planned lobby, on the main menu
+        public const string API_PATH_LOBBIES_NEXT = "/lobbies/next";
+        public const float LOBBY_REFRESH_SECONDS = 600f;
+
         /// <summary>
         /// Seconds before asking again an API without the friends endpoints.
         /// </summary>

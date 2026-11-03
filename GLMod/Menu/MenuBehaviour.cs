@@ -1,6 +1,8 @@
 using BepInEx.Unity.IL2CPP;
 using GLMod.Class;
 using GLMod.Constants;
+using GLMod.GLEntities;
+using GLMod.Services.Implementations;
 using GLMod.Services.Interfaces;
 using System;
 using System.Collections.Generic;
@@ -47,6 +49,7 @@ namespace GLMod.Menu
         private static readonly ShownTabTracker _shownTab = new ShownTabTracker();
         private static Rect _chipRect;
         private static Rect _panelRect;
+        private static Rect _lobbyBannerRect;
         private static readonly HashSet<string> _loggedErrors = new HashSet<string>();
 
         public MenuBehaviour(IntPtr ptr) : base(ptr)
@@ -66,7 +69,8 @@ namespace GLMod.Menu
                 }
                 Vector3 mouse = Input.mousePosition;
                 var point = new Vector2(mouse.x, Screen.height - mouse.y);
-                return (_slide < 1f && _chipRect.Contains(point))
+                return _lobbyBannerRect.Contains(point)
+                    || (_slide < 1f && _chipRect.Contains(point))
                     || (_slide > 0f && _panelRect.Contains(point));
             }
         }
@@ -157,6 +161,7 @@ namespace GLMod.Menu
             {
                 _chipRect = Rect.zero;
                 _panelRect = Rect.zero;
+                _lobbyBannerRect = Rect.zero;
                 return;
             }
 
@@ -167,6 +172,7 @@ namespace GLMod.Menu
                 MenuUI.ApplyTheme(MenuTheme.ForMod(GLMod.ConfigService?.ModName));
                 DrawChip(menu);
                 DrawFriendNotification();
+                DrawLobbyBanner();
                 if (_slide > 0f)
                 {
                     DrawPanel(menu);
@@ -331,6 +337,51 @@ namespace GLMod.Menu
             MenuUI.DrawGlow(rect, MenuUI.WithAlpha(MenuUI.Accent, 0.3f));
             MenuUI.DrawOutline(rect, MenuUI.WithAlpha(MenuUI.Accent, 0.6f), MenuUI.PanelBottom, MenuUI.Corner.Small);
             MenuUI.DrawText(new Rect(rect.x + MenuUI.U(14f), rect.y, width - MenuUI.U(14f), height), text, MenuUI.RowStyle, MenuUI.Text);
+        }
+
+        /// <summary>
+        /// Next planned lobby, on the main menu with the menu closed, above the chip and the friend notifications:
+        /// a button opens its page, × hides it until the next lobby.
+        /// </summary>
+        private static void DrawLobbyBanner()
+        {
+            IPlannedLobbyService lobbies = GLMod.PlannedLobbyService;
+            if (lobbies == null || _slide > 0f || !lobbies.HasBanner || !PlannedLobbyService.IsAtMainMenu())
+            {
+                _lobbyBannerRect = Rect.zero;
+                return;
+            }
+
+            GLNextLobby next = lobbies.Next;
+            string text = PlannedLobbyLogic.Text(next, TimeZoneInfo.Local, PlannedLobbyLogic.CultureOf(GameLanguage.CurrentCode()));
+            float pad = MenuUI.U(14f);
+            float height = MenuUI.U(40f);
+            float actionWidth = MenuUI.SmallButtonStyle.CalcSize(new GUIContent(next.texts.action)).x + MenuUI.U(24f);
+            float closeWidth = MenuUI.U(24f);
+            float textWidth = MenuUI.RowStyle.CalcSize(new GUIContent(text)).x;
+            float width = pad + textWidth + pad + actionWidth + MenuUI.U(6f) + closeWidth + MenuUI.U(8f);
+            // Above the room for a friend notification, so that the two never overlap
+            float y = Screen.height - MenuUI.U(ChipHeight) - MenuUI.U(8f) - MenuUI.U(34f) - MenuUI.U(8f) - height;
+            var rect = new Rect(MenuUI.U(ChipLeft), y, width, height);
+            _lobbyBannerRect = rect;
+
+            GUI.color = new Color { r = 1f, g = 1f, b = 1f, a = 1f };
+            MenuUI.DrawGlow(rect, MenuUI.WithAlpha(MenuUI.Accent, 0.3f));
+            MenuUI.DrawOutline(rect, MenuUI.WithAlpha(MenuUI.Accent, 0.6f), MenuUI.PanelBottom, MenuUI.Corner.Small);
+            MenuUI.DrawText(new Rect(rect.x + pad, rect.y, textWidth + MenuUI.U(4f), height), text, MenuUI.RowStyle, MenuUI.Text);
+
+            float buttonHeight = MenuUI.U(26f);
+            float buttonY = rect.y + (height - buttonHeight) / 2f;
+            var action = new Rect(rect.x + pad + textWidth + pad, buttonY, actionWidth, buttonHeight);
+            if (MenuUI.DrawSecondaryButton(action, next.texts.action))
+            {
+                Application.OpenURL(next.lobby.url);
+            }
+            var close = new Rect(action.xMax + MenuUI.U(6f), buttonY, closeWidth, buttonHeight);
+            if (GUI.Button(close, "×", MenuUI.CloseStyle))
+            {
+                lobbies.Dismiss();
+            }
         }
 
         // ------------------------------------------------------------------ panel

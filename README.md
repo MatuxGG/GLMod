@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://github.com/MatuxGG/GLMod">
-    <img src="https://img.shields.io/badge/GLMod-v5.9.1-blue" alt="GLMod Version">
+    <img src="https://img.shields.io/badge/GLMod-v5.10.0-blue" alt="GLMod Version">
   </a>
   <a href="https://goodloss.fr/discord">
     <img src="https://img.shields.io/badge/Good%20Loss%20Discord%20Server-Join-7289DA?logo=discord&logoColor=white" alt="Good Loss Discord Server">
@@ -41,6 +41,7 @@ At rest, GLMod only shows a small "GOOD LOSS" tab at the bottom edge of the scre
 - **Last game**: your last finished game on Good Loss (victory or defeat, map, role) with a button to open its recap, and every stat Good Loss computed for you in it (kills, tasks, votes, reports, survival...). After a game, it updates by itself once Good Loss has processed the game.
 - **Sessions**: your last 10 sessions (date, number of games, duration, live session) with a link to each session page.
 - Mods built on GLMod can hide the menu, remove its tabs or add their own (see [docs/dev.MD](docs/dev.MD)).
+- On the main menu, a banner shows the next planned lobby of [Good Loss](https://goodloss.fr/lobbies) in your language; a button opens its page to take a place, and × hides it until the next one. It asks the site for the language and the mod only, without your account.
 - The menu follows the language selected in the game (English and French for now; English when the language is not translated).
 
 ### Data Collection
