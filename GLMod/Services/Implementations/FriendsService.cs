@@ -34,6 +34,7 @@ namespace GLMod.Services.Implementations
         public string Error { get; private set; }
         public IReadOnlyList<GLRecentPlayer> RecentPlayers { get; private set; }
         public FriendNotificationQueue Notifications { get; } = new FriendNotificationQueue();
+        public bool PresenceEnabled { get; set; } = true;
 
         public FriendsService(ManualLogSource logger, IAuthenticationService authService, IMenuService menuService, string apiEndpoint)
         {
@@ -93,7 +94,11 @@ namespace GLMod.Services.Implementations
 
             IsAvailable = true;
             Error = null;
-            Notify(State, state);
+            // Without the Friends tab, nothing could answer a notification: the presence goes on without them
+            if (_menuService.IsVisible && _menuService.FindTab(GameConstants.MENU_TAB_FRIENDS) != null)
+            {
+                Notify(State, state);
+            }
             State = state;
         }
 
@@ -138,8 +143,8 @@ namespace GLMod.Services.Implementations
                     next = 0f;
                     continue;
                 }
-                // A mod that hides the menu or removes the tab has no friends list: nothing is declared
-                if (Time.realtimeSinceStartup < next || !_menuService.IsVisible || _menuService.FindTab(GameConstants.MENU_TAB_FRIENDS) == null)
+                // The presence does not depend on the menu: a mod hiding it or removing the tab still shows its players online
+                if (Time.realtimeSinceStartup < next || !PresenceEnabled)
                 {
                     continue;
                 }

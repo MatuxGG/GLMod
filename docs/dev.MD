@@ -135,6 +135,7 @@ Every tab has a unique, stable **id**. Built-in tabs, in this order:
 | Tab | Id (`GLMod.Constants.GameConstants`) |
 |-----|--------------------------------------|
 | Account | `MENU_TAB_ACCOUNT` = `"glmod.account"` |
+| Friends | `MENU_TAB_FRIENDS` = `"glmod.friends"` |
 | Stats | `MENU_TAB_STATS` = `"glmod.stats"` |
 | Last game | `MENU_TAB_LAST_GAME` = `"glmod.lastgame"` |
 | Sessions | `MENU_TAB_SESSIONS` = `"glmod.sessions"` |
@@ -240,7 +241,11 @@ GLFriendsState state = GLMod.FriendsService.State; // null before the first sync
 int waiting = GLMod.FriendsService.PendingRequestCount;
 ```
 
-If your mod hides the menu (`MenuService.Enabled = false`) or removes this tab, GLMod declares nothing to Good Loss: no presence, no friends list.
+The presence does not depend on the menu: if your mod hides the menu (`MenuService.Enabled = false`) or removes this tab, GLMod keeps declaring the presence of the player, so their friends still see them online; only the friend notifications are no longer shown. To stop the presence too:
+
+```csharp
+GLMod.FriendsService.PresenceEnabled = false; // no presence declared, the friends list is no longer read
+```
 
 ## Service Architecture
 
@@ -443,7 +448,7 @@ GLMod does collect the following data:
 
 ### <ins>Presence data</ins>
 
-Sent about every 15 seconds when the player is logged in, for the friends list. Nothing is sent if your mod hides the menu or removes the Friends tab.
+Sent about every 15 seconds when the player is logged in, for the friends list, even if your mod hides the menu or removes the Friends tab. Nothing is sent if your mod sets `GLMod.FriendsService.PresenceEnabled = false`.
 
 - State : menu / lobby / game
 - Server and its region

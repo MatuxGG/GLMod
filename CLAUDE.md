@@ -42,7 +42,7 @@ Any code review MUST reject contributions that introduce non-English identifiers
 
 ### 1.1 Identity
 - **Name**: GLMod (Good Loss Mod)
-- **Current version**: `5.10.0` (see [GLMod/GLMod.csproj](GLMod/GLMod.csproj) and [GLMod/GLMod.cs](GLMod/GLMod.cs))
+- **Current version**: `5.11.0` (see [GLMod/GLMod.csproj](GLMod/GLMod.csproj) and [GLMod/GLMod.cs](GLMod/GLMod.cs))
 - **BepInEx plugin Id**: `glmod`
 - **Author**: Matux
 - **License**: GNU GPLv3
@@ -246,11 +246,11 @@ Every service is exposed statically via the main `GLMod` class and has a dedicat
 - **Role**: friends list of the Good Loss account, in the F2 menu (§8.1). One list per account, stored on the site (`/account` manages it too); the TCG will read it later.
 - **Identity in a room**: the game only knows declared names. Each GLMod declares `POST {API}/friends/sync` with its Bearer game token (state `menu` / `lobby` / `game`, region, server, mod, `gameCode`, `clientId`, `playerName`, [GamePresence.cs](GLMod/Class/GamePresence.cs)); the site answers the accounts of the room, matched by the tab with `PlayerControl.OwnerId`. A player can only declare themselves, unlike with an RPC. A player without GLMod shows as "no account".
 - **Game codes** only leave for `GOOD_LOSS_PRESENCE_SERVERS` (also enforced by the site): elsewhere there is no room list (the tab hides its room section, `GoodLossServers.IsInRoomWithList`) and no Join, friends only see the status and the name of the server.
-- **Sync**: `KeepInSync()` every `FRIENDS_SYNC_SECONDS` (started by the first login on the main menu), so requests and statuses take 10 to 15 s to arrive: the site has no WebSocket. Nothing is declared while the menu is hidden by a mod or the tab removed. An API without the endpoints answers 404: asked again every `FRIENDS_UNAVAILABLE_RETRY_SECONDS`.
-- **Rules** (on the site, `FriendService`): a request needs the same room or a game in common among the last 20; acceptance required; silent refusal, 24 h before a new request; blocked and "refuse every request" both answer `unavailable`; requests expire after 30 days; 100 friends max.
+- **Sync**: `KeepInSync()` every `FRIENDS_SYNC_SECONDS` (started by the first login on the main menu), so requests and statuses take 10 to 15 s to arrive: the site has no WebSocket. The presence does not depend on the menu (since 5.11.0): a mod hiding it or removing the tab still declares it (the TCG hides the tab, its players must stay online for their friends); only the notifications need the Friends tab. `PresenceEnabled = false` is the only way for a mod to stop the syncs. An API without the endpoints answers 404: asked again every `FRIENDS_UNAVAILABLE_RETRY_SECONDS`.
+- **Rules** (on the site, `FriendService`): a request can go to any account (since 2026-11-03; the tab still only offers the room and the last 20 games); acceptance required; silent refusal, 24 h before a new request; blocked and "refuse every request" both answer `unavailable`; requests expire after 30 days; 100 friends max.
 - **Join**: `Join(friend)` needs `friend.canJoin` (friend in a lobby, same server and mod, the site gives the code only then; it is never displayed). A free play game in progress refuses the join, but not the main menu after one, where the network mode is still free play (`FriendsLogic.FreePlayBlocksJoin`). In a game, a friend on another region fails without leaving it (`FriendsLogic.MustStayInGame`). Otherwise leaves the current game like the Leave button, goes back to the main menu from any other screen, waits for the main menu, checks the region again (a mod may set it there), joins.
 - **During a game**: only the count on the chip of the menu changes. Request notifications wait for the lobby ([FriendNotificationQueue.cs](GLMod/Class/FriendNotificationQueue.cs)) and each sync forgets those no longer pending (answered, expired), connection alerts are dropped.
-- **Members**: `State`, `PendingRequestCount`, `IsAvailable`, `Error`, `RecentPlayers`, `Notifications`, `Sync()`, `KeepInSync()`, `ReloadRecentPlayers()`, `SendRequest`, `Answer`, `Remove`, `SetBlocked`, `UpdateSettings`, `Join`. Errors of the actions are API codes, shown through `friends.error.<code>`; a code without text (network failure, `HTTP 502`, unknown API message) shows `friends.error.network`. `Error` is why the last sync failed: without a list yet, the tab shows "Unavailable" with `friends.error` until a sync succeeds; a list already received stays on screen.
+- **Members**: `State`, `PendingRequestCount`, `IsAvailable`, `Error`, `RecentPlayers`, `Notifications`, `PresenceEnabled`, `Sync()`, `KeepInSync()`, `ReloadRecentPlayers()`, `SendRequest`, `Answer`, `Remove`, `SetBlocked`, `UpdateSettings`, `Join`. Errors of the actions are API codes, shown through `friends.error.<code>`; a code without text (network failure, `HTTP 502`, unknown API message) shows `friends.error.network`. `Error` is why the last sync failed: without a list yet, the tab shows "Unavailable" with `friends.error` until a sync succeeds; a list already received stays on screen.
 
 ### 3.15 `IPlannedLobbyService` — [Interfaces/IPlannedLobbyService.cs](GLMod/Services/Interfaces/IPlannedLobbyService.cs)
 - **Role**: the next planned lobby of the site (`goodloss.fr/lobbies`), for the banner of the main menu (§8.1). New players have nobody to play with: this shows them when and where.
@@ -949,5 +949,5 @@ For every change to the project:
 
 ---
 
-*Last updated: 2026-11-03 — GLMod version 5.10.0.*
+*Last updated: 2026-11-03 — GLMod version 5.11.0.*
 *Every change to the project must be accompanied by an update of this file.*
