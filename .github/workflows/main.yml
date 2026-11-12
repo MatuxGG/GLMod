@@ -9,7 +9,41 @@ on:
       - main
 
 jobs:
+  # Détection de secrets avant le build (Homelab#17) : commits poussés et
+  # arbre courant, valeurs masquées. Même outil et même version que le
+  # modèle GitLab good-loss/infra/ci-templates (secret-scan.yml).
+  secret-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 50
+
+      - name: gitleaks
+        env:
+          BEFORE: ${{ github.event.before || github.event.pull_request.base.sha }}
+        run: |
+          set -u
+          ZERO=0000000000000000000000000000000000000000
+          if [ -n "${BEFORE:-}" ] && [ "$BEFORE" != "$ZERO" ] && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            RANGE="${BEFORE}..${GITHUB_SHA}"
+          else
+            RANGE="-1 ${GITHUB_SHA}"
+          fi
+          CFG=""
+          [ -f .gitleaks.toml ] && CFG="--config .gitleaks.toml"
+          docker run --rm -v "$PWD":/repo -w /repo -e RANGE="$RANGE" -e CFG="$CFG" \
+            --entrypoint sh zricethezav/gitleaks:v8.30.1 -c '
+              git config --global --add safe.directory /repo
+              rc=0
+              gitleaks git . $CFG --redact --no-banner --exit-code 1 --log-opts="$RANGE" || rc=1
+              gitleaks dir . $CFG --redact --no-banner --exit-code 1 || rc=1
+              exit $rc'
+
   build:
+    needs: secret-scan
     runs-on: ubuntu-latest
 
     steps:
