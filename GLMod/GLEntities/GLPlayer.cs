@@ -75,6 +75,19 @@ namespace GLMod.GLEntities
             this.tasksMax = tasksMax.ToString();
         }
 
+        /// <summary>
+        /// Keeps the highest task count seen for the player: a later read of 0 (player gone,
+        /// tasks cleared at the end of the game) never erases a count read earlier.
+        /// </summary>
+        public void RecordTasksMax(int tasksMax)
+        {
+            int current;
+            if (!int.TryParse(this.tasksMax, out current) || tasksMax > current)
+            {
+                this.tasksMax = tasksMax.ToString();
+            }
+        }
+
         public void SetWin()
         {
             this.win = "1";

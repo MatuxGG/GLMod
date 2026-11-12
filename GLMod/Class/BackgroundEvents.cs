@@ -67,6 +67,9 @@ namespace GLMod.Class
                 yield return new WaitForSeconds(GameConstants.BACKGROUND_POLLING_INTERVAL);
                 if (!IsRunning(runGeneration)) break;
 
+                // Before a player can leave: the count is gone with them
+                TasksMaxRecorder.Record(GLMod.GameStateManager.CurrentGame);
+
                 // Check if not in meeting
                 int turn = int.Parse(GLMod.GameStateManager.CurrentGame.turns);
                 if (turn > 1000) continue;
