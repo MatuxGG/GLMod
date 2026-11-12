@@ -66,6 +66,28 @@ namespace GLMod.Tests
         }
 
         [Fact]
+        public void RecordTasksMax_KeepsTheHighestCount()
+        {
+            var player = new GLPlayer();
+
+            player.RecordTasksMax(8);
+            player.RecordTasksMax(0);
+            player.RecordTasksMax(5);
+
+            Assert.Equal("8", player.tasksMax);
+        }
+
+        [Fact]
+        public void RecordTasksMax_ReplacesAnUnreadableValue()
+        {
+            var player = new GLPlayer { tasksMax = "" };
+
+            player.RecordTasksMax(0);
+
+            Assert.Equal("0", player.tasksMax);
+        }
+
+        [Fact]
         public void SetWin_MarksPlayerAsWinner()
         {
             var player = new GLPlayer();
@@ -104,6 +126,34 @@ namespace GLMod.Tests
     {
         private static GLGame NewGame(bool ranked = false)
             => new GLGame("ABCDEF", "Polus", ranked, "Vanilla");
+
+        [Fact]
+        public void RecordTasksMax_SetsThePlayersWithThatName()
+        {
+            var game = NewGame();
+            game.AddPlayer(null, "Alice", "VanillaCrewmate", "Crewmate", "0");
+            game.AddPlayer(null, "Bob", "VanillaCrewmate", "Crewmate", "1");
+
+            game.RecordTasksMax("Alice", 8);
+            game.RecordTasksMax("Unknown", 5);
+            game.RecordTasksMax(null, 5);
+
+            Assert.Equal("8", game.players[0].tasksMax);
+            Assert.Equal("0", game.players[1].tasksMax);
+        }
+
+        [Fact]
+        public void RecordTasksMax_KeepsTheCountOfAPlayerWhoLeft()
+        {
+            // Read during the game, then nothing more at the end: the player is gone
+            var game = NewGame();
+            game.AddPlayer(null, "Alice", "VanillaCrewmate", "Crewmate", "0");
+
+            game.RecordTasksMax("Alice", 8);
+            game.RecordTasksMax("Alice", 0);
+
+            Assert.Equal("8", game.players[0].tasksMax);
+        }
 
         [Fact]
         public void Constructor_RankedFalse_StoresZero()

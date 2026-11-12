@@ -49,6 +49,15 @@ namespace GLMod.GLEntities
             this.players.Add(new GLPlayer(login, playerName, role, team, color));
         }
 
+        /// <summary>
+        /// Records the task count of every player with this name (players are keyed by name).
+        /// </summary>
+        public void RecordTasksMax(string playerName, int tasksMax)
+        {
+            if (string.IsNullOrEmpty(playerName) || this.players == null) return;
+            this.players.FindAll(p => p.playerName == playerName).ForEach(p => p.RecordTasksMax(tasksMax));
+        }
+
         public void SetId(int id)
         {
             this.id = id.ToString();

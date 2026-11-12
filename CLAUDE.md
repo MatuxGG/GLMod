@@ -42,7 +42,7 @@ Any code review MUST reject contributions that introduce non-English identifiers
 
 ### 1.1 Identity
 - **Name**: GLMod (Good Loss Mod)
-- **Current version**: `5.11.0` (see [GLMod/GLMod.csproj](GLMod/GLMod.csproj) and [GLMod/GLMod.cs](GLMod/GLMod.cs))
+- **Current version**: `5.11.1` (see [GLMod/GLMod.csproj](GLMod/GLMod.csproj) and [GLMod/GLMod.cs](GLMod/GLMod.cs))
 - **BepInEx plugin Id**: `glmod`
 - **Author**: Matux
 - **License**: GNU GPLv3
@@ -324,7 +324,7 @@ Reactor, Coms, Lights, O2
 | `SUPPORT_ID_CHARS`            | `A-Za-z1-9` (no `0`)                         |
 | `SUPPORT_ID_LENGTH`           | `10`                                         |
 | `RPC_SYNC_TIMEOUT`            | `5.0f` seconds                               |
-| `BACKGROUND_POLLING_INTERVAL` | `0.5f` seconds (DCs, sabotages)              |
+| `BACKGROUND_POLLING_INTERVAL` | `0.5f` seconds (DCs, sabotages, tasks max)   |
 | `POSITION_SAMPLING_INTERVAL`  | `0.1f` seconds — player positions are sampled at this rate (§14.2) |
 | `POSITION_SIMPLIFY_TOLERANCE` | `0.1f` map units — a sample is dropped when the recap would still draw the player within this distance of it |
 | `POSITION_MAX_GAP_MS`         | `5000` — at least one sent position per player in this time, even standing still |
@@ -433,7 +433,8 @@ Patches are applied automatically via `Harmony.PatchAll()` at the end of `Load()
 | `CoroutineHelpers.cs`  | `RunAsync` / `RunAsync<T>` — async-task ↔ coroutine bridge. Use these instead of re-implementing the `Task.Run` + volatile `done` flag pattern. |
 | `CoroutineRunner.cs`   | `MonoBehaviour` IL2CPP singleton used to run coroutines from static classes.               |
 | `ServiceLogger.cs`     | `Log(logger, serviceName, message)` — shared log formatter producing `[GLMod][Service] PlayerName: message`. Every service must delegate to it. |
-| `BackgroundEvents.cs`  | Background loops of a game: DCs and hidden sabotages every 0.5 s, player positions every 0.1 s (through `PositionRecorder`). Each start increments a generation, so loops of a previous game stop. `endBackgroundProcess` flushes the pending positions. |
+| `BackgroundEvents.cs`  | Background loops of a game: DCs, hidden sabotages and tasks max (through `TasksMaxRecorder`) every 0.5 s, player positions every 0.1 s (through `PositionRecorder`). Each start increments a generation, so loops of a previous game stop. `endBackgroundProcess` flushes the pending positions. |
+| `TasksMaxRecorder.cs`  | `Record(game)` (TasksMax service): task count of every player (`Data.Tasks.Count`), read every 0.5 s during the game, again in `GameStateManager.EndGame` right before `/game/end` and in the `AmongUsClient.OnGameEnd` postfix. Values only go up (`GLPlayer.RecordTasksMax`). Before 5.11.1 it was only read in `OnGameEnd`: players who left before the end got 0, and so did every player of Among Us Ranked Roles, which sends the game itself from `LogicGameFlowNormal.CheckEndCriteria`, before `OnGameEnd`. Main thread only. |
 | `PositionRecorder.cs`  | Records positions through one `PositionSimplifier` per player. `AddKeyPosition` (kill, report / emergency, meeting start) always records the position, after the player's pending samples; meetings and the end of the game flush the pending samples. Main thread only. |
 | `PositionSimplifier.cs` | Pure, unit-tested: online trajectory simplification (opening window). A sample is dropped when the linear interpolation **in time** between the sent positions (how the site draws a player) stays within `POSITION_SIMPLIFY_TOLERANCE` of every dropped sample; at most `POSITION_MAX_GAP_MS` between two sent positions. Turns, stops and teleports keep their samples. |
 | `GoodLossServers.cs`   | `IsGoodLossServer(pingServer)` (pure) and `IsCurrentRegion()`: the Good Loss servers. `ReceivesRoomTicket(onlineGame, pingServer)` (pure) and `IsCurrentConnectionEligible()`: the connections that carry the room ticket. `IsPresenceServer` and `HasRoomList` (pure), `IsInRoomWithList()`: the games that have a room list. |
@@ -702,6 +703,7 @@ GLMod/                                # Repo root
     │   ├── PositionSimplifier.cs     # Pure trajectory simplification.
     │   ├── RankedMod.cs              # Among Us Ranked detection (menu theme).
     │   ├── ServiceLogger.cs          # Shared [GLMod][Service] log formatter.
+    │   ├── TasksMaxRecorder.cs       # Task count of each player during the game (IL2CPP).
     │   └── VanillaEvents.cs
     ├── Constants/
     │   └── GameConstants.cs          # Global constants (API, timeouts, defaults).
@@ -876,7 +878,7 @@ A third-party mod consumes GLMod by:
 - **Free play games are never collected nor sent** (§3.3).
 
 ### 14.2 Player data
-- Name (PseudoInGame), Good Loss account (if connected), Role, Team (`Crewmate` / `Impostor` / `Neutral` / other), Tasks alive, Tasks dead, Tasks max, Win (0/1), Color, Positions.
+- Name (PseudoInGame), Good Loss account (if connected), Role, Team (`Crewmate` / `Impostor` / `Neutral` / other), Tasks alive, Tasks dead, Tasks max (highest task count seen during the game, `TasksMaxRecorder`), Win (0/1), Color, Positions.
 - **Positions** (`x`, `y` rounded to 0.01, `triggerTime` from `ServerClock`, `turn`): alive players are sampled every `POSITION_SAMPLING_INTERVAL` (0.1 s; 0.5 s before 5.7.1) outside meetings, and only the samples needed to redraw the path within `POSITION_SIMPLIFY_TOLERANCE` are sent (`PositionSimplifier`), plus one at least every `POSITION_MAX_GAP_MS`. Positions at a kill (killer and victim), a report / emergency (caller) and the start of a meeting (alive players) are always sent. The site interpolates linearly in time between two positions: that is the contract the simplification relies on.
 
 ### 14.2b Friends
@@ -949,5 +951,5 @@ For every change to the project:
 
 ---
 
-*Last updated: 2026-11-03 — GLMod version 5.11.0.*
+*Last updated: 2026-11-12 — GLMod version 5.11.1.*
 *Every change to the project must be accompanied by an update of this file.*

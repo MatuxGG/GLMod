@@ -590,6 +590,9 @@ namespace GLMod.Services.Implementations
 
             BackgroundEvents.endBackgroundProcess();
 
+            // Mods may end the game before AmongUsClient.OnGameEnd (Among Us Ranked does)
+            TasksMaxRecorder.Record(CurrentGame);
+
             yield return PostEndGame(_apiEndpoint + "/game/end", CurrentGame, Log, step => Step = step, () => CurrentGame);
         }
 

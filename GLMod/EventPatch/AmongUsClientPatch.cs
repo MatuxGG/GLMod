@@ -14,13 +14,7 @@ namespace GLMod
         {
             try
             {
-                if (GLMod.existService("TasksMax") || GLMod.debug)
-                {
-                    foreach (PlayerControl player in PlayerControl.AllPlayerControls)
-                    {
-                        GLMod.GameStateManager.CurrentGame.players.FindAll(p => p.playerName == player.Data.PlayerName).ForEach(p => p.SetTasksMax(player.Data.Tasks.Count));
-                    }
-                }
+                TasksMaxRecorder.Record(GLMod.GameStateManager?.CurrentGame);
 
                 GameOverReason gameOverReason = endGameResult.GameOverReason;
 
